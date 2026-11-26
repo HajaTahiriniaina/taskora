@@ -28,7 +28,8 @@ USER 10001:10001
 # 8080 : API (routée par nginx) ; 8091 : management (/actuator/health, jamais publié).
 EXPOSE 8080 8091
 # Clés JWT montées en lecture seule (volume jwt_keys) ; aucun secret dans l'image.
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError" \
+# B1 : --enable-native-access pour le moteur bcrypt natif (crypt_rn de libcrypt.so.1 via FFM).
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError --enable-native-access=ALL-UNNAMED" \
     JWT_PRIVATE_KEY_PATH=/run/taskora/jwt/private.pem \
     JWT_PUBLIC_KEY_PATH=/run/taskora/jwt/public.pem
 # Sans curl dans l'image JRE : requête HTTP minimale par /dev/tcp (bash).
