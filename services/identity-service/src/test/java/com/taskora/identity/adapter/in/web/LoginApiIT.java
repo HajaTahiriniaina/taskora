@@ -32,7 +32,8 @@ class LoginApiIT extends ApiTestBase {
     assertThat(r.getResponse().getStatus()).as(body(r)).isEqualTo(200);
     OpenApiValidation.assertResponseConforms(r);
     JsonNode b = json(r);
-    assertThat(new java.util.ArrayList<>(b.propertyNames())).containsExactlyInAnyOrder("token", "user");
+    assertThat(new java.util.ArrayList<>(b.propertyNames()))
+        .containsExactlyInAnyOrder("token", "user");
     assertUserJson(b.get("user"), "Camille", "camille@exemple.fr", null);
     String token = b.get("token").asString();
     JsonNode claims = JSON.readTree(TokenFactory.decodePart(token, 1));
@@ -43,7 +44,13 @@ class LoginApiIT extends ApiTestBase {
   }
 
   @ParameterizedTest(name = "« {0} » → 200")
-  @ValueSource(strings = {"Camille@Exemple.fr", "CAMILLE@EXEMPLE.FR", "camille@exemple.fr ", "camille@exemple.fr   "})
+  @ValueSource(
+      strings = {
+        "Camille@Exemple.fr",
+        "CAMILLE@EXEMPLE.FR",
+        "camille@exemple.fr ",
+        "camille@exemple.fr   "
+      })
   @DisplayName("SC-IDENT-007 — collation utf8mb4_unicode_ci : casse et espaces finaux ignorés")
   void collationCaseAndTrailingSpaces(String email) throws Exception {
     camille();
@@ -69,7 +76,8 @@ class LoginApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-008 — mauvais mot de passe et e-mail inconnu : même 401, mêmes corps et en-têtes")
+  @DisplayName(
+      "SC-IDENT-008 — mauvais mot de passe et e-mail inconnu : même 401, mêmes corps et en-têtes")
   void sameBodyForUnknownAndWrong() throws Exception {
     camille();
     MvcResult wrong = login("camille@exemple.fr", "mauvaismdp");
@@ -124,7 +132,8 @@ class LoginApiIT extends ApiTestBase {
           password absent                    | {"email":"camille@exemple.fr"}              | Le champ "password" est obligatoire.
           password vide                      | {"email":"camille@exemple.fr","password":""} | Le champ "password" est obligatoire.
           """)
-  @DisplayName("SC-IDENT-009/032 E19 — 400 en français, message exact ; ordre forme → types → présences")
+  @DisplayName(
+      "SC-IDENT-009/032 E19 — 400 en français, message exact ; ordre forme → types → présences")
   void frenchValidation(String label, String body, String message) throws Exception {
     assertError(postJson("/api/auth/login", body), 400, message);
   }
@@ -137,13 +146,16 @@ class LoginApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-032 E19 — Content-Type absent : la requête est traitée normalement (plus de 404)")
+  @DisplayName(
+      "SC-IDENT-032 E19 — Content-Type absent : la requête est traitée normalement (plus de 404)")
   void noContentType() throws Exception {
     camille();
     MvcResult r =
         mvc.perform(
                 post("/api/auth/login")
-                    .content("{\"email\":\"camille@exemple.fr\",\"password\":\"motdepasse\"}".getBytes(StandardCharsets.UTF_8)))
+                    .content(
+                        "{\"email\":\"camille@exemple.fr\",\"password\":\"motdepasse\"}"
+                            .getBytes(StandardCharsets.UTF_8)))
             .andReturn();
     assertThat(r.getResponse().getStatus()).as(body(r)).isEqualTo(200);
   }
@@ -156,7 +168,9 @@ class LoginApiIT extends ApiTestBase {
         mvc.perform(
                 post("/api/auth/login")
                     .contentType("text/plain")
-                    .content("{\"email\":\"camille@exemple.fr\",\"password\":\"mauvais\"}".getBytes(StandardCharsets.UTF_8)))
+                    .content(
+                        "{\"email\":\"camille@exemple.fr\",\"password\":\"mauvais\"}"
+                            .getBytes(StandardCharsets.UTF_8)))
             .andReturn();
     assertAuthError(r, BAD);
   }
@@ -167,7 +181,11 @@ class LoginApiIT extends ApiTestBase {
     for (String b : new String[] {"{}", "{\"email\":1}", "{\"email\":\"a@b.c\"}"}) {
       MvcResult r = postJson("/api/auth/login", b);
       assertThat(r.getResponse().getStatus()).as(b).isEqualTo(400);
-      assertThat(body(r)).doesNotContain("must be").doesNotContain("Invalid JSON").contains("Le champ").containsAnyOf("obligatoire", "chaîne");
+      assertThat(body(r))
+          .doesNotContain("must be")
+          .doesNotContain("Invalid JSON")
+          .contains("Le champ")
+          .containsAnyOf("obligatoire", "chaîne");
     }
   }
 
@@ -183,7 +201,8 @@ class LoginApiIT extends ApiTestBase {
   @DisplayName("SC-IDENT-017 — après changement de mot de passe : ancien → 401, nouveau → 200")
   void afterPasswordChange() throws Exception {
     String token = registeredToken("Camille", "camille@exemple.fr", "ancienmdp1");
-    MvcResult p = patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"nouveaumdp1\"}");
+    MvcResult p =
+        patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"nouveaumdp1\"}");
     assertThat(p.getResponse().getStatus()).as(body(p)).isEqualTo(200);
     assertAuthError(login("camille@exemple.fr", "ancienmdp1"), BAD);
     assertThat(login("camille@exemple.fr", "nouveaumdp1").getResponse().getStatus()).isEqualTo(200);

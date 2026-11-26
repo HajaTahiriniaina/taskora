@@ -61,7 +61,8 @@ class LegacyImportServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-023 — verify : une métrique diffère → consistent=false, contrôle nommé, sans donnée personnelle")
+  @DisplayName(
+      "SC-IDENT-023 — verify : une métrique diffère → consistent=false, contrôle nommé, sans donnée personnelle")
   void verifyInconsistent() {
     when(source.sourceMetrics()).thenReturn(Map.of("count", "9", "crc", "123"));
     when(source.targetMetrics()).thenReturn(Map.of("count", "8", "crc", "123"));

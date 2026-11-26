@@ -40,12 +40,15 @@ class OutboxDeliveryServiceTest {
   void setUp() {
     outbox = mock(OutboxPort.class);
     client = mock(InvitationClaimPort.class);
-    service = new OutboxDeliveryService(outbox, client, new FakeUnitOfWork(), Clock.fixed(NOW, ZoneOffset.UTC));
+    service =
+        new OutboxDeliveryService(
+            outbox, client, new FakeUnitOfWork(), Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   private static PendingClaim pending(int attempts) {
     return new PendingClaim(
-        new InvitationClaim(UUID.randomUUID(), new UserId(4), new Email("camille@exemple.fr")), attempts);
+        new InvitationClaim(UUID.randomUUID(), new UserId(4), new Email("camille@exemple.fr")),
+        attempts);
   }
 
   @Test
@@ -61,14 +64,19 @@ class OutboxDeliveryServiceTest {
 
   @ParameterizedTest(name = "tentatives {0} → nouvelle tentative dans {1} s")
   @CsvSource({"0,5", "1,10", "2,20", "3,40", "4,80", "5,160", "6,300", "7,300", "30,300"})
-  @DisplayName("SC-IDENT-005 — RETRYABLE_FAILURE → markRetry, backoff 5 s, 10 s, 20 s… plafonné à 5 min, sans limite")
+  @DisplayName(
+      "SC-IDENT-005 — RETRYABLE_FAILURE → markRetry, backoff 5 s, 10 s, 20 s… plafonné à 5 min, sans limite")
   void retryBackoff(int previousAttempts, long delaySeconds) {
     PendingClaim p = pending(previousAttempts);
     when(outbox.lockDueClaims(NOW, 20)).thenReturn(List.of(p));
     when(client.claim(p.claim())).thenReturn(ClaimOutcome.RETRYABLE_FAILURE);
     service.deliverDue(20);
     verify(outbox)
-        .markRetry(eq(p.claim().eventId()), eq(previousAttempts + 1), eq(NOW.plusSeconds(delaySeconds)), anyString());
+        .markRetry(
+            eq(p.claim().eventId()),
+            eq(previousAttempts + 1),
+            eq(NOW.plusSeconds(delaySeconds)),
+            anyString());
     verify(outbox, never()).markFailed(any(), any());
     verify(outbox, never()).markDelivered(any(), any());
   }
@@ -127,7 +135,8 @@ class OutboxDeliveryServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — deliverNow : message déjà pris par le relais (non verrouillable) → false, aucun appel")
+  @DisplayName(
+      "SC-IDENT-005 — deliverNow : message déjà pris par le relais (non verrouillable) → false, aucun appel")
   void deliverNowAlreadyTaken() {
     UUID id = UUID.randomUUID();
     when(outbox.lockClaim(id)).thenReturn(Optional.empty());

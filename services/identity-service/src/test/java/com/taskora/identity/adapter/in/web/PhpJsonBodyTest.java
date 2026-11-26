@@ -21,17 +21,23 @@ class PhpJsonBodyTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"[]", "[1,2]", "\"texte\"", "42", "true", "null", "{", "texte", "{\"a\":}"})
+  @ValueSource(
+      strings = {"[]", "[1,2]", "\"texte\"", "42", "true", "null", "{", "texte", "{\"a\":}"})
   @DisplayName("SC-IDENT-029 E16 — JSON non objet ou invalide → « JSON invalide. »")
   void nonObjectRejected(String body) {
-    assertThatThrownBy(() -> parse(body)).isInstanceOf(ValidationException.class).hasMessage("JSON invalide.");
+    assertThatThrownBy(() -> parse(body))
+        .isInstanceOf(ValidationException.class)
+        .hasMessage("JSON invalide.");
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"", " ", "\n\t "})
-  @DisplayName("SC-IDENT-033 E20 — corps vide ou d'espaces → « JSON invalide. » (plus d'équivalence avec {})")
+  @DisplayName(
+      "SC-IDENT-033 E20 — corps vide ou d'espaces → « JSON invalide. » (plus d'équivalence avec {})")
   void emptyRejected(String body) {
-    assertThatThrownBy(() -> parse(body)).isInstanceOf(ValidationException.class).hasMessage("JSON invalide.");
+    assertThatThrownBy(() -> parse(body))
+        .isInstanceOf(ValidationException.class)
+        .hasMessage("JSON invalide.");
   }
 
   @Test
@@ -56,7 +62,8 @@ class PhpJsonBodyTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-030 — chaînes lues telles quelles (aucun trim à ce niveau, Unicode conservé)")
+  @DisplayName(
+      "SC-IDENT-030 — chaînes lues telles quelles (aucun trim à ce niveau, Unicode conservé)")
   void stringsAsIs() {
     PhpJsonBody b = parse("{\"name\":\"  Camille 😀 \",\"e\":\"\"}");
     assertThat(b.requiredString("name")).isEqualTo("  Camille 😀 ");
@@ -65,8 +72,10 @@ class PhpJsonBodyTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"123", "1.5", "true", "false", "null", "[]", "[\"a\"]", "{}", "{\"x\":\"y\"}"})
-  @DisplayName("SC-IDENT-030 E17 — requiredString : non-chaîne (null compris) → message exact, aucune conversion PHP")
+  @ValueSource(
+      strings = {"123", "1.5", "true", "false", "null", "[]", "[\"a\"]", "{}", "{\"x\":\"y\"}"})
+  @DisplayName(
+      "SC-IDENT-030 E17 — requiredString : non-chaîne (null compris) → message exact, aucune conversion PHP")
   void requiredStringRejectsNonStrings(String value) {
     PhpJsonBody b = parse("{\"name\":" + value + "}");
     assertThatThrownBy(() -> b.requiredString("name"))
@@ -91,7 +100,8 @@ class PhpJsonBodyTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-034 E21 — \"0\" est une chaîne comme les autres (pas de sémantique empty() de PHP)")
+  @DisplayName(
+      "SC-IDENT-034 E21 — \"0\" est une chaîne comme les autres (pas de sémantique empty() de PHP)")
   void zeroIsAString() {
     assertThat(parse("{\"newPassword\":\"0\"}").optionalString("newPassword")).isEqualTo("0");
   }
@@ -108,6 +118,7 @@ class PhpJsonBodyTest {
   void messageNamesKey() {
     PhpJsonBody b = parse("{\"currentPassword\":1,\"newPassword\":2}");
     assertThatThrownBy(() -> b.optionalString("newPassword")).hasMessage(typeError("newPassword"));
-    assertThatThrownBy(() -> b.optionalString("currentPassword")).hasMessage(typeError("currentPassword"));
+    assertThatThrownBy(() -> b.optionalString("currentPassword"))
+        .hasMessage(typeError("currentPassword"));
   }
 }

@@ -22,8 +22,8 @@ import org.bouncycastle.openssl.jcajce.JceOpenSSLPKCS8EncryptorBuilder;
 import org.bouncycastle.operator.OutputEncryptor;
 
 /**
- * Paire RSA 2048 générée à l'exécution et écrite en PEM PKCS#8 chiffré (PBES2, comme Lexik).
- * Aucune clé n'est commitée ; la passphrase est aléatoire.
+ * Paire RSA 2048 générée à l'exécution et écrite en PEM PKCS#8 chiffré (PBES2, comme Lexik). Aucune
+ * clé n'est commitée ; la passphrase est aléatoire.
  */
 public final class TestKeys {
   /** Chiffrement de la clé privée. */

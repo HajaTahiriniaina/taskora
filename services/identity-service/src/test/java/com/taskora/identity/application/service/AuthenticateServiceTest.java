@@ -58,19 +58,23 @@ class AuthenticateServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-007 — l'e-mail est passé BRUT au dépôt (ni trim ni minuscules : la collation décide)")
+  @DisplayName(
+      "SC-IDENT-007 — l'e-mail est passé BRUT au dépôt (ni trim ni minuscules : la collation décide)")
   void rawEmail() {
     when(users.findByLoginEmail(anyString())).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.authenticate(new LoginCommand(" Camille@Exemple.fr ", "motdepasse")))
+    assertThatThrownBy(
+            () -> service.authenticate(new LoginCommand(" Camille@Exemple.fr ", "motdepasse")))
         .isInstanceOf(InvalidCredentialsException.class);
     verify(users).findByLoginEmail(" Camille@Exemple.fr ");
   }
 
   @Test
-  @DisplayName("SC-IDENT-008 — e-mail inconnu → vérification factice (temps comparable) puis InvalidCredentialsException")
+  @DisplayName(
+      "SC-IDENT-008 — e-mail inconnu → vérification factice (temps comparable) puis InvalidCredentialsException")
   void unknownEmail() {
     when(users.findByLoginEmail(anyString())).thenReturn(Optional.empty());
-    assertThatThrownBy(() -> service.authenticate(new LoginCommand("inconnu@exemple.fr", "motdepasse")))
+    assertThatThrownBy(
+            () -> service.authenticate(new LoginCommand("inconnu@exemple.fr", "motdepasse")))
         .isInstanceOf(InvalidCredentialsException.class);
     ArgumentCaptor<PlainPassword> pw = ArgumentCaptor.forClass(PlainPassword.class);
     verify(hasher).verifyAgainstDummy(pw.capture());
@@ -79,11 +83,13 @@ class AuthenticateServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-008 — mauvais mot de passe → la même InvalidCredentialsException, aucun jeton")
+  @DisplayName(
+      "SC-IDENT-008 — mauvais mot de passe → la même InvalidCredentialsException, aucun jeton")
   void wrongPassword() {
     when(users.findByLoginEmail(anyString())).thenReturn(Optional.of(Users.camille()));
     when(hasher.matches(any(), any())).thenReturn(false);
-    assertThatThrownBy(() -> service.authenticate(new LoginCommand("camille@exemple.fr", "mauvais")))
+    assertThatThrownBy(
+            () -> service.authenticate(new LoginCommand("camille@exemple.fr", "mauvais")))
         .isInstanceOf(InvalidCredentialsException.class);
     verify(hasher, never()).verifyAgainstDummy(any());
     verifyNoInteractions(tokens);
@@ -98,9 +104,11 @@ class AuthenticateServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-008 — mot de passe de plus de 4096 octets → refus (401) sans appel au dépôt")
+  @DisplayName(
+      "SC-IDENT-008 — mot de passe de plus de 4096 octets → refus (401) sans appel au dépôt")
   void passwordTooLong() {
-    assertThatThrownBy(() -> service.authenticate(new LoginCommand("camille@exemple.fr", "a".repeat(4097))))
+    assertThatThrownBy(
+            () -> service.authenticate(new LoginCommand("camille@exemple.fr", "a".repeat(4097))))
         .isInstanceOf(InvalidCredentialsException.class);
     verifyNoInteractions(users, tokens);
   }

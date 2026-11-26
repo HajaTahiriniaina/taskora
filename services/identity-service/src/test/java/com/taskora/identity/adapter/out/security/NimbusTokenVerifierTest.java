@@ -46,30 +46,70 @@ class NimbusTokenVerifierTest {
 
   static Stream<Arguments> rejected() {
     return Stream.of(
-        Arguments.of("expiré", (Function<TokenFactory, String>) t -> t.expired(U), TokenRejection.EXPIRED),
-        Arguments.of("exp == maintenant (tolérance 0)", (Function<TokenFactory, String>) t -> t.expiringNow(U), TokenRejection.EXPIRED),
-        Arguments.of("expiré ET signature fausse → Expired l'emporte", (Function<TokenFactory, String>) t -> t.expiredWithBadSignature(U), TokenRejection.EXPIRED),
-        Arguments.of("signature altérée", (Function<TokenFactory, String>) t -> t.badSignature(U), TokenRejection.INVALID),
-        Arguments.of("alg none", (Function<TokenFactory, String>) t -> t.algNone(U), TokenRejection.INVALID),
-        Arguments.of("HS256 signé avec la clé publique", (Function<TokenFactory, String>) t -> t.hs256WithPublicKey(U), TokenRejection.INVALID),
-        Arguments.of("autre clé", (Function<TokenFactory, String>) t -> t.signedByOtherKey(U), TokenRejection.INVALID),
-        Arguments.of("RS512 (seul RS256 accepté)", (Function<TokenFactory, String>) t -> t.rs512(U), TokenRejection.INVALID),
-        Arguments.of("exp absent", (Function<TokenFactory, String>) t -> t.withoutExp(U), TokenRejection.INVALID),
-        Arguments.of("iat futur", (Function<TokenFactory, String>) t -> t.futureIat(U), TokenRejection.INVALID),
-        Arguments.of("nbf futur", (Function<TokenFactory, String>) t -> t.futureNbf(U), TokenRejection.INVALID),
-        Arguments.of("illisible", (Function<TokenFactory, String>) t -> "pas-un-jeton", TokenRejection.INVALID),
-        Arguments.of("3 parties non base64", (Function<TokenFactory, String>) t -> "a.b.c", TokenRejection.INVALID),
+        Arguments.of(
+            "expiré", (Function<TokenFactory, String>) t -> t.expired(U), TokenRejection.EXPIRED),
+        Arguments.of(
+            "exp == maintenant (tolérance 0)",
+            (Function<TokenFactory, String>) t -> t.expiringNow(U),
+            TokenRejection.EXPIRED),
+        Arguments.of(
+            "expiré ET signature fausse → Expired l'emporte",
+            (Function<TokenFactory, String>) t -> t.expiredWithBadSignature(U),
+            TokenRejection.EXPIRED),
+        Arguments.of(
+            "signature altérée",
+            (Function<TokenFactory, String>) t -> t.badSignature(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "alg none", (Function<TokenFactory, String>) t -> t.algNone(U), TokenRejection.INVALID),
+        Arguments.of(
+            "HS256 signé avec la clé publique",
+            (Function<TokenFactory, String>) t -> t.hs256WithPublicKey(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "autre clé",
+            (Function<TokenFactory, String>) t -> t.signedByOtherKey(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "RS512 (seul RS256 accepté)",
+            (Function<TokenFactory, String>) t -> t.rs512(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "exp absent",
+            (Function<TokenFactory, String>) t -> t.withoutExp(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "iat futur",
+            (Function<TokenFactory, String>) t -> t.futureIat(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "nbf futur",
+            (Function<TokenFactory, String>) t -> t.futureNbf(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "illisible",
+            (Function<TokenFactory, String>) t -> "pas-un-jeton",
+            TokenRejection.INVALID),
+        Arguments.of(
+            "3 parties non base64",
+            (Function<TokenFactory, String>) t -> "a.b.c",
+            TokenRejection.INVALID),
         Arguments.of("vide", (Function<TokenFactory, String>) t -> "", TokenRejection.INVALID),
-        Arguments.of("username absent", (Function<TokenFactory, String>) TokenFactory::withoutUsername, TokenRejection.MISSING_USERNAME));
+        Arguments.of(
+            "username absent",
+            (Function<TokenFactory, String>) TokenFactory::withoutUsername,
+            TokenRejection.MISSING_USERNAME));
   }
 
   @ParameterizedTest(name = "{0} → {2}")
   @MethodSource("rejected")
-  @DisplayName("SC-IDENT-012 — chaque variante de jeton est refusée avec la raison de la précédence §8.1")
+  @DisplayName(
+      "SC-IDENT-012 — chaque variante de jeton est refusée avec la raison de la précédence §8.1")
   void rejects(String label, Function<TokenFactory, String> token, TokenRejection expected) {
     String t = token.apply(tokens);
     assertThatThrownBy(() -> verifier.verify(t))
-        .isInstanceOfSatisfying(TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(expected));
+        .isInstanceOfSatisfying(
+            TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(expected));
   }
 
   @Test
@@ -81,7 +121,8 @@ class NimbusTokenVerifierTest {
     String t = tokens.rs256(TokenFactory.lexikHeader(), c, keys.privateKey());
     assertThatThrownBy(() -> verifier.verify(t))
         .isInstanceOfSatisfying(
-            TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(TokenRejection.EXPIRED));
+            TokenRejectedException.class,
+            e -> assertThat(e.reason()).isEqualTo(TokenRejection.EXPIRED));
   }
 
   @Test
@@ -99,7 +140,8 @@ class NimbusTokenVerifierTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-012 — tolérance 0 s : exp = maintenant + 1 accepté, puis refusé une seconde plus tard")
+  @DisplayName(
+      "SC-IDENT-012 — tolérance 0 s : exp = maintenant + 1 accepté, puis refusé une seconde plus tard")
   void zeroLeeway() {
     Map<String, Object> c = tokens.symfonyClaims(U);
     c.put("exp", CLOCK.epochSecond() + 1);
@@ -108,7 +150,8 @@ class NimbusTokenVerifierTest {
     CLOCK.advance(java.time.Duration.ofSeconds(1));
     assertThatThrownBy(() -> verifier.verify(t))
         .isInstanceOfSatisfying(
-            TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(TokenRejection.EXPIRED));
+            TokenRejectedException.class,
+            e -> assertThat(e.reason()).isEqualTo(TokenRejection.EXPIRED));
   }
 
   @Test
@@ -119,6 +162,7 @@ class NimbusTokenVerifierTest {
     String t = tokens.rs256(TokenFactory.lexikHeader(), c, keys.privateKey());
     assertThatThrownBy(() -> verifier.verify(t))
         .isInstanceOfSatisfying(
-            TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(TokenRejection.INVALID));
+            TokenRejectedException.class,
+            e -> assertThat(e.reason()).isEqualTo(TokenRejection.INVALID));
   }
 }

@@ -29,13 +29,15 @@ class RegisterApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-001 — 201, jeton, utilisateur normalisé, couleur de la palette, hash $2y$ stocké, projection historique")
+  @DisplayName(
+      "SC-IDENT-001 — 201, jeton, utilisateur normalisé, couleur de la palette, hash $2y$ stocké, projection historique")
   void nominal() throws Exception {
     MvcResult r = register("  Camille Martin ", " Camille@Exemple.FR ", "motdepasse");
     assertThat(r.getResponse().getStatus()).as(body(r)).isEqualTo(201);
     OpenApiValidation.assertResponseConforms(r);
     JsonNode b = json(r);
-    assertThat(new java.util.ArrayList<>(b.propertyNames())).containsExactlyInAnyOrder("token", "user");
+    assertThat(new java.util.ArrayList<>(b.propertyNames()))
+        .containsExactlyInAnyOrder("token", "user");
     assertUserJson(b.get("user"), "Camille Martin", "camille@exemple.fr", null);
     assertThat(AvatarColor.PALETTE).contains(b.get("user").get("avatarColor").asString());
 
@@ -47,7 +49,8 @@ class RegisterApiIT extends ApiTestBase {
     assertThat(rows).hasSize(1);
     assertThat((String) rows.getFirst().get("password_hash")).startsWith("$2y$04$").hasSize(60);
     assertThat(rows.getFirst().get("email")).isEqualTo("camille@exemple.fr");
-    assertThat(count("SELECT COUNT(*) FROM taskora.`user` WHERE email = 'camille@exemple.fr'")).isEqualTo(1);
+    assertThat(count("SELECT COUNT(*) FROM taskora.`user` WHERE email = 'camille@exemple.fr'"))
+        .isEqualTo(1);
   }
 
   @Test
@@ -56,13 +59,17 @@ class RegisterApiIT extends ApiTestBase {
     MvcResult r = register("Camille", "camille@exemple.fr", "motdepasse-secret");
     String body = body(r);
     assertThat(r.getResponse().getStatus()).isEqualTo(201);
-    assertThat(body).doesNotContain("motdepasse-secret").doesNotContain("password").doesNotContain("$2y$");
+    assertThat(body)
+        .doesNotContain("motdepasse-secret")
+        .doesNotContain("password")
+        .doesNotContain("$2y$");
   }
 
   @Test
   @DisplayName("SC-IDENT-002 — e-mail déjà utilisé (autre casse) → 409, aucun second compte")
   void duplicate() throws Exception {
-    assertThat(register("Camille", "camille@exemple.fr", "motdepasse").getResponse().getStatus()).isEqualTo(201);
+    assertThat(register("Camille", "camille@exemple.fr", "motdepasse").getResponse().getStatus())
+        .isEqualTo(201);
     MvcResult r = register("Autre", "CAMILLE@exemple.fr", "motdepasse");
     assertError(r, 409, "Un compte existe déjà avec cette adresse e-mail.");
     assertThat(accounts()).isEqualTo(1);
@@ -96,7 +103,8 @@ class RegisterApiIT extends ApiTestBase {
   @Test
   @DisplayName("SC-IDENT-003 — 8 caractères exactement → 201")
   void eightAccepted() throws Exception {
-    assertThat(register("Camille", "camille@exemple.fr", "12345678").getResponse().getStatus()).isEqualTo(201);
+    assertThat(register("Camille", "camille@exemple.fr", "12345678").getResponse().getStatus())
+        .isEqualTo(201);
   }
 
   @Test
@@ -105,13 +113,16 @@ class RegisterApiIT extends ApiTestBase {
     MvcResult r = register("n".repeat(150), "camille@exemple.fr", "motdepasse");
     assertThat(r.getResponse().getStatus()).isEqualTo(201);
     assertThat(json(r).get("user").get("name").asString()).hasSize(120);
-    assertThat((String) query("SELECT name FROM identity.user_account").getFirst().get("name")).hasSize(120);
+    assertThat((String) query("SELECT name FROM identity.user_account").getFirst().get("name"))
+        .hasSize(120);
   }
 
   @Test
-  @DisplayName("SC-IDENT-004 — e-mail de 182 caractères tronqué à 180 avant validation → 400 « Adresse e-mail invalide. »")
+  @DisplayName(
+      "SC-IDENT-004 — e-mail de 182 caractères tronqué à 180 avant validation → 400 « Adresse e-mail invalide. »")
   void longEmailTruncatedThenInvalid() throws Exception {
-    String email = "a".repeat(40) + "@" + "d".repeat(60) + "." + "d".repeat(60) + "." + "d".repeat(16) + ".fr";
+    String email =
+        "a".repeat(40) + "@" + "d".repeat(60) + "." + "d".repeat(60) + "." + "d".repeat(16) + ".fr";
     assertThat(email).hasSize(182);
     assertError(register("Camille", email, "motdepasse"), 400, "Adresse e-mail invalide.");
   }
@@ -119,7 +130,9 @@ class RegisterApiIT extends ApiTestBase {
   @Test
   @DisplayName("SC-IDENT-028 E15 — mot de passe de 4096 octets → 201")
   void password4096() throws Exception {
-    assertThat(register("Camille", "camille@exemple.fr", "a".repeat(4096)).getResponse().getStatus()).isEqualTo(201);
+    assertThat(
+            register("Camille", "camille@exemple.fr", "a".repeat(4096)).getResponse().getStatus())
+        .isEqualTo(201);
   }
 
   @ParameterizedTest
@@ -170,14 +183,27 @@ class RegisterApiIT extends ApiTestBase {
     "email,nombre", "email,booléen", "email,null", "email,tableau", "email,objet",
     "password,nombre", "password,booléen", "password,null", "password,tableau", "password,objet"
   })
-  @DisplayName("SC-IDENT-030 E17 — champ non chaîne (null compris) → 400 « Le champ \"x\" doit être une chaîne de caractères. »")
+  @DisplayName(
+      "SC-IDENT-030 E17 — champ non chaîne (null compris) → 400 « Le champ \"x\" doit être une chaîne de caractères. »")
   void nonStringField(String field, String type) throws Exception {
     Map<String, String> values =
         new java.util.LinkedHashMap<>(
-            Map.of("name", "\"Camille\"", "email", "\"camille@exemple.fr\"", "password", "\"motdepasse\""));
+            Map.of(
+                "name",
+                "\"Camille\"",
+                "email",
+                "\"camille@exemple.fr\"",
+                "password",
+                "\"motdepasse\""));
     values.put(field, nonStringJson(type));
     String body =
-        "{\"name\":" + values.get("name") + ",\"email\":" + values.get("email") + ",\"password\":" + values.get("password") + "}";
+        "{\"name\":"
+            + values.get("name")
+            + ",\"email\":"
+            + values.get("email")
+            + ",\"password\":"
+            + values.get("password")
+            + "}";
     assertError(postJson("/api/auth/register", body), 400, typeError(field));
     assertThat(accounts()).isZero();
   }
@@ -193,7 +219,8 @@ class RegisterApiIT extends ApiTestBase {
           premier champ invalide : name           | {"name":1,"email":2,"password":3}                 | name
           premier champ invalide : email          | {"name":"C","email":2,"password":3}               | email
           """)
-  @DisplayName("SC-IDENT-030 E17 — contrôle de type de tous les champs, dans l'ordre, AVANT les contrôles de contenu")
+  @DisplayName(
+      "SC-IDENT-030 E17 — contrôle de type de tous les champs, dans l'ordre, AVANT les contrôles de contenu")
   void typeCheckedFirstInOrder(String label, String body, String field) throws Exception {
     assertError(postJson("/api/auth/register", body), 400, typeError(field));
   }
@@ -218,6 +245,9 @@ class RegisterApiIT extends ApiTestBase {
                     .content("{\"name\":".getBytes(StandardCharsets.UTF_8)))
             .andReturn();
     assertError(r, 400, "JSON invalide.");
-    assertThat(body(r)).doesNotContain("Exception").doesNotContain("at com.").doesNotContain("jackson");
+    assertThat(body(r))
+        .doesNotContain("Exception")
+        .doesNotContain("at com.")
+        .doesNotContain("jackson");
   }
 }

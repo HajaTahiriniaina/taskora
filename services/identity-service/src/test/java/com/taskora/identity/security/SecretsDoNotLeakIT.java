@@ -13,15 +13,23 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** SC-IDENT-024 : aucun mot de passe, hash, jeton, passphrase ni PEM dans les réponses et les journaux. */
+/**
+ * SC-IDENT-024 : aucun mot de passe, hash, jeton, passphrase ni PEM dans les réponses et les
+ * journaux.
+ */
 @ExtendWith(OutputCaptureExtension.class)
-@TestPropertySource(properties = {"logging.level.com.taskora=DEBUG", "logging.level.org.springframework.security=DEBUG"})
+@TestPropertySource(
+    properties = {
+      "logging.level.com.taskora=DEBUG",
+      "logging.level.org.springframework.security=DEBUG"
+    })
 class SecretsDoNotLeakIT extends ApiTestBase {
   private static final String PW1 = "Secret-Initial-7f3a";
   private static final String PW2 = "Secret-Nouveau-9c1e";
 
   @Test
-  @DisplayName("SC-IDENT-024 — parcours inscription → login → PATCH mot de passe → erreurs : aucune fuite")
+  @DisplayName(
+      "SC-IDENT-024 — parcours inscription → login → PATCH mot de passe → erreurs : aucune fuite")
   void noLeak(CapturedOutput output) throws Exception {
     List<MvcResult> responses = new ArrayList<>();
     MvcResult reg = register("Camille", "camille@exemple.fr", PW1);
@@ -33,20 +41,37 @@ class SecretsDoNotLeakIT extends ApiTestBase {
     assertThat(log.getResponse().getStatus()).as("connexion : %s", body(log)).isEqualTo(200);
     responses.add(log);
     String token2 = json(log).get("token").asString();
-    responses.add(patchMe(token2, "{\"currentPassword\":\"" + PW1 + "\",\"newPassword\":\"" + PW2 + "\"}"));
+    responses.add(
+        patchMe(token2, "{\"currentPassword\":\"" + PW1 + "\",\"newPassword\":\"" + PW2 + "\"}"));
     String hash2 = storedHash("camille@exemple.fr");
     responses.add(login("camille@exemple.fr", PW1)); // 401
-    responses.add(patchMe(token2, "{\"currentPassword\":\"" + PW1 + "\",\"newPassword\":\"" + PW2 + "x\"}")); // 400
-    responses.add(patchMe(token2, "{\"currentPassword\":\"" + PW2 + "\",\"newPassword\":\"" + "z".repeat(4097) + "\"}")); // 400 E15
+    responses.add(
+        patchMe(
+            token2,
+            "{\"currentPassword\":\"" + PW1 + "\",\"newPassword\":\"" + PW2 + "x\"}")); // 400
+    responses.add(
+        patchMe(
+            token2,
+            "{\"currentPassword\":\""
+                + PW2
+                + "\",\"newPassword\":\""
+                + "z".repeat(4097)
+                + "\"}")); // 400 E15
     responses.add(register("Camille", "camille@exemple.fr", PW1)); // 409
     responses.add(me(TOKENS.badSignature("camille@exemple.fr"))); // 401
     responses.add(me(TOKENS.expired("camille@exemple.fr"))); // 401
     responses.add(postJson("/api/auth/register", "{\"name\":")); // 400
 
-    List<String> secrets = new ArrayList<>(List.of(PW1, PW2, hash1, hash2, token1, token2, KEYS.passphrase(), "z".repeat(100)));
+    List<String> secrets =
+        new ArrayList<>(
+            List.of(PW1, PW2, hash1, hash2, token1, token2, KEYS.passphrase(), "z".repeat(100)));
     secrets.add(hash1.substring(7)); // sel + empreinte bcrypt sans préfixe
     secrets.add(token1.split("\\.")[2]); // signature du jeton
-    KEYS.privatePemText().lines().filter(l -> !l.startsWith("-----")).limit(3).forEach(secrets::add);
+    KEYS.privatePemText()
+        .lines()
+        .filter(l -> !l.startsWith("-----"))
+        .limit(3)
+        .forEach(secrets::add);
 
     for (MvcResult r : responses) {
       String b = body(r);
@@ -65,13 +90,15 @@ class SecretsDoNotLeakIT extends ApiTestBase {
     }
     assertThat(logs).doesNotContain("BEGIN ENCRYPTED PRIVATE KEY").doesNotContain("PRIVATE KEY");
     assertThat(query("SELECT last_error FROM identity.outbox_message WHERE last_error IS NOT NULL"))
-        .allSatisfy(row -> assertThat(String.valueOf(row.get("last_error"))).doesNotContain("camille"));
+        .allSatisfy(
+            row -> assertThat(String.valueOf(row.get("last_error"))).doesNotContain("camille"));
   }
 
   @Test
   @DisplayName("SC-IDENT-024 — les e-mails ne sont pas journalisés en INFO")
   void noEmailAtInfo(CapturedOutput output) throws Exception {
-    assertThat(register("Camille", "journal-info@exemple.fr", PW1).getResponse().getStatus()).isEqualTo(201);
+    assertThat(register("Camille", "journal-info@exemple.fr", PW1).getResponse().getStatus())
+        .isEqualTo(201);
     assertThat(login("journal-info@exemple.fr", PW1).getResponse().getStatus()).isEqualTo(200);
     assertThat(output.getAll().lines().filter(l -> l.contains(" INFO ")))
         .noneMatch(l -> l.contains("journal-info@exemple.fr"));

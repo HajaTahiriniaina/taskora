@@ -22,12 +22,19 @@ final class CompatStack {
   }
 
   /**
-   * Vérifie qu'identity répond AVANT toute écriture sur Symfony : sans identity-service, aucun compte
-   * de test n'est créé dans la base de la stack.
+   * Vérifie qu'identity répond AVANT toute écriture sur Symfony : sans identity-service, aucun
+   * compte de test n'est créé dans la base de la stack.
    */
   static void requireIdentityUp() {
-    Response r = given().baseUri(IDENTITY).contentType("application/json").body("{}").post("/api/auth/login");
-    assertThat(r.statusCode()).as("identity-service doit répondre sur %s", IDENTITY).isLessThan(500);
+    Response r =
+        given()
+            .baseUri(IDENTITY)
+            .contentType("application/json")
+            .body("{}")
+            .post("/api/auth/login");
+    assertThat(r.statusCode())
+        .as("identity-service doit répondre sur %s", IDENTITY)
+        .isLessThan(500);
   }
 
   static Response post(String base, String path, String body) {
@@ -35,13 +42,21 @@ final class CompatStack {
   }
 
   static Response post(String base, String path, String body, String token) {
-    return given().baseUri(base).contentType("application/json").header("Authorization", "Bearer " + token)
-        .body(body).post(path);
+    return given()
+        .baseUri(base)
+        .contentType("application/json")
+        .header("Authorization", "Bearer " + token)
+        .body(body)
+        .post(path);
   }
 
   static Response patch(String base, String path, String body, String token) {
-    return given().baseUri(base).contentType("application/json").header("Authorization", "Bearer " + token)
-        .body(body).patch(path);
+    return given()
+        .baseUri(base)
+        .contentType("application/json")
+        .header("Authorization", "Bearer " + token)
+        .body(body)
+        .patch(path);
   }
 
   static Response get(String base, String path, String token) {
@@ -49,8 +64,11 @@ final class CompatStack {
   }
 
   static String register(String base, String email, String password) {
-    Response r = post(base, "/api/auth/register",
-        "{\"name\":\"Compat\",\"email\":\"" + email + "\",\"password\":\"" + password + "\"}");
+    Response r =
+        post(
+            base,
+            "/api/auth/register",
+            "{\"name\":\"Compat\",\"email\":\"" + email + "\",\"password\":\"" + password + "\"}");
     assertThat(r.statusCode()).as("%s : %s", base, r.asString()).isEqualTo(201);
     return r.jsonPath().getString("token");
   }

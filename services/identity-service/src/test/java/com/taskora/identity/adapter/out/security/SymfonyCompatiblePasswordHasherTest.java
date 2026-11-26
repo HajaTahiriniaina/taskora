@@ -24,7 +24,10 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** SC-IDENT-023 : golden fixtures/php-hashes.json produit par Symfony NativePasswordHasher (PHP 8.4). */
+/**
+ * SC-IDENT-023 : golden fixtures/php-hashes.json produit par Symfony NativePasswordHasher (PHP
+ * 8.4).
+ */
 class SymfonyCompatiblePasswordHasherTest {
 
   /**
@@ -38,12 +41,14 @@ class SymfonyCompatiblePasswordHasherTest {
 
   static Stream<Arguments> golden() {
     try (InputStream in =
-        SymfonyCompatiblePasswordHasherTest.class.getResourceAsStream("/fixtures/php-hashes.json")) {
+        SymfonyCompatiblePasswordHasherTest.class.getResourceAsStream(
+            "/fixtures/php-hashes.json")) {
       List<Arguments> out = new ArrayList<>();
       for (JsonNode n : JsonMapper.builder().build().readTree(in)) {
         String label = n.get("label").asString();
         boolean expected = A2_OVERRIDES.getOrDefault(label, n.get("expectedValid").asBoolean());
-        out.add(Arguments.of(label, n.get("password").asString(), n.get("hash").asString(), expected));
+        out.add(
+            Arguments.of(label, n.get("password").asString(), n.get("hash").asString(), expected));
       }
       return out.stream();
     } catch (java.io.IOException e) {
@@ -53,9 +58,11 @@ class SymfonyCompatiblePasswordHasherTest {
 
   @ParameterizedTest(name = "[{index}] {0} → {3}")
   @MethodSource("golden")
-  @DisplayName("SC-IDENT-023 — vérification identique à Symfony pour 100 % du golden ($2y$ 13/4, $2a$, $2b$, argon2id/i, sodium, >72 octets, NUL, 4096, corrompus)")
+  @DisplayName(
+      "SC-IDENT-023 — vérification identique à Symfony pour 100 % du golden ($2y$ 13/4, $2a$, $2b$, argon2id/i, sodium, >72 octets, NUL, 4096, corrompus)")
   void verifiesLikeSymfony(String label, String password, String hash, boolean expected) {
-    assertThat(hasher13.matches(PlainPassword.of(password), new HashedPassword(hash))).isEqualTo(expected);
+    assertThat(hasher13.matches(PlainPassword.of(password), new HashedPassword(hash)))
+        .isEqualTo(expected);
   }
 
   @Test
@@ -74,17 +81,20 @@ class SymfonyCompatiblePasswordHasherTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-023 — 100 octets : hash Java vérifiable par l'algorithme PHP (base64(sha512) puis 72 octets)")
+  @DisplayName(
+      "SC-IDENT-023 — 100 octets : hash Java vérifiable par l'algorithme PHP (base64(sha512) puis 72 octets)")
   void longPasswordPrehashedLikePhp() throws Exception {
     String pw = "c".repeat(50) + "é".repeat(25); // 100 octets
     HashedPassword h = hasher4.hash(PlainPassword.of(pw));
     String prehash =
         Base64.getEncoder()
-            .encodeToString(MessageDigest.getInstance("SHA-512").digest(pw.getBytes(StandardCharsets.UTF_8)));
+            .encodeToString(
+                MessageDigest.getInstance("SHA-512").digest(pw.getBytes(StandardCharsets.UTF_8)));
     assertThat(prehash).hasSize(88);
     String $2a = "$2a$" + h.value().substring(4);
     assertThat(BCrypt.checkpw(prehash.substring(0, 72), $2a)).as("pré-hachage PHP").isTrue();
-    String first72 = new String(pw.getBytes(StandardCharsets.UTF_8), 0, 72, StandardCharsets.ISO_8859_1);
+    String first72 =
+        new String(pw.getBytes(StandardCharsets.UTF_8), 0, 72, StandardCharsets.ISO_8859_1);
     assertThat(BCrypt.checkpw(first72, $2a)).as("pas de troncature naïve à 72 octets").isFalse();
   }
 
@@ -95,7 +105,8 @@ class SymfonyCompatiblePasswordHasherTest {
     HashedPassword h = hasher4.hash(PlainPassword.of(pw));
     String prehash =
         Base64.getEncoder()
-            .encodeToString(MessageDigest.getInstance("SHA-512").digest(pw.getBytes(StandardCharsets.UTF_8)));
+            .encodeToString(
+                MessageDigest.getInstance("SHA-512").digest(pw.getBytes(StandardCharsets.UTF_8)));
     assertThat(BCrypt.checkpw(prehash.substring(0, 72), "$2a$" + h.value().substring(4))).isTrue();
     assertThat(hasher4.matches(PlainPassword.of("avant"), h)).isFalse();
   }
@@ -116,7 +127,8 @@ class SymfonyCompatiblePasswordHasherTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-028 E15 — > 4096 octets : false en vérification, PasswordTooLongException en hachage (garde défensive)")
+  @DisplayName(
+      "SC-IDENT-028 E15 — > 4096 octets : false en vérification, PasswordTooLongException en hachage (garde défensive)")
   void over4096() {
     HashedPassword h = hasher4.hash(PlainPassword.of("d".repeat(4096)));
     assertThat(hasher4.matches(PlainPassword.of("d".repeat(4096)), h)).isTrue();
@@ -128,8 +140,17 @@ class SymfonyCompatiblePasswordHasherTest {
   @Test
   @DisplayName("SC-IDENT-023 — hash corrompu : false, jamais d'exception (jamais de 500)")
   void corruptNeverThrows() {
-    for (String bad : List.of("", "$2y$", "$2y$13$tropcourt", "$argon2id$v=19$x", "n'importe quoi", "$2y$04$" + "!".repeat(53))) {
-      assertThatCode(() -> assertThat(hasher4.matches(PlainPassword.of("motdepasse"), new HashedPassword(bad))).isFalse())
+    for (String bad :
+        List.of(
+            "",
+            "$2y$",
+            "$2y$13$tropcourt",
+            "$argon2id$v=19$x",
+            "n'importe quoi",
+            "$2y$04$" + "!".repeat(53))) {
+      assertThatCode(() ->
+              assertThat(hasher4.matches(PlainPassword.of("motdepasse"), new HashedPassword(bad)))
+                  .isFalse())
           .doesNotThrowAnyException();
     }
   }
@@ -137,7 +158,9 @@ class SymfonyCompatiblePasswordHasherTest {
   @Test
   @DisplayName("SC-IDENT-008 — vérification factice sans exception")
   void dummy() {
-    assertThatCode(() -> hasher4.verifyAgainstDummy(PlainPassword.of("motdepasse"))).doesNotThrowAnyException();
-    assertThatCode(() -> hasher4.verifyAgainstDummy(PlainPassword.of(""))).doesNotThrowAnyException();
+    assertThatCode(() -> hasher4.verifyAgainstDummy(PlainPassword.of("motdepasse")))
+        .doesNotThrowAnyException();
+    assertThatCode(() -> hasher4.verifyAgainstDummy(PlainPassword.of("")))
+        .doesNotThrowAnyException();
   }
 }

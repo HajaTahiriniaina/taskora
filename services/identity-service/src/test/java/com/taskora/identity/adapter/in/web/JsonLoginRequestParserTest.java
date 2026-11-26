@@ -16,7 +16,8 @@ class JsonLoginRequestParserTest {
   private static final String EMAIL_REQUIRED = "Le champ \"email\" est obligatoire.";
   private static final String PASSWORD_REQUIRED = "Le champ \"password\" est obligatoire.";
   private static final String EMAIL_TYPE = "Le champ \"email\" doit être une chaîne de caractères.";
-  private static final String PASSWORD_TYPE = "Le champ \"password\" doit être une chaîne de caractères.";
+  private static final String PASSWORD_TYPE =
+      "Le champ \"password\" doit être une chaîne de caractères.";
 
   private static LoginCommand parse(String body) {
     return JsonLoginRequestParser.parse(body.getBytes(StandardCharsets.UTF_8));
@@ -53,14 +54,21 @@ class JsonLoginRequestParserTest {
           '{"email":"camille@exemple.fr"}'           | Le champ "password" est obligatoire.
           '{"email":"camille@exemple.fr","password":""}' | Le champ "password" est obligatoire.
           """)
-  @DisplayName("SC-IDENT-032/033 E19 E20 — messages français ; ordre forme → type email → type password → présence email → présence password")
+  @DisplayName(
+      "SC-IDENT-032/033 E19 E20 — messages français ; ordre forme → type email → type password → présence email → présence password")
   void rejects(String body, String message) {
-    assertThatThrownBy(() -> parse(body)).isInstanceOf(ValidationException.class).hasMessage(message);
+    assertThatThrownBy(() -> parse(body))
+        .isInstanceOf(ValidationException.class)
+        .hasMessage(message);
   }
 
   @Test
   @DisplayName("SC-IDENT-032 E19 — aucun message anglais de json_login")
   void noEnglish() {
-    assertThatThrownBy(() -> parse("{}")).isInstanceOf(ValidationException.class).message().doesNotContain("must be").doesNotContain("Invalid JSON");
+    assertThatThrownBy(() -> parse("{}"))
+        .isInstanceOf(ValidationException.class)
+        .message()
+        .doesNotContain("must be")
+        .doesNotContain("Invalid JSON");
   }
 }

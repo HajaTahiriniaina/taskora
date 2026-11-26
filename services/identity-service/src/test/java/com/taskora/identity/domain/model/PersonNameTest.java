@@ -21,7 +21,8 @@ class PersonNameTest {
   @ParameterizedTest
   @NullSource
   @ValueSource(strings = {"", "   ", "\t\n\r\0\u000B"})
-  @DisplayName("SC-IDENT-003 — nom absent, vide ou composé d'espaces → « Le champ \"name\" est obligatoire. »")
+  @DisplayName(
+      "SC-IDENT-003 — nom absent, vide ou composé d'espaces → « Le champ \"name\" est obligatoire. »")
   void required(String raw) {
     assertThatThrownBy(() -> PersonName.of(raw))
         .isInstanceOf(ValidationException.class)

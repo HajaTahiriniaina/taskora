@@ -68,33 +68,68 @@ class RegisterUserServiceTest {
     uow = new FakeUnitOfWork();
     service =
         new RegisterUserService(
-            users, hasher, tokens, projection, outbox, uow, delivery,
-            Clock.fixed(NOW, ZoneOffset.UTC), PARIS, new SplittableRandom(7));
+            users,
+            hasher,
+            tokens,
+            projection,
+            outbox,
+            uow,
+            delivery,
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            PARIS,
+            new SplittableRandom(7));
 
     when(hasher.hash(any())).thenReturn(new HashedPassword(Users.HASH));
     when(tokens.issue(any())).thenReturn("jeton.de.test");
     when(users.insert(any()))
-        .thenAnswer(
+        .thenAnswer(inv -> {
+          uow.assertActive("insert");
+          NewUser n = inv.getArgument(0);
+          return User.rehydrate(
+              new UserId(4),
+              n.email(),
+              n.name(),
+              n.password(),
+              n.avatarColor(),
+              n.roles(),
+              n.createdAt());
+        });
+    doAnswer(
             inv -> {
-              uow.assertActive("insert");
-              NewUser n = inv.getArgument(0);
-              return User.rehydrate(
-                  new UserId(4), n.email(), n.name(), n.password(), n.avatarColor(), n.roles(), n.createdAt());
-            });
-    doAnswer(inv -> { uow.assertActive("projection.upsert"); return null; }).when(projection).upsert(any());
-    doAnswer(inv -> { uow.assertActive("outbox.appendInvitationClaim"); return null; })
-        .when(outbox).appendInvitationClaim(any(), any());
-    doAnswer(inv -> { uow.assertActive("outbox.appendEvent"); return null; }).when(outbox).appendEvent(any());
+              uow.assertActive("projection.upsert");
+              return null;
+            })
+        .when(projection)
+        .upsert(any());
+    doAnswer(
+            inv -> {
+              uow.assertActive("outbox.appendInvitationClaim");
+              return null;
+            })
+        .when(outbox)
+        .appendInvitationClaim(any(), any());
+    doAnswer(
+            inv -> {
+              uow.assertActive("outbox.appendEvent");
+              return null;
+            })
+        .when(outbox)
+        .appendEvent(any());
     when(delivery.deliverNow(any()))
-        .thenAnswer(inv -> { uow.assertInactive("deliverNow"); return true; });
+        .thenAnswer(inv -> {
+          uow.assertInactive("deliverNow");
+          return true;
+        });
   }
 
   private AuthResult registerCamille() {
-    return service.register(new RegisterUserCommand("  Camille Martin ", " Camille@Exemple.FR ", "motdepasse"));
+    return service.register(
+        new RegisterUserCommand("  Camille Martin ", " Camille@Exemple.FR ", "motdepasse"));
   }
 
   @Test
-  @DisplayName("SC-IDENT-001 — inscription nominale : compte normalisé, haché, palette, created_at en heure de Paris")
+  @DisplayName(
+      "SC-IDENT-001 — inscription nominale : compte normalisé, haché, palette, created_at en heure de Paris")
   void nominal() {
     AuthResult r = registerCamille();
 
@@ -116,7 +151,8 @@ class RegisterUserServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-002 — e-mail déjà utilisé → EmailAlreadyUsedException, aucune écriture ni hachage")
+  @DisplayName(
+      "SC-IDENT-002 — e-mail déjà utilisé → EmailAlreadyUsedException, aucune écriture ni hachage")
   void duplicate() {
     when(users.existsByEmail(new Email("camille@exemple.fr"))).thenReturn(true);
     assertThatThrownBy(this::registerCamille).isInstanceOf(EmailAlreadyUsedException.class);
@@ -126,7 +162,8 @@ class RegisterUserServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-002 — course perdue (violation d'unicité à l'insertion) → EmailAlreadyUsedException, ni projection ni outbox")
+  @DisplayName(
+      "SC-IDENT-002 — course perdue (violation d'unicité à l'insertion) → EmailAlreadyUsedException, ni projection ni outbox")
   void duplicateRace() {
     doThrow(new EmailAlreadyUsedException()).when(users).insert(any());
     assertThatThrownBy(this::registerCamille).isInstanceOf(EmailAlreadyUsedException.class);
@@ -152,16 +189,19 @@ class RegisterUserServiceTest {
   @Test
   @DisplayName("SC-IDENT-003 — ordre : format de l'e-mail avant password")
   void emailFormatBeforePassword() {
-    assertThatThrownBy(() -> service.register(new RegisterUserCommand("Camille", "pas-un-email", "1")))
+    assertThatThrownBy(
+            () -> service.register(new RegisterUserCommand("Camille", "pas-un-email", "1")))
         .isInstanceOf(ValidationException.class)
         .hasMessage("Adresse e-mail invalide.");
   }
 
   @Test
-  @DisplayName("SC-IDENT-003 — ordre : longueur du mot de passe avant l'unicité (dépôt non consulté)")
+  @DisplayName(
+      "SC-IDENT-003 — ordre : longueur du mot de passe avant l'unicité (dépôt non consulté)")
   void passwordBeforeUniqueness() {
     when(users.existsByEmail(any())).thenReturn(true);
-    assertThatThrownBy(() -> service.register(new RegisterUserCommand("Camille", "camille@exemple.fr", "1234567")))
+    assertThatThrownBy(() ->
+            service.register(new RegisterUserCommand("Camille", "camille@exemple.fr", "1234567")))
         .isInstanceOf(ValidationException.class)
         .hasMessage("Le mot de passe doit contenir au moins 8 caractères.");
     verify(users, never()).existsByEmail(any());
@@ -170,17 +210,20 @@ class RegisterUserServiceTest {
   @Test
   @DisplayName("SC-IDENT-003 — mot de passe absent (null) → message de longueur")
   void passwordAbsent() {
-    assertThatThrownBy(() -> service.register(new RegisterUserCommand("Camille", "camille@exemple.fr", null)))
+    assertThatThrownBy(
+            () -> service.register(new RegisterUserCommand("Camille", "camille@exemple.fr", null)))
         .isInstanceOf(ValidationException.class)
         .hasMessage("Le mot de passe doit contenir au moins 8 caractères.");
   }
 
   @Test
-  @DisplayName("SC-IDENT-028 E15 — > 4096 octets → PasswordTooLongException avant l'unicité, sans écriture ni hachage")
+  @DisplayName(
+      "SC-IDENT-028 E15 — > 4096 octets → PasswordTooLongException avant l'unicité, sans écriture ni hachage")
   void passwordTooLong() {
     when(users.existsByEmail(any())).thenReturn(true);
-    assertThatThrownBy(
-            () -> service.register(new RegisterUserCommand("Camille", "camille@exemple.fr", "a".repeat(4097))))
+    assertThatThrownBy(() ->
+            service.register(
+                new RegisterUserCommand("Camille", "camille@exemple.fr", "a".repeat(4097))))
         .isInstanceOf(PasswordTooLongException.class);
     verify(users, never()).existsByEmail(any());
     verify(users, never()).insert(any());
@@ -189,7 +232,8 @@ class RegisterUserServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — une seule unité de travail : insert + projection + claim immédiat + claim à +60 s + UserRegistered")
+  @DisplayName(
+      "SC-IDENT-005 — une seule unité de travail : insert + projection + claim immédiat + claim à +60 s + UserRegistered")
   void oneUnitOfWorkWithThreeOutboxMessages() {
     registerCamille();
     assertThat(uow.transactions).isEqualTo(1);
@@ -199,7 +243,7 @@ class RegisterUserServiceTest {
     ArgumentCaptor<Instant> due = ArgumentCaptor.forClass(Instant.class);
     verify(outbox, times(2)).appendInvitationClaim(claims.capture(), due.capture());
     assertThat(due.getAllValues()).containsExactly(NOW, NOW.plusSeconds(60));
-    InvitationClaim first = claims.getAllValues().get(0);
+    InvitationClaim first = claims.getAllValues().getFirst();
     InvitationClaim catchUp = claims.getAllValues().get(1);
     assertThat(first.userId()).isEqualTo(new UserId(4));
     assertThat(first.email().value()).isEqualTo("camille@exemple.fr");
@@ -220,16 +264,18 @@ class RegisterUserServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — livraison synchrone du PREMIER claim, APRÈS la validation de la transaction")
+  @DisplayName(
+      "SC-IDENT-005 — livraison synchrone du PREMIER claim, APRÈS la validation de la transaction")
   void deliverNowAfterCommit() {
     registerCamille();
     ArgumentCaptor<InvitationClaim> claims = ArgumentCaptor.forClass(InvitationClaim.class);
     verify(outbox, times(2)).appendInvitationClaim(claims.capture(), any());
-    verify(delivery).deliverNow(claims.getAllValues().get(0).eventId());
+    verify(delivery).deliverNow(claims.getAllValues().getFirst().eventId());
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — échec de la livraison synchrone (exception) → l'inscription réussit quand même")
+  @DisplayName(
+      "SC-IDENT-005 — échec de la livraison synchrone (exception) → l'inscription réussit quand même")
   void deliveryFailureDoesNotFailRegistration() {
     when(delivery.deliverNow(any())).thenThrow(new IllegalStateException("Symfony injoignable"));
     AuthResult r = registerCamille();
@@ -244,9 +290,15 @@ class RegisterUserServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — échec de la projection → exception propagée, aucune livraison tentée")
+  @DisplayName(
+      "SC-IDENT-005 — échec de la projection → exception propagée, aucune livraison tentée")
   void projectionFailure() {
-    doAnswer(inv -> { throw new IllegalStateException("projection"); }).when(projection).upsert(any());
+    doAnswer(
+            inv -> {
+              throw new IllegalStateException("projection");
+            })
+        .when(projection)
+        .upsert(any());
     assertThatThrownBy(this::registerCamille)
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("projection");

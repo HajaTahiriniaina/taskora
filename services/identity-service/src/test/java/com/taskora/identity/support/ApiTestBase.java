@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,9 +40,11 @@ import org.springframework.test.web.servlet.MvcResult;
 @Import(TestClockConfig.class)
 @TestPropertySource(
     properties = {
-      // Valeurs par défaut : un @DynamicPropertySource de sous-classe les remplace (priorité supérieure).
+      // Valeurs par défaut : un @DynamicPropertySource de sous-classe les remplace (priorité
+      // supérieure).
       "identity.password.bcrypt-cost=4",
-      // Symfony injoignable (port fermé) ; RegistrationInvitationClaimIT et OutboxRelayIT pointent sur WireMock.
+      // Symfony injoignable (port fermé) ; RegistrationInvitationClaimIT et OutboxRelayIT pointent
+      // sur WireMock.
       "identity.symfony.internal-url=http://127.0.0.1:9"
     })
 public abstract class ApiTestBase {
@@ -63,6 +66,10 @@ public abstract class ApiTestBase {
     registry.add("identity.symfony.internal-secret", () -> INTERNAL_SECRET);
   }
 
+  @AfterAll
+  static void closeRootPool() {
+    MariaDbContainerSupport.closeRootPool();
+  }
 
   @BeforeEach
   void resetDatabaseAndClock() {
@@ -74,7 +81,9 @@ public abstract class ApiTestBase {
 
   protected MvcResult postJson(String path, String body) throws Exception {
     return mvc.perform(
-            post(path).contentType(MediaType.APPLICATION_JSON).content(body.getBytes(StandardCharsets.UTF_8)))
+            post(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.getBytes(StandardCharsets.UTF_8)))
         .andReturn();
   }
 
@@ -151,8 +160,10 @@ public abstract class ApiTestBase {
     Map<String, Object> expected = new LinkedHashMap<>();
     expected.put("code", 401);
     expected.put("message", message);
-    org.assertj.core.api.Assertions.assertThat(json(r)).isEqualTo(JSON.readTree(Json.write(expected)));
-    org.assertj.core.api.Assertions.assertThat(r.getResponse().getHeader("WWW-Authenticate")).isEqualTo("Bearer");
+    org.assertj.core.api.Assertions.assertThat(json(r))
+        .isEqualTo(JSON.readTree(Json.write(expected)));
+    org.assertj.core.api.Assertions.assertThat(r.getResponse().getHeader("WWW-Authenticate"))
+        .isEqualTo("Bearer");
     OpenApiValidation.assertResponseConforms(r);
   }
 
@@ -165,7 +176,8 @@ public abstract class ApiTestBase {
     org.assertj.core.api.Assertions.assertThat(user.get("name").asString()).isEqualTo(name);
     org.assertj.core.api.Assertions.assertThat(user.get("email").asString()).isEqualTo(email);
     if (avatarColor != null) {
-      org.assertj.core.api.Assertions.assertThat(user.get("avatarColor").asString()).isEqualTo(avatarColor);
+      org.assertj.core.api.Assertions.assertThat(user.get("avatarColor").asString())
+          .isEqualTo(avatarColor);
     }
   }
 

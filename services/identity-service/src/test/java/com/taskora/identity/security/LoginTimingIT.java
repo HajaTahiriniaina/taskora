@@ -11,7 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/** SC-IDENT-008 : pas d'oracle temporel flagrant entre e-mail inconnu et mauvais mot de passe (coût 13). */
+/**
+ * SC-IDENT-008 : pas d'oracle temporel flagrant entre e-mail inconnu et mauvais mot de passe (coût
+ * 13).
+ */
 class LoginTimingIT extends ApiTestBase {
   private static final int RUNS = 30;
 
@@ -35,7 +38,8 @@ class LoginTimingIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-008 — 30 essais e-mail inconnu vs mauvais mot de passe : écart des médianes < 50 %")
+  @DisplayName(
+      "SC-IDENT-008 — 30 essais e-mail inconnu vs mauvais mot de passe : écart des médianes < 50 %")
   void comparableTimes() throws Exception {
     registeredToken("Camille", "camille@exemple.fr", "motdepasse");
     assertThat(storedHash("camille@exemple.fr")).startsWith("$2y$13$");

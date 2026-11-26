@@ -29,14 +29,25 @@ class JwtSecurityApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-011 — sans en-tête Authorization → 401 « JWT Token not found » + WWW-Authenticate: Bearer")
+  @DisplayName(
+      "SC-IDENT-011 — sans en-tête Authorization → 401 « JWT Token not found » + WWW-Authenticate: Bearer")
   void noHeader() throws Exception {
     assertAuthError(mvc.perform(get("/api/me")).andReturn(), "JWT Token not found");
   }
 
   @ParameterizedTest(name = "« {0} »")
-  @ValueSource(strings = {"Basic Y2FtaWxsZTpwYXNz", "Bearer", "Bearer ", "Bearer a b", "Bearer  jeton", "Token abc", ""})
-  @DisplayName("SC-IDENT-011 — en-tête qui ne se découpe pas en « Bearer <jeton> » → « JWT Token not found »")
+  @ValueSource(
+      strings = {
+        "Basic Y2FtaWxsZTpwYXNz",
+        "Bearer",
+        "Bearer ",
+        "Bearer a b",
+        "Bearer  jeton",
+        "Token abc",
+        ""
+      })
+  @DisplayName(
+      "SC-IDENT-011 — en-tête qui ne se découpe pas en « Bearer <jeton> » → « JWT Token not found »")
   void malformedHeader(String header) throws Exception {
     assertAuthError(meWithHeader(header), "JWT Token not found");
   }
@@ -82,7 +93,8 @@ class JwtSecurityApiIT extends ApiTestBase {
     registeredToken("Camille", U, "motdepasse");
     MvcResult r =
         mvc.perform(
-                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/auth/login")
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/api/auth/login")
                     .header("Authorization", "Bearer n.importe.quoi")
                     .contentType("application/json")
                     .content("{\"email\":\"camille@exemple.fr\",\"password\":\"motdepasse\"}"))
@@ -92,33 +104,62 @@ class JwtSecurityApiIT extends ApiTestBase {
 
   static Stream<Arguments> invalidTokens() {
     return Stream.of(
-        Arguments.of("expiré", (Function<TokenFactory, String>) t -> t.expired(U), "Expired JWT Token"),
-        Arguments.of("expiré + signature fausse", (Function<TokenFactory, String>) t -> t.expiredWithBadSignature(U), "Expired JWT Token"),
-        Arguments.of("signature altérée", (Function<TokenFactory, String>) t -> t.badSignature(U), "Invalid JWT Token"),
-        Arguments.of("alg none", (Function<TokenFactory, String>) t -> t.algNone(U), "Invalid JWT Token"),
-        Arguments.of("HS256 + clé publique", (Function<TokenFactory, String>) t -> t.hs256WithPublicKey(U), "Invalid JWT Token"),
-        Arguments.of("autre clé", (Function<TokenFactory, String>) t -> t.signedByOtherKey(U), "Invalid JWT Token"),
-        Arguments.of("RS512", (Function<TokenFactory, String>) t -> t.rs512(U), "Invalid JWT Token"),
-        Arguments.of("exp absent", (Function<TokenFactory, String>) t -> t.withoutExp(U), "Invalid JWT Token"),
-        Arguments.of("iat futur", (Function<TokenFactory, String>) t -> t.futureIat(U), "Invalid JWT Token"),
-        Arguments.of("nbf futur", (Function<TokenFactory, String>) t -> t.futureNbf(U), "Invalid JWT Token"),
-        Arguments.of("illisible", (Function<TokenFactory, String>) t -> "pas.un.jeton", "Invalid JWT Token"),
-        Arguments.of("username absent", (Function<TokenFactory, String>) TokenFactory::withoutUsername,
+        Arguments.of(
+            "expiré", (Function<TokenFactory, String>) t -> t.expired(U), "Expired JWT Token"),
+        Arguments.of(
+            "expiré + signature fausse",
+            (Function<TokenFactory, String>) t -> t.expiredWithBadSignature(U),
+            "Expired JWT Token"),
+        Arguments.of(
+            "signature altérée",
+            (Function<TokenFactory, String>) t -> t.badSignature(U),
+            "Invalid JWT Token"),
+        Arguments.of(
+            "alg none", (Function<TokenFactory, String>) t -> t.algNone(U), "Invalid JWT Token"),
+        Arguments.of(
+            "HS256 + clé publique",
+            (Function<TokenFactory, String>) t -> t.hs256WithPublicKey(U),
+            "Invalid JWT Token"),
+        Arguments.of(
+            "autre clé",
+            (Function<TokenFactory, String>) t -> t.signedByOtherKey(U),
+            "Invalid JWT Token"),
+        Arguments.of(
+            "RS512", (Function<TokenFactory, String>) t -> t.rs512(U), "Invalid JWT Token"),
+        Arguments.of(
+            "exp absent",
+            (Function<TokenFactory, String>) t -> t.withoutExp(U),
+            "Invalid JWT Token"),
+        Arguments.of(
+            "iat futur", (Function<TokenFactory, String>) t -> t.futureIat(U), "Invalid JWT Token"),
+        Arguments.of(
+            "nbf futur", (Function<TokenFactory, String>) t -> t.futureNbf(U), "Invalid JWT Token"),
+        Arguments.of(
+            "illisible", (Function<TokenFactory, String>) t -> "pas.un.jeton", "Invalid JWT Token"),
+        Arguments.of(
+            "username absent",
+            (Function<TokenFactory, String>) TokenFactory::withoutUsername,
             "Unable to find key \"username\" in the token payload."));
   }
 
   @ParameterizedTest(name = "{0} → {2}")
   @MethodSource("invalidTokens")
-  @DisplayName("SC-IDENT-012 — chaque jeton invalide → 401, message exact Lexik, WWW-Authenticate: Bearer")
-  void invalidToken(String label, Function<TokenFactory, String> token, String message) throws Exception {
+  @DisplayName(
+      "SC-IDENT-012 — chaque jeton invalide → 401, message exact Lexik, WWW-Authenticate: Bearer")
+  void invalidToken(String label, Function<TokenFactory, String> token, String message)
+      throws Exception {
     registeredToken("Camille", U, "motdepasse");
     assertAuthError(me(token.apply(TOKENS)), message);
     MvcResult p =
-        mvc.perform(patch("/api/me").header("Authorization", "Bearer " + token.apply(TOKENS))
-                .contentType("application/json").content("{\"name\":\"Pirate\"}"))
+        mvc.perform(
+                patch("/api/me")
+                    .header("Authorization", "Bearer " + token.apply(TOKENS))
+                    .contentType("application/json")
+                    .content("{\"name\":\"Pirate\"}"))
             .andReturn();
     assertThat(p.getResponse().getStatus()).isEqualTo(401);
-    assertThat(query("SELECT name FROM identity.user_account").getFirst().get("name")).isEqualTo("Camille");
+    assertThat(query("SELECT name FROM identity.user_account").getFirst().get("name"))
+        .isEqualTo("Camille");
   }
 
   @Test
@@ -131,7 +172,8 @@ class JwtSecurityApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-012 — jeton expiré au fil de l'horloge (tolérance 0) : accepté puis refusé")
+  @DisplayName(
+      "SC-IDENT-012 — jeton expiré au fil de l'horloge (tolérance 0) : accepté puis refusé")
   void expiresWithClock() throws Exception {
     String token = registeredToken("Camille", U, "motdepasse");
     assertThat(me(token).getResponse().getStatus()).isEqualTo(200);
@@ -146,10 +188,12 @@ class JwtSecurityApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-013 — compte supprimé après émission du jeton → 401 « Invalid credentials. »")
+  @DisplayName(
+      "SC-IDENT-013 — compte supprimé après émission du jeton → 401 « Invalid credentials. »")
   void deletedAccount() throws Exception {
     String token = registeredToken("Camille", U, "motdepasse");
-    MariaDbContainerSupport.rootExecute(List.of("DELETE FROM identity.user_account WHERE email = 'camille@exemple.fr'"));
+    MariaDbContainerSupport.rootExecute(
+        List.of("DELETE FROM identity.user_account WHERE email = 'camille@exemple.fr'"));
     assertAuthError(me(token), "Invalid credentials.");
   }
 
@@ -160,7 +204,11 @@ class JwtSecurityApiIT extends ApiTestBase {
     String b = registeredToken("Bob", "bob@exemple.fr", "motdepasse");
     assertThat(json(me(a)).get("email").asString()).isEqualTo(U);
     assertThat(json(me(b)).get("email").asString()).isEqualTo("bob@exemple.fr");
-    assertThat(mvc.perform(get("/api/me?id=1").header("Authorization", "Bearer " + b)).andReturn()
-            .getResponse().getContentAsString()).contains("bob@exemple.fr");
+    assertThat(
+            mvc.perform(get("/api/me?id=1").header("Authorization", "Bearer " + b))
+                .andReturn()
+                .getResponse()
+                .getContentAsString())
+        .contains("bob@exemple.fr");
   }
 }

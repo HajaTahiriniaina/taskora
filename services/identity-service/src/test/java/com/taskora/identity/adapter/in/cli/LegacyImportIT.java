@@ -43,12 +43,16 @@ class LegacyImportIT extends ApiTestBase {
   }
 
   private static String fingerprint() {
-    return String.valueOf(query("SELECT COUNT(*) AS n, SUM(CRC32(CONCAT_WS('|', id, email, name, password_hash, avatar_color, roles, created_at))) AS s "
-        + "FROM identity.user_account").getFirst());
+    return String.valueOf(
+        query(
+                "SELECT COUNT(*) AS n, SUM(CRC32(CONCAT_WS('|', id, email, name, password_hash, avatar_color, roles, created_at))) AS s "
+                    + "FROM identity.user_account")
+            .getFirst());
   }
 
   @Test
-  @DisplayName("SC-IDENT-023 — run : chaque compte du jeu d'essai se connecte via l'API (100 %), le hash corrompu → 401")
+  @DisplayName(
+      "SC-IDENT-023 — run : chaque compte du jeu d'essai se connecte via l'API (100 %), le hash corrompu → 401")
   void everyAccountLogsIn() throws Exception {
     ImportReport report = importer.importAll();
     assertThat(report.sourceRows()).isEqualTo(accounts.size());
@@ -56,21 +60,25 @@ class LegacyImportIT extends ApiTestBase {
     for (JsonNode a : accounts) {
       MvcResult r = login(a.get("email").asString(), a.get("password").asString());
       int expected = a.get("expectLogin").asBoolean() ? 200 : 401;
-      assertThat(r.getResponse().getStatus()).as("%s (%s)", a.get("label").asString(), body(r)).isEqualTo(expected);
+      assertThat(r.getResponse().getStatus())
+          .as("%s (%s)", a.get("label").asString(), body(r))
+          .isEqualTo(expected);
       if (expected == 200) {
         assertThat(json(r).get("user").get("id").asInt()).isEqualTo(a.get("id").asInt());
       }
     }
-    assertThat(accounts.stream().filter(a -> a.get("expectLogin").asBoolean()).count()).isGreaterThanOrEqualTo(8);
+    assertThat(accounts.stream().filter(a -> a.get("expectLogin").asBoolean()).count())
+        .isGreaterThanOrEqualTo(8);
   }
 
   @Test
   @DisplayName("SC-IDENT-023 — hashes copiés tels quels, created_at sans conversion")
   void copiedAsIs() {
     importer.importAll();
-    List<Map<String, Object>> diff = query(
-        "SELECT u.id FROM taskora.`user` u JOIN identity.user_account a ON a.id = u.id "
-            + "WHERE BINARY a.password_hash <> BINARY u.password OR a.created_at <> u.created_at OR a.name <> u.name");
+    List<Map<String, Object>> diff =
+        query(
+            "SELECT u.id FROM taskora.`user` u JOIN identity.user_account a ON a.id = u.id "
+                + "WHERE BINARY a.password_hash <> BINARY u.password OR a.created_at <> u.created_at OR a.name <> u.name");
     assertThat(diff).isEmpty();
   }
 
@@ -87,14 +95,17 @@ class LegacyImportIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-023 — verify vert après run ; AUTO_INCREMENT = MAX(id) + 1 ; inscription suivante sans collision")
+  @DisplayName(
+      "SC-IDENT-023 — verify vert après run ; AUTO_INCREMENT = MAX(id) + 1 ; inscription suivante sans collision")
   void verifyAndAutoIncrement() throws Exception {
     importer.importAll();
     VerificationReport v = importer.verify();
     assertThat(v.consistent()).as("contrôles en échec : %s", v.failedChecks()).isTrue();
     assertThat(v.metrics().values()).noneMatch(m -> m.contains("@"));
     long maxId = count("SELECT MAX(id) FROM taskora.`user`");
-    long next = count("SELECT AUTO_INCREMENT FROM information_schema.tables WHERE table_schema='identity' AND table_name='user_account'");
+    long next =
+        count(
+            "SELECT AUTO_INCREMENT FROM information_schema.tables WHERE table_schema='identity' AND table_name='user_account'");
     assertThat(next).isEqualTo(maxId + 1);
     MvcResult r = register("Nouveau", "nouveau@exemple.test", "motdepasse");
     assertThat(r.getResponse().getStatus()).isEqualTo(201);
@@ -105,29 +116,34 @@ class LegacyImportIT extends ApiTestBase {
   @DisplayName("SC-IDENT-023 — verify rouge si la cible diverge (ligne modifiée à la main)")
   void verifyDetectsDivergence() {
     importer.importAll();
-    MariaDbContainerSupport.rootExecute(List.of("UPDATE identity.user_account SET name = 'Modifié' WHERE id = 1"));
+    MariaDbContainerSupport.rootExecute(
+        List.of("UPDATE identity.user_account SET name = 'Modifié' WHERE id = 1"));
     VerificationReport v = importer.verify();
     assertThat(v.consistent()).isFalse();
     assertThat(v.failedChecks()).isNotEmpty();
   }
 
   @Test
-  @DisplayName("SC-IDENT-023 — compte présent seulement dans la cible : signalé et conservé (jamais de DELETE)")
+  @DisplayName(
+      "SC-IDENT-023 — compte présent seulement dans la cible : signalé et conservé (jamais de DELETE)")
   void targetOnlyKept() {
-    MariaDbContainerSupport.rootExecute(List.of(
-        "INSERT INTO identity.user_account (id, email, name, password_hash, avatar_color, roles, created_at) "
-            + "VALUES (99, 'cible-seule@exemple.test', 'Cible', '$2y$04$x', '#6366f1', '[]', '2026-01-01 00:00:00')"));
+    MariaDbContainerSupport.rootExecute(
+        List.of(
+            "INSERT INTO identity.user_account (id, email, name, password_hash, avatar_color, roles, created_at) "
+                + "VALUES (99, 'cible-seule@exemple.test', 'Cible', '$2y$04$x', '#6366f1', '[]', '2026-01-01 00:00:00')"));
     ImportReport report = importer.importAll();
     assertThat(report.targetOnly()).isEqualTo(1);
     assertThat(count("SELECT COUNT(*) FROM identity.user_account WHERE id = 99")).isEqualTo(1);
   }
 
   @Test
-  @DisplayName("SC-IDENT-023 — doublon d'e-mail normalisé dans la source → échec avant toute écriture")
+  @DisplayName(
+      "SC-IDENT-023 — doublon d'e-mail normalisé dans la source → échec avant toute écriture")
   void duplicateAborts() {
-    MariaDbContainerSupport.rootExecute(List.of(
-        "INSERT INTO taskora.`user` (id, email, name, password, avatar_color, roles, created_at) "
-            + "VALUES (50, ' Reprise-2y-13@exemple.test', 'Doublon', '$2y$04$x', '#6366f1', '[]', '2026-01-01 00:00:00')"));
+    MariaDbContainerSupport.rootExecute(
+        List.of(
+            "INSERT INTO taskora.`user` (id, email, name, password, avatar_color, roles, created_at) "
+                + "VALUES (50, ' Reprise-2y-13@exemple.test', 'Doublon', '$2y$04$x', '#6366f1', '[]', '2026-01-01 00:00:00')"));
     try {
       importer.importAll();
     } catch (UnsupportedOperationException e) {

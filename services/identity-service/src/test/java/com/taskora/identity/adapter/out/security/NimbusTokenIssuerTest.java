@@ -41,7 +41,8 @@ class NimbusTokenIssuerTest {
     clock = new MutableClock(Instant.parse("2026-11-26T09:00:00Z"));
     issuer =
         new NimbusTokenIssuer(
-            new LexikKeyLoader(keys.privatePem(), keys.publicPem(), keys.passphrase().toCharArray()),
+            new LexikKeyLoader(
+                keys.privatePem(), keys.publicPem(), keys.passphrase().toCharArray()),
             clock,
             Duration.ofSeconds(604_800));
   }
@@ -68,10 +69,12 @@ class NimbusTokenIssuerTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-010 — revendications : iat/exp entiers, exp − iat = 604800, username, roles, uid, rien d'autre")
+  @DisplayName(
+      "SC-IDENT-010 — revendications : iat/exp entiers, exp − iat = 604800, username, roles, uid, rien d'autre")
   void claims() {
     JsonNode c = JSON.readTree(TokenFactory.decodePart(issuer.issue(camille(List.of())), 1));
-    assertThat(new ArrayList<>(c.propertyNames())).containsExactlyInAnyOrder("iat", "exp", "roles", "username", "uid");
+    assertThat(new ArrayList<>(c.propertyNames()))
+        .containsExactlyInAnyOrder("iat", "exp", "roles", "username", "uid");
     assertThat(c.get("iat").isIntegralNumber()).isTrue();
     assertThat(c.get("exp").isIntegralNumber()).isTrue();
     assertThat(c.get("iat").asLong()).isEqualTo(clock.epochSecond());
@@ -87,7 +90,8 @@ class NimbusTokenIssuerTest {
   @Test
   @DisplayName("SC-IDENT-010 — rôles stockés + ROLE_USER, ordre de User::getRoles()")
   void storedRoles() {
-    JsonNode c = JSON.readTree(TokenFactory.decodePart(issuer.issue(camille(List.of("ROLE_ADMIN"))), 1));
+    JsonNode c =
+        JSON.readTree(TokenFactory.decodePart(issuer.issue(camille(List.of("ROLE_ADMIN"))), 1));
     assertThat(c.get("roles").get(0).asString()).isEqualTo("ROLE_ADMIN");
     assertThat(c.get("roles").get(1).asString()).isEqualTo("ROLE_USER");
   }
@@ -107,6 +111,7 @@ class NimbusTokenIssuerTest {
   void followsClock() {
     clock.advance(Duration.ofHours(1));
     JsonNode c = JSON.readTree(TokenFactory.decodePart(issuer.issue(camille(List.of())), 1));
-    assertThat(c.get("iat").asLong()).isEqualTo(Instant.parse("2026-11-26T10:00:00Z").getEpochSecond());
+    assertThat(c.get("iat").asLong())
+        .isEqualTo(Instant.parse("2026-11-26T10:00:00Z").getEpochSecond());
   }
 }

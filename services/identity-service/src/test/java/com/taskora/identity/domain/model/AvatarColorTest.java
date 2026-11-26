@@ -46,8 +46,21 @@ class AvatarColorTest {
 
   @ParameterizedTest
   @ValueSource(
-      strings = {"red", "#12345", "#1234567", "", "#0EA5E9\n", " #0EA5E9", "#0EA5E9 ", "#GGGGGG", "0EA5E9", "##0EA5E", "#0EA5E9\r"})
-  @DisplayName("SC-IDENT-031 E18 — couleur invalide (dont \\n final) → « Couleur d'avatar invalide. »")
+      strings = {
+        "red",
+        "#12345",
+        "#1234567",
+        "",
+        "#0EA5E9\n",
+        " #0EA5E9",
+        "#0EA5E9 ",
+        "#GGGGGG",
+        "0EA5E9",
+        "##0EA5E",
+        "#0EA5E9\r"
+      })
+  @DisplayName(
+      "SC-IDENT-031 E18 — couleur invalide (dont \\n final) → « Couleur d'avatar invalide. »")
   void invalidRejected(String raw) {
     assertThatThrownBy(() -> AvatarColor.parse(raw))
         .isInstanceOf(ValidationException.class)

@@ -57,21 +57,32 @@ class OutboxRelayIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 A11 — deux relais concurrents (SKIP LOCKED) ne livrent jamais deux fois le même message")
+  @DisplayName(
+      "SC-IDENT-005 A11 — deux relais concurrents (SKIP LOCKED) ne livrent jamais deux fois le même message")
   void skipLocked() throws Exception {
     SYMFONY.stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(500)));
     for (int i = 0; i < 6; i++) {
       registeredToken("Compte " + i, "relais-" + i + "@exemple.test", "motdepasse");
     }
     SYMFONY.resetAll();
-    SYMFONY.stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(200).withFixedDelay(300)
-        .withHeader("Content-Type", "application/json").withBody("{\"claimed\":0,\"boardIds\":[]}")));
+    SYMFONY.stubFor(
+        post(urlEqualTo(PATH))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withFixedDelay(300)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"claimed\":0,\"boardIds\":[]}")));
     CLOCK.advance(Duration.ofSeconds(61)); // les 12 claims (immédiats et de rattrapage) sont dus
     ExecutorService pool = Executors.newFixedThreadPool(2);
     CountDownLatch go = new CountDownLatch(1);
     List<Future<Integer>> f = new ArrayList<>();
     for (int i = 0; i < 2; i++) {
-      f.add(pool.submit(() -> { go.await(); return relay.deliverDue(20); }));
+      f.add(
+          pool.submit(() -> {
+            go.await();
+            return relay.deliverDue(20);
+          }));
     }
     go.countDown();
     for (Future<Integer> x : f) {
@@ -79,16 +90,22 @@ class OutboxRelayIT extends ApiTestBase {
     }
     pool.shutdown();
     Map<String, Integer> perEvent = new HashMap<>();
-    SYMFONY.findAll(postRequestedFor(urlEqualTo(PATH)))
-        .forEach(req -> perEvent.merge(JSON.readTree(req.getBodyAsString()).get("eventId").asString(), 1, Integer::sum));
+    SYMFONY
+        .findAll(postRequestedFor(urlEqualTo(PATH)))
+        .forEach(req ->
+            perEvent.merge(
+                JSON.readTree(req.getBodyAsString()).get("eventId").asString(), 1, Integer::sum));
     assertThat(perEvent).hasSize(12);
     assertThat(perEvent.values()).allMatch(n -> n == 1);
-    assertThat(count("SELECT COUNT(*) FROM identity.outbox_message WHERE destination='symfony-invitations' AND status='DELIVERED'"))
+    assertThat(
+            count(
+                "SELECT COUNT(*) FROM identity.outbox_message WHERE destination='symfony-invitations' AND status='DELIVERED'"))
         .isEqualTo(12);
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 A11 — UserRegistered : HELD, destination broker, charge conforme au schéma UserRegistered v1")
+  @DisplayName(
+      "SC-IDENT-005 A11 — UserRegistered : HELD, destination broker, charge conforme au schéma UserRegistered v1")
   void userRegisteredPayload() throws Exception {
     String token = registeredToken("Camille Martin", "camille@exemple.fr", "motdepasse");
     List<Map<String, Object>> rows =
@@ -99,7 +116,8 @@ class OutboxRelayIT extends ApiTestBase {
     assertThat(row.get("destination")).isEqualTo("broker");
     JsonNode p = JSON.readTree((String) row.get("payload"));
     assertThat(new ArrayList<>(p.propertyNames()))
-        .containsExactlyInAnyOrder("eventId", "type", "version", "occurredAt", "userId", "email", "name", "avatarColor");
+        .containsExactlyInAnyOrder(
+            "eventId", "type", "version", "occurredAt", "userId", "email", "name", "avatarColor");
     assertEnvelope(p, "UserRegistered", row);
     assertThat(p.get("email").asString()).isEqualTo("camille@exemple.fr");
     assertThat(p.get("name").asString()).isEqualTo("Camille Martin");
@@ -108,19 +126,24 @@ class OutboxRelayIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-015/016 A8 — UserProfileUpdated : HELD, changed exact ; aucun événement pour un mot de passe seul")
+  @DisplayName(
+      "SC-IDENT-015/016 A8 — UserProfileUpdated : HELD, changed exact ; aucun événement pour un mot de passe seul")
   void userProfileUpdatedPayload() throws Exception {
     String token = registeredToken("Camille", "camille@exemple.fr", "ancienmdp1");
     patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"nouveaumdp1\"}");
-    assertThat(count("SELECT COUNT(*) FROM identity.outbox_message WHERE type = 'UserProfileUpdated'")).isZero();
+    assertThat(
+            count("SELECT COUNT(*) FROM identity.outbox_message WHERE type = 'UserProfileUpdated'"))
+        .isZero();
     patchMe(token, "{\"name\":\"Camille M.\",\"avatarColor\":\"#0EA5E9\"}");
-    List<Map<String, Object>> rows = query("SELECT * FROM identity.outbox_message WHERE type = 'UserProfileUpdated'");
+    List<Map<String, Object>> rows =
+        query("SELECT * FROM identity.outbox_message WHERE type = 'UserProfileUpdated'");
     assertThat(rows).hasSize(1);
     assertThat(rows.getFirst().get("status")).isEqualTo("HELD");
     assertThat(rows.getFirst().get("destination")).isEqualTo("broker");
     JsonNode p = JSON.readTree((String) rows.getFirst().get("payload"));
     assertThat(new ArrayList<>(p.propertyNames()))
-        .containsExactlyInAnyOrder("eventId", "type", "version", "occurredAt", "userId", "name", "avatarColor", "changed");
+        .containsExactlyInAnyOrder(
+            "eventId", "type", "version", "occurredAt", "userId", "name", "avatarColor", "changed");
     assertEnvelope(p, "UserProfileUpdated", rows.getFirst());
     assertThat(p.get("name").asString()).isEqualTo("Camille M.");
     assertThat(p.get("avatarColor").asString()).isEqualTo("#0EA5E9");

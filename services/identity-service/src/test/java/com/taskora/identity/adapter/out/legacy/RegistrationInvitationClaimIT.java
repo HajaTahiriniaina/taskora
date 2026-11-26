@@ -28,7 +28,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 
-/** SC-IDENT-005/006 (A10) : client de POST /internal/invitations/claim, livraison synchrone puis outbox. */
+/**
+ * SC-IDENT-005/006 (A10) : client de POST /internal/invitations/claim, livraison synchrone puis
+ * outbox.
+ */
 class RegistrationInvitationClaimIT extends ApiTestBase {
   private static final String PATH = "/internal/invitations/claim";
   static final WireMockServer SYMFONY = new WireMockServer(wireMockConfig().dynamicPort());
@@ -55,17 +58,24 @@ class RegistrationInvitationClaimIT extends ApiTestBase {
   }
 
   private static void symfonyAnswers(int status) {
-    SYMFONY.stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(status)
-        .withHeader("Content-Type", "application/json")
-        .withBody(status == 200 ? "{\"claimed\":0,\"boardIds\":[]}" : "{\"error\":\"x\"}")));
+    SYMFONY.stubFor(
+        post(urlEqualTo(PATH))
+            .willReturn(
+                aResponse()
+                    .withStatus(status)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        status == 200 ? "{\"claimed\":0,\"boardIds\":[]}" : "{\"error\":\"x\"}")));
   }
 
   private static List<Map<String, Object>> claims() {
-    return query("SELECT * FROM identity.outbox_message WHERE destination = 'symfony-invitations' ORDER BY id");
+    return query(
+        "SELECT * FROM identity.outbox_message WHERE destination = 'symfony-invitations' ORDER BY id");
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — Symfony 200 : appel AVANT la réponse 201, corps InvitationClaimRequest exact, X-Internal-Secret, claim DELIVERED")
+  @DisplayName(
+      "SC-IDENT-005 — Symfony 200 : appel AVANT la réponse 201, corps InvitationClaimRequest exact, X-Internal-Secret, claim DELIVERED")
   void deliveredSynchronously() throws Exception {
     symfonyAnswers(200);
     MvcResult r = register("Camille", " Camille@Exemple.FR ", "motdepasse");
@@ -78,7 +88,8 @@ class RegistrationInvitationClaimIT extends ApiTestBase {
     assertThat(call.getHeader("X-Internal-Secret")).isEqualTo(INTERNAL_SECRET);
     assertThat(call.getHeader("Content-Type")).contains("application/json");
     JsonNode body = JSON.readTree(call.getBodyAsString());
-    assertThat(new java.util.ArrayList<>(body.propertyNames())).containsExactlyInAnyOrder("eventId", "userId", "email");
+    assertThat(new java.util.ArrayList<>(body.propertyNames()))
+        .containsExactlyInAnyOrder("eventId", "userId", "email");
     assertThat(UUID.fromString(body.get("eventId").asString()).version()).isEqualTo(4);
     assertThat(body.get("userId").isIntegralNumber()).isTrue();
     assertThat(body.get("userId").asInt()).isEqualTo(userId);
@@ -86,42 +97,59 @@ class RegistrationInvitationClaimIT extends ApiTestBase {
 
     List<Map<String, Object>> rows = claims();
     assertThat(rows).hasSize(2);
-    assertThat(rows.get(0).get("status")).isEqualTo("DELIVERED");
-    assertThat(rows.get(0).get("event_id")).isEqualTo(body.get("eventId").asString());
+    assertThat(rows.getFirst().get("status")).isEqualTo("DELIVERED");
+    assertThat(rows.getFirst().get("event_id")).isEqualTo(body.get("eventId").asString());
     assertThat(rows.get(1).get("status")).isEqualTo("PENDING");
-    assertThat(rows.get(0).get("type")).isEqualTo("InvitationClaimRequested");
+    assertThat(rows.getFirst().get("type")).isEqualTo("InvitationClaimRequested");
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — la projection est visible par Symfony au moment de l'appel (appel après validation)")
+  @DisplayName(
+      "SC-IDENT-005 — la projection est visible par Symfony au moment de l'appel (appel après validation)")
   void projectionCommittedBeforeCall() throws Exception {
-    SYMFONY.stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(200)
-        .withHeader("Content-Type", "application/json").withBody("{\"claimed\":0,\"boardIds\":[]}")));
+    SYMFONY.stubFor(
+        post(urlEqualTo(PATH))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"claimed\":0,\"boardIds\":[]}")));
     final long[] seenByCall = {-1};
     SYMFONY.addMockServiceRequestListener((req, resp) ->
-        seenByCall[0] = count("SELECT COUNT(*) FROM taskora.`user` WHERE email = 'camille@exemple.fr'"));
+        seenByCall[0] =
+            count("SELECT COUNT(*) FROM taskora.`user` WHERE email = 'camille@exemple.fr'"));
     register("Camille", "camille@exemple.fr", "motdepasse");
     assertThat(seenByCall[0]).isEqualTo(1);
   }
 
   @ParameterizedTest(name = "Symfony {0} → {1}")
-  @CsvSource({"500,PENDING", "503,PENDING", "404,PENDING", "401,FAILED", "400,FAILED", "409,FAILED"})
-  @DisplayName("SC-IDENT-005 — réponse de Symfony : 201 quand même ; 5xx/404 rejouables, 401/400/409 FAILED")
+  @CsvSource({
+    "500,PENDING",
+    "503,PENDING",
+    "404,PENDING",
+    "401,FAILED",
+    "400,FAILED",
+    "409,FAILED"
+  })
+  @DisplayName(
+      "SC-IDENT-005 — réponse de Symfony : 201 quand même ; 5xx/404 rejouables, 401/400/409 FAILED")
   void outcomes(int status, String expected) throws Exception {
     symfonyAnswers(status);
     MvcResult r = register("Camille", "camille@exemple.fr", "motdepasse");
     assertThat(r.getResponse().getStatus()).isEqualTo(201);
     assertThat(claims().getFirst().get("status")).isEqualTo(expected);
-    if (expected.equals("PENDING")) {
+    if ("PENDING".equals(expected)) {
       assertThat(((Number) claims().getFirst().get("attempts")).intValue()).isEqualTo(1);
       assertThat((String) claims().getFirst().get("last_error")).doesNotContain("camille");
     }
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — délai de lecture > 3 s → 201 sans attendre indéfiniment, message rejouable")
+  @DisplayName(
+      "SC-IDENT-005 — délai de lecture > 3 s → 201 sans attendre indéfiniment, message rejouable")
   void timeout() throws Exception {
-    SYMFONY.stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(200).withFixedDelay(5_000)));
+    SYMFONY.stubFor(
+        post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(200).withFixedDelay(5_000)));
     long t0 = System.nanoTime();
     MvcResult r = register("Camille", "camille@exemple.fr", "motdepasse");
     long ms = Duration.ofNanos(System.nanoTime() - t0).toMillis();
@@ -138,7 +166,9 @@ class RegistrationInvitationClaimIT extends ApiTestBase {
     SYMFONY.resetAll();
     symfonyAnswers(200);
     relay.deliverDue(20);
-    assertThat(SYMFONY.findAll(postRequestedFor(urlEqualTo(PATH)))).as("pas avant l'échéance").isEmpty();
+    assertThat(SYMFONY.findAll(postRequestedFor(urlEqualTo(PATH))))
+        .as("pas avant l'échéance")
+        .isEmpty();
     CLOCK.advance(Duration.ofSeconds(5));
     relay.deliverDue(20);
     assertThat(SYMFONY.findAll(postRequestedFor(urlEqualTo(PATH)))).hasSize(1);
@@ -146,7 +176,8 @@ class RegistrationInvitationClaimIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-005 — claim de rattrapage envoyé à +60 s (même userId et e-mail, autre eventId)")
+  @DisplayName(
+      "SC-IDENT-005 — claim de rattrapage envoyé à +60 s (même userId et e-mail, autre eventId)")
   void catchUpAfter60s() throws Exception {
     symfonyAnswers(200);
     register("Camille", "camille@exemple.fr", "motdepasse");
@@ -157,20 +188,27 @@ class RegistrationInvitationClaimIT extends ApiTestBase {
     relay.deliverDue(20);
     List<LoggedRequest> calls = SYMFONY.findAll(postRequestedFor(urlEqualTo(PATH)));
     assertThat(calls).hasSize(2);
-    JsonNode a = JSON.readTree(calls.get(0).getBodyAsString());
+    JsonNode a = JSON.readTree(calls.getFirst().getBodyAsString());
     JsonNode b = JSON.readTree(calls.get(1).getBodyAsString());
     assertThat(b.get("userId")).isEqualTo(a.get("userId"));
     assertThat(b.get("email")).isEqualTo(a.get("email"));
     assertThat(b.get("eventId")).isNotEqualTo(a.get("eventId"));
     assertThat(claims()).allSatisfy(c -> assertThat(c.get("status")).isEqualTo("DELIVERED"));
-    SYMFONY.verify(2, postRequestedFor(urlEqualTo(PATH)).withHeader("X-Internal-Secret", equalTo(INTERNAL_SECRET)));
+    SYMFONY.verify(
+        2,
+        postRequestedFor(urlEqualTo(PATH))
+            .withHeader("X-Internal-Secret", equalTo(INTERNAL_SECRET)));
   }
 
   @Test
   @DisplayName("SC-IDENT-005 — Symfony injoignable : 201, inscription utilisable immédiatement")
   void symfonyDown() throws Exception {
-    SYMFONY.stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withFault(
-        com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER)));
+    SYMFONY.stubFor(
+        post(urlEqualTo(PATH))
+            .willReturn(
+                aResponse()
+                    .withFault(
+                        com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER)));
     MvcResult r = register("Camille", "camille@exemple.fr", "motdepasse");
     assertThat(r.getResponse().getStatus()).isEqualTo(201);
     assertThat(login("camille@exemple.fr", "motdepasse").getResponse().getStatus()).isEqualTo(200);

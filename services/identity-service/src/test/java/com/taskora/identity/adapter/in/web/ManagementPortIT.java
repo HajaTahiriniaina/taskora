@@ -19,8 +19,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/** SC-IDENT-022 : /actuator/health servi sur le port de management uniquement (non routé par nginx). */
-@SpringBootTest(classes = IdentityServiceApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+/**
+ * SC-IDENT-022 : /actuator/health servi sur le port de management uniquement (non routé par nginx).
+ */
+@SpringBootTest(
+    classes = IdentityServiceApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestClockConfig.class)
 class ManagementPortIT {
   private static final TestKeys KEYS = TestKeys.shared();
@@ -41,12 +45,14 @@ class ManagementPortIT {
   }
 
   private HttpResponse<String> get(int p, String path) throws Exception {
-    return http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + p + path)).GET().build(),
+    return http.send(
+        HttpRequest.newBuilder(URI.create("http://localhost:" + p + path)).GET().build(),
         HttpResponse.BodyHandlers.ofString());
   }
 
   @Test
-  @DisplayName("SC-IDENT-022 A13 — application.yml : management sur le port 8091, seul health exposé, aucune trace d'erreur")
+  @DisplayName(
+      "SC-IDENT-022 A13 — application.yml : management sur le port 8091, seul health exposé, aucune trace d'erreur")
   void configuredPorts() {
     org.springframework.beans.factory.config.YamlPropertiesFactoryBean yaml =
         new org.springframework.beans.factory.config.YamlPropertiesFactoryBean();
@@ -77,7 +83,10 @@ class ManagementPortIT {
   @Test
   @DisplayName("SC-IDENT-022 — seul health est exposé (pas d'env, beans, heapdump…)")
   void onlyHealthExposed() throws Exception {
-    for (String ep : new String[] {"/actuator/env", "/actuator/beans", "/actuator/heapdump", "/actuator/configprops"}) {
+    for (String ep :
+        new String[] {
+          "/actuator/env", "/actuator/beans", "/actuator/heapdump", "/actuator/configprops"
+        }) {
       assertThat(get(managementPort, ep).statusCode()).as(ep).isNotEqualTo(200);
     }
   }

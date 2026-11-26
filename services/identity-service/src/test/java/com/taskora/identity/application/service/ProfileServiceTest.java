@@ -48,17 +48,40 @@ class ProfileServiceTest {
     projection = mock(LegacyUserProjectionPort.class);
     outbox = mock(OutboxPort.class);
     uow = new FakeUnitOfWork();
-    service = new ProfileService(users, hasher, projection, outbox, uow, Clock.fixed(NOW, ZoneOffset.UTC));
+    service =
+        new ProfileService(
+            users, hasher, projection, outbox, uow, Clock.fixed(NOW, ZoneOffset.UTC));
     when(users.findById(new UserId(4))).thenAnswer(inv -> Optional.of(Users.camille()));
     when(hasher.hash(any())).thenReturn(new HashedPassword("$2y$04$nouveauhash"));
-    doAnswer(inv -> { uow.assertActive("users.update"); return null; }).when(users).update(any());
-    doAnswer(inv -> { uow.assertActive("projection.upsert"); return null; }).when(projection).upsert(any());
-    doAnswer(inv -> { uow.assertActive("outbox.appendEvent"); return null; }).when(outbox).appendEvent(any());
+    doAnswer(
+            inv -> {
+              uow.assertActive("users.update");
+              return null;
+            })
+        .when(users)
+        .update(any());
+    doAnswer(
+            inv -> {
+              uow.assertActive("projection.upsert");
+              return null;
+            })
+        .when(projection)
+        .upsert(any());
+    doAnswer(
+            inv -> {
+              uow.assertActive("outbox.appendEvent");
+              return null;
+            })
+        .when(outbox)
+        .appendEvent(any());
   }
 
   private static ProfileUpdate update(String name, String color, String current, String newPw) {
     return new ProfileUpdate(
-        Optional.ofNullable(name), Optional.ofNullable(color), Optional.ofNullable(current), Optional.ofNullable(newPw));
+        Optional.ofNullable(name),
+        Optional.ofNullable(color),
+        Optional.ofNullable(current),
+        Optional.ofNullable(newPw));
   }
 
   @Test
@@ -69,7 +92,8 @@ class ProfileServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-015 — renommage : une unité de travail (update + projection + UserProfileUpdated)")
+  @DisplayName(
+      "SC-IDENT-015 — renommage : une unité de travail (update + projection + UserProfileUpdated)")
   void rename() {
     UserView v = service.update(new UserId(4), update("  Camille M. ", null, null, null));
     assertThat(v.name()).isEqualTo("Camille M.");
@@ -99,7 +123,8 @@ class ProfileServiceTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-017 — mot de passe seul : persisté et projeté, AUCUN événement (pas de donnée sensible)")
+  @DisplayName(
+      "SC-IDENT-017 — mot de passe seul : persisté et projeté, AUCUN événement (pas de donnée sensible)")
   void passwordOnlyNoEvent() {
     when(hasher.matches(any(), any())).thenReturn(true);
     service.update(new UserId(4), update(null, null, "ancienmdp1", "nouveaumdp1"));
@@ -121,7 +146,8 @@ class ProfileServiceTest {
   @DisplayName("SC-IDENT-018/019 — mot de passe actuel faux : aucune écriture")
   void errorWritesNothing() {
     when(hasher.matches(any(), any())).thenReturn(false);
-    assertThatThrownBy(() -> service.update(new UserId(4), update("Camille M.", null, "faux", "nouveaumdp1")))
+    assertThatThrownBy(
+            () -> service.update(new UserId(4), update("Camille M.", null, "faux", "nouveaumdp1")))
         .isInstanceOf(InvalidCurrentPasswordException.class);
     verify(users, never()).update(any());
     verifyNoInteractions(projection, outbox);

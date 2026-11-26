@@ -13,11 +13,15 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Golden : compat/php-string-functions.json (trim, mb_strlen, mb_substr(0,120), mb_strtolower de PHP 8.4). */
+/**
+ * Golden : compat/php-string-functions.json (trim, mb_strlen, mb_substr(0,120), mb_strtolower de
+ * PHP 8.4).
+ */
 class PhpStringTest {
 
   static Stream<Arguments> golden() {
-    try (InputStream in = PhpStringTest.class.getResourceAsStream("/compat/php-string-functions.json")) {
+    try (InputStream in =
+        PhpStringTest.class.getResourceAsStream("/compat/php-string-functions.json")) {
       List<Arguments> out = new ArrayList<>();
       for (JsonNode n : JsonMapper.builder().build().readTree(in)) {
         out.add(

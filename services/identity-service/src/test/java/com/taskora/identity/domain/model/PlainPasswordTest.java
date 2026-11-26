@@ -23,7 +23,8 @@ class PlainPasswordTest {
   @Test
   @DisplayName("SC-IDENT-003 — 8 caractères exactement → accepté")
   void eightAccepted() {
-    assertThatCode(() -> PlainPassword.of("12345678").requireMinimumLength()).doesNotThrowAnyException();
+    assertThatCode(() -> PlainPassword.of("12345678").requireMinimumLength())
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -32,7 +33,9 @@ class PlainPasswordTest {
     PlainPassword p = PlainPassword.of("ééééééé");
     assertThat(p.codePointLength()).isEqualTo(7);
     assertThat(p.utf8Length()).isEqualTo(14);
-    assertThatThrownBy(p::requireMinimumLength).isInstanceOf(ValidationException.class).hasMessage(TOO_SHORT);
+    assertThatThrownBy(p::requireMinimumLength)
+        .isInstanceOf(ValidationException.class)
+        .hasMessage(TOO_SHORT);
   }
 
   @Test
@@ -48,13 +51,15 @@ class PlainPasswordTest {
   void empty() {
     assertThat(PlainPassword.of("").isEmpty()).isTrue();
     assertThat(PlainPassword.of("x").isEmpty()).isFalse();
-    assertThatThrownBy(() -> PlainPassword.of("").requireMinimumLength()).isInstanceOf(ValidationException.class);
+    assertThatThrownBy(() -> PlainPassword.of("").requireMinimumLength())
+        .isInstanceOf(ValidationException.class);
   }
 
   @Test
   @DisplayName("SC-IDENT-028 E15 — 4096 octets exactement → accepté")
   void max4096Accepted() {
-    assertThatCode(() -> PlainPassword.of("a".repeat(4096)).requireMaximumLength()).doesNotThrowAnyException();
+    assertThatCode(() -> PlainPassword.of("a".repeat(4096)).requireMaximumLength())
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -65,11 +70,13 @@ class PlainPasswordTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-028 E15 — limite en OCTETS : 2049 × é = 4098 octets → refus ; 2048 × é = 4096 → accepté")
+  @DisplayName(
+      "SC-IDENT-028 E15 — limite en OCTETS : 2049 × é = 4098 octets → refus ; 2048 × é = 4096 → accepté")
   void limitInBytes() {
     assertThatThrownBy(() -> PlainPassword.of("é".repeat(2049)).requireMaximumLength())
         .isInstanceOf(PasswordTooLongException.class);
-    assertThatCode(() -> PlainPassword.of("é".repeat(2048)).requireMaximumLength()).doesNotThrowAnyException();
+    assertThatCode(() -> PlainPassword.of("é".repeat(2048)).requireMaximumLength())
+        .doesNotThrowAnyException();
   }
 
   @Test

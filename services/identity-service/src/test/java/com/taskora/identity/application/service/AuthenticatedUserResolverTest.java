@@ -35,7 +35,8 @@ class AuthenticatedUserResolverTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-014 — jeton valide → utilisateur rechargé par username (e-mail), rôles effectifs")
+  @DisplayName(
+      "SC-IDENT-014 — jeton valide → utilisateur rechargé par username (e-mail), rôles effectifs")
   void resolves() {
     when(verifier.verify("t")).thenReturn(new VerifiedToken("camille@exemple.fr", Map.of()));
     when(users.findByLoginEmail("camille@exemple.fr")).thenReturn(Optional.of(Users.camille()));
@@ -52,18 +53,21 @@ class AuthenticatedUserResolverTest {
     when(users.findByLoginEmail(anyString())).thenReturn(Optional.empty());
     assertThatThrownBy(() -> resolver.resolve("t"))
         .isInstanceOfSatisfying(
-            TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(TokenRejection.ACCOUNT_NOT_FOUND));
+            TokenRejectedException.class,
+            e -> assertThat(e.reason()).isEqualTo(TokenRejection.ACCOUNT_NOT_FOUND));
     verify(users).findByLoginEmail("parti@exemple.fr");
   }
 
   @Test
-  @DisplayName("SC-IDENT-012 — username absent → TokenRejectedException(MISSING_USERNAME) sans requête")
+  @DisplayName(
+      "SC-IDENT-012 — username absent → TokenRejectedException(MISSING_USERNAME) sans requête")
   void missingUsername() {
     Map<String, Object> claims = new HashMap<>();
     when(verifier.verify("t")).thenReturn(new VerifiedToken(null, claims));
     assertThatThrownBy(() -> resolver.resolve("t"))
         .isInstanceOfSatisfying(
-            TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(TokenRejection.MISSING_USERNAME));
+            TokenRejectedException.class,
+            e -> assertThat(e.reason()).isEqualTo(TokenRejection.MISSING_USERNAME));
     verifyNoInteractions(users);
   }
 
@@ -73,7 +77,8 @@ class AuthenticatedUserResolverTest {
     when(verifier.verify("t")).thenThrow(new TokenRejectedException(TokenRejection.EXPIRED));
     assertThatThrownBy(() -> resolver.resolve("t"))
         .isInstanceOfSatisfying(
-            TokenRejectedException.class, e -> assertThat(e.reason()).isEqualTo(TokenRejection.EXPIRED));
+            TokenRejectedException.class,
+            e -> assertThat(e.reason()).isEqualTo(TokenRejection.EXPIRED));
     verifyNoInteractions(users);
   }
 }

@@ -12,8 +12,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * Valide chaque réponse de test contre le contrat public docs/contracts/openapi/identity-service.yaml
- * (chemin relatif au module : ../../docs/...).
+ * Valide chaque réponse de test contre le contrat public
+ * docs/contracts/openapi/identity-service.yaml (chemin relatif au module : ../../docs/...).
  */
 public final class OpenApiValidation {
   public static final Path CONTRACT = Path.of("../../docs/contracts/openapi/identity-service.yaml");
@@ -23,13 +23,30 @@ public final class OpenApiValidation {
 
   private static synchronized OpenApiInteractionValidator validator() {
     if (validator == null) {
-      assertThat(Files.exists(CONTRACT)).as("contrat OpenAPI introuvable : " + CONTRACT.toAbsolutePath()).isTrue();
+      assertThat(Files.exists(CONTRACT))
+          .as("contrat OpenAPI introuvable : " + CONTRACT.toAbsolutePath())
+          .isTrue();
       validator =
           OpenApiInteractionValidator.createForSpecificationUrl(CONTRACT.toUri().toString())
               .withBasePathOverride("/api")
               .build();
     }
     return validator;
+  }
+
+  /** Réponse HTTP réelle (serveur sur port aléatoire) conforme au contrat pour cette opération. */
+  public static void assertResponseConforms(
+      String method, String path, int status, String contentType, String body) {
+    SimpleResponse.Builder b = SimpleResponse.Builder.status(status);
+    if (contentType != null) {
+      b.withContentType(contentType);
+    }
+    b.withBody(body);
+    ValidationReport report =
+        validator().validateResponse(path, Request.Method.valueOf(method), b.build());
+    assertThat(report.getMessages())
+        .as("réponse %s %s non conforme au contrat", method, path)
+        .isEmpty();
   }
 
   /** La réponse (statut, en-têtes, corps) est conforme au contrat pour cette opération. */

@@ -47,35 +47,63 @@ class UserPersistenceIT extends ApiTestBase {
   @DisplayName("SC-IDENT-001 — Flyway : V1 et V2 appliquées avec succès dans le schéma identity")
   void flywayApplied() {
     List<Map<String, Object>> rows =
-        query("SELECT version, success FROM identity.flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
+        query(
+            "SELECT version, success FROM identity.flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
     assertThat(rows).extracting(r -> r.get("version")).containsExactly("1", "2");
     assertThat(rows).allSatisfy(r -> assertThat(r.get("success")).isEqualTo(Boolean.TRUE));
   }
 
   @Test
-  @DisplayName("SC-IDENT-001 — colonnes : email en utf8mb4_unicode_ci (VARCHAR 180), password_hash en utf8mb4_bin")
+  @DisplayName(
+      "SC-IDENT-001 — colonnes : email en utf8mb4_unicode_ci (VARCHAR 180), password_hash en utf8mb4_bin")
   void columns() {
     List<Map<String, Object>> cols =
-        query("SELECT column_name AS c, collation_name AS k, character_maximum_length AS l FROM information_schema.columns "
-            + "WHERE table_schema = 'identity' AND table_name = 'user_account'");
+        query(
+            "SELECT column_name AS c, collation_name AS k, character_maximum_length AS l FROM information_schema.columns "
+                + "WHERE table_schema = 'identity' AND table_name = 'user_account'");
     Map<Object, Map<String, Object>> byName = new java.util.HashMap<>();
     cols.forEach(c -> byName.put(c.get("c"), c));
-    assertThat(byName).containsKeys("id", "email", "name", "password_hash", "avatar_color", "roles", "created_at", "updated_at");
+    assertThat(byName)
+        .containsKeys(
+            "id",
+            "email",
+            "name",
+            "password_hash",
+            "avatar_color",
+            "roles",
+            "created_at",
+            "updated_at");
     assertThat(byName.get("email").get("k")).isEqualTo("utf8mb4_unicode_ci");
     assertThat(((Number) byName.get("email").get("l")).intValue()).isEqualTo(180);
     assertThat(byName.get("password_hash").get("k")).isEqualTo("utf8mb4_bin");
-    assertThat(count("SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='identity' "
-        + "AND table_name='user_account' AND index_name='uq_user_account_email' AND non_unique=0")).isEqualTo(1);
-    assertThat(count("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='identity' AND table_name='outbox_message'"))
+    assertThat(
+            count(
+                "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='identity' "
+                    + "AND table_name='user_account' AND index_name='uq_user_account_email' AND non_unique=0"))
+        .isEqualTo(1);
+    assertThat(
+            count(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='identity' AND table_name='outbox_message'"))
         .isEqualTo(1);
   }
 
   @ParameterizedTest(name = "« {0} » trouvé")
-  @ValueSource(strings = {"camille@exemple.fr", "CAMILLE@Exemple.FR", "camille@exemple.fr   ", "cämille@exemplé.fr"})
-  @DisplayName("SC-IDENT-007 — findByLoginEmail suit la collation : casse, accents et espaces finaux ignorés")
+  @ValueSource(
+      strings = {
+        "camille@exemple.fr",
+        "CAMILLE@Exemple.FR",
+        "camille@exemple.fr   ",
+        "cämille@exemplé.fr"
+      })
+  @DisplayName(
+      "SC-IDENT-007 — findByLoginEmail suit la collation : casse, accents et espaces finaux ignorés")
   void collationLookup(String raw) {
     insert("camille@exemple.fr");
-    assertThat(users.findByLoginEmail(raw)).isPresent().get().extracting(u -> u.email().value()).isEqualTo("camille@exemple.fr");
+    assertThat(users.findByLoginEmail(raw))
+        .isPresent()
+        .get()
+        .extracting(u -> u.email().value())
+        .isEqualTo("camille@exemple.fr");
   }
 
   @Test
@@ -86,7 +114,8 @@ class UserPersistenceIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-002 — index unique avec la collation : « É@x.fr » après « e@x.fr » → EmailAlreadyUsedException")
+  @DisplayName(
+      "SC-IDENT-002 — index unique avec la collation : « É@x.fr » après « e@x.fr » → EmailAlreadyUsedException")
   void uniqueIndexCollation() {
     insert("e@x.fr");
     assertThatThrownBy(() -> insert("É@x.fr")).isInstanceOf(EmailAlreadyUsedException.class);

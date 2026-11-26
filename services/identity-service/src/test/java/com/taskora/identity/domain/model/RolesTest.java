@@ -15,11 +15,15 @@ class RolesTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-010 — ROLE_USER ajouté après les rôles stockés, sans doublon (ordre de User::getRoles())")
+  @DisplayName(
+      "SC-IDENT-010 — ROLE_USER ajouté après les rôles stockés, sans doublon (ordre de User::getRoles())")
   void appendsWithoutDuplicate() {
-    assertThat(new Roles(List.of("ROLE_ADMIN")).effective()).containsExactly("ROLE_ADMIN", "ROLE_USER");
-    assertThat(new Roles(List.of("ROLE_USER", "ROLE_ADMIN")).effective()).containsExactly("ROLE_USER", "ROLE_ADMIN");
-    assertThat(new Roles(List.of("ROLE_X", "ROLE_X")).effective()).containsExactly("ROLE_X", "ROLE_USER");
+    assertThat(new Roles(List.of("ROLE_ADMIN")).effective())
+        .containsExactly("ROLE_ADMIN", "ROLE_USER");
+    assertThat(new Roles(List.of("ROLE_USER", "ROLE_ADMIN")).effective())
+        .containsExactly("ROLE_USER", "ROLE_ADMIN");
+    assertThat(new Roles(List.of("ROLE_X", "ROLE_X")).effective())
+        .containsExactly("ROLE_X", "ROLE_USER");
   }
 
   @Test

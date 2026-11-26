@@ -15,7 +15,8 @@ class EmailTest {
   @Test
   @DisplayName("SC-IDENT-001 — l'e-mail d'inscription est trimé et mis en minuscules")
   void normalizesRegistrationEmail() {
-    assertThat(Email.fromRegistration(" Camille@Exemple.FR ").value()).isEqualTo("camille@exemple.fr");
+    assertThat(Email.fromRegistration(" Camille@Exemple.FR ").value())
+        .isEqualTo("camille@exemple.fr");
   }
 
   @Test
@@ -31,7 +32,8 @@ class EmailTest {
   @ParameterizedTest
   @NullSource
   @ValueSource(strings = {"", "   ", "\t\n"})
-  @DisplayName("SC-IDENT-003 — e-mail absent, vide ou blanc → « Le champ \"email\" est obligatoire. »")
+  @DisplayName(
+      "SC-IDENT-003 — e-mail absent, vide ou blanc → « Le champ \"email\" est obligatoire. »")
   void requiredEmail(String raw) {
     assertThatThrownBy(() -> Email.fromRegistration(raw))
         .isInstanceOf(ValidationException.class)
@@ -39,7 +41,8 @@ class EmailTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"pas-un-email", "camille@", "@exemple.fr", "a b@exemple.fr", "x@exemple..fr"})
+  @ValueSource(
+      strings = {"pas-un-email", "camille@", "@exemple.fr", "a b@exemple.fr", "x@exemple..fr"})
   @DisplayName("SC-IDENT-003 — format refusé → « Adresse e-mail invalide. »")
   void invalidFormat(String raw) {
     assertThatThrownBy(() -> Email.fromRegistration(raw))
@@ -47,7 +50,9 @@ class EmailTest {
         .hasMessage("Adresse e-mail invalide.");
   }
 
-  /** Domaine fait de labels de 60 caractères au plus (FILTER_VALIDATE_EMAIL limite un label à 63). */
+  /**
+   * Domaine fait de labels de 60 caractères au plus (FILTER_VALIDATE_EMAIL limite un label à 63).
+   */
   private static String labels(char c, int length) {
     StringBuilder sb = new StringBuilder();
     while (sb.length() < length) {
@@ -68,9 +73,11 @@ class EmailTest {
   }
 
   @Test
-  @DisplayName("SC-IDENT-004 — 182 caractères valides, tronqués à 180 AVANT validation → finit par « . » → invalide")
+  @DisplayName(
+      "SC-IDENT-004 — 182 caractères valides, tronqués à 180 AVANT validation → finit par « . » → invalide")
   void truncatedBeforeValidation() {
-    String prefix = "a".repeat(40) + "@" + labels('d', 138) + "."; // 180 caractères terminés par un point
+    String prefix =
+        "a".repeat(40) + "@" + labels('d', 138) + "."; // 180 caractères terminés par un point
     assertThat(prefix).hasSize(180);
     assertThatThrownBy(() -> Email.fromRegistration(prefix + "fr"))
         .isInstanceOf(ValidationException.class)
@@ -80,9 +87,10 @@ class EmailTest {
   @Test
   @DisplayName("SC-IDENT-004 — troncature en points de code, puis minuscules")
   void truncatesThenLowercases() {
-    String raw = "A".repeat(40) + "@" + labels('D', 137) + ".FRX"; // 182 → 180 : se termine par ".F"
+    String raw =
+        "A".repeat(40) + "@" + labels('D', 137) + ".FRX"; // 182 → 180 : se termine par ".F"
     Email e = Email.fromRegistration(raw);
-    assertThat(e.value()).hasSize(180).isEqualTo(("a".repeat(40) + "@" + labels('d', 137) + ".f"));
+    assertThat(e.value()).hasSize(180).isEqualTo("a".repeat(40) + "@" + labels('d', 137) + ".f");
   }
 
   @Test

@@ -1,7 +1,8 @@
 package com.taskora.identity.support;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -10,9 +11,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.mariadb.MariaDBContainer;
 
 /**
- * MariaDB 11.8 partagée par les tests d'intégration (Testcontainers), configurée comme la base réelle
- * (utf8mb4_unicode_ci) : schémas identity et taskora, table taskora.user exactement comme en §8.3,
- * utilisateur identity avec les droits exacts d'identity-migration.md §2 (jamais DELETE sur
+ * MariaDB 11.8 partagée par les tests d'intégration (Testcontainers), configurée comme la base
+ * réelle (utf8mb4_unicode_ci) : schémas identity et taskora, table taskora.user exactement comme en
+ * §8.3, utilisateur identity avec les droits exacts d'identity-migration.md §2 (jamais DELETE sur
  * taskora.user). Aucun accès à la base de développement.
  */
 public final class MariaDbContainerSupport {
@@ -37,6 +38,7 @@ public final class MariaDbContainerSupport {
       """;
 
   private static MariaDBContainer container;
+  private static HikariDataSource rootPool;
 
   private MariaDbContainerSupport() {}
 
@@ -75,7 +77,36 @@ public final class MariaDbContainerSupport {
 
   /** Connexion root (préparation et contrôle des données de test uniquement). */
   public static Connection rootConnection() throws SQLException {
-    return DriverManager.getConnection(jdbcUrl("identity"), "root", ROOT_PASSWORD);
+    return rootDataSource().getConnection();
+  }
+
+  /**
+   * Pool root unique (B7) : les connexions sont réutilisées au lieu d'ouvrir un socket par requête
+   * de contrôle (délais JDBC intermittents via host.docker.internal sur Docker Desktop).
+   */
+  private static synchronized HikariDataSource rootDataSource() {
+    if (rootPool == null || rootPool.isClosed()) {
+      container();
+      HikariConfig config = new HikariConfig();
+      config.setJdbcUrl(jdbcUrl("identity"));
+      config.setUsername("root");
+      config.setPassword(ROOT_PASSWORD);
+      config.setPoolName("test-root");
+      config.setMaximumPoolSize(2);
+      config.setMinimumIdle(1);
+      config.setConnectionTimeout(30_000);
+      config.addDataSourceProperty("connectTimeout", "30000");
+      rootPool = new HikariDataSource(config);
+    }
+    return rootPool;
+  }
+
+  /** Ferme le pool root (appelé en fin de classe de test ; recréé à la demande). */
+  public static synchronized void closeRootPool() {
+    if (rootPool != null) {
+      rootPool.close();
+      rootPool = null;
+    }
   }
 
   public static void rootExecute(List<String> statements) {

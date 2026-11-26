@@ -14,7 +14,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Golden : compat/php-filter-validate-email.json, produit par filter_var(FILTER_VALIDATE_EMAIL) en PHP 8.4. */
+/**
+ * Golden : compat/php-filter-validate-email.json, produit par filter_var(FILTER_VALIDATE_EMAIL) en
+ * PHP 8.4.
+ */
 class PhpEmailValidatorTest {
 
   static List<JsonNode> cases() {

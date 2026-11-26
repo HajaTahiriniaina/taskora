@@ -32,7 +32,8 @@ class MeApiIT extends ApiTestBase {
   }
 
   private static Map<String, Object> row() {
-    return query("SELECT * FROM identity.user_account WHERE email = 'camille@exemple.fr'").getFirst();
+    return query("SELECT * FROM identity.user_account WHERE email = 'camille@exemple.fr'")
+        .getFirst();
   }
 
   private static Map<String, Object> legacyRow() {
@@ -56,7 +57,8 @@ class MeApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-014 — GET /api/me : {id, name, email, avatarColor} de SON compte, conforme au contrat")
+  @DisplayName(
+      "SC-IDENT-014 — GET /api/me : {id, name, email, avatarColor} de SON compte, conforme au contrat")
   void getMe() throws Exception {
     registeredToken("Autre", "autre@exemple.fr", "motdepasse");
     MvcResult r = ok(me(token));
@@ -120,21 +122,29 @@ class MeApiIT extends ApiTestBase {
 
   @ParameterizedTest(name = "« {0} »")
   @ValueSource(strings = {"red", "#12345", "#1234567", "", "#0EA5E9\\n", " #0EA5E9", "#GGGGGG"})
-  @DisplayName("SC-IDENT-031 E18 — couleur invalide → 400 « Couleur d'avatar invalide. », nom envoyé non appliqué")
+  @DisplayName(
+      "SC-IDENT-031 E18 — couleur invalide → 400 « Couleur d'avatar invalide. », nom envoyé non appliqué")
   void invalidColor(String jsonEscapedColor) throws Exception {
     assertError(
-        patchMe(token, "{\"name\":\"Camille M.\",\"avatarColor\":\"" + jsonEscapedColor + "\"}"), 400, BAD_COLOR);
+        patchMe(token, "{\"name\":\"Camille M.\",\"avatarColor\":\"" + jsonEscapedColor + "\"}"),
+        400,
+        BAD_COLOR);
     assertNothingChanged();
   }
 
   @Test
-  @DisplayName("SC-IDENT-031 E18 — {\"name\":\"\",\"avatarColor\":\"red\"} → message sur name (ordre)")
+  @DisplayName(
+      "SC-IDENT-031 E18 — {\"name\":\"\",\"avatarColor\":\"red\"} → message sur name (ordre)")
   void nameBeforeColor() throws Exception {
-    assertError(patchMe(token, "{\"name\":\"\",\"avatarColor\":\"red\"}"), 400, "Le champ \"name\" est obligatoire.");
+    assertError(
+        patchMe(token, "{\"name\":\"\",\"avatarColor\":\"red\"}"),
+        400,
+        "Le champ \"name\" est obligatoire.");
   }
 
   @Test
-  @DisplayName("SC-IDENT-017 — changement de mot de passe : 200, hash $2y$ changé dans identity et taskora.user")
+  @DisplayName(
+      "SC-IDENT-017 — changement de mot de passe : 200, hash $2y$ changé dans identity et taskora.user")
   void changePassword() throws Exception {
     ok(patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"nouveaumdp1\"}"));
     String newHash = storedHash("camille@exemple.fr");
@@ -143,39 +153,58 @@ class MeApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-018 — currentPassword faux → 400 « Mot de passe actuel incorrect. », hash inchangé")
+  @DisplayName(
+      "SC-IDENT-018 — currentPassword faux → 400 « Mot de passe actuel incorrect. », hash inchangé")
   void wrongCurrent() throws Exception {
-    assertError(patchMe(token, "{\"currentPassword\":\"faux\",\"newPassword\":\"nouveaumdp1\"}"), 400, WRONG_CURRENT);
+    assertError(
+        patchMe(token, "{\"currentPassword\":\"faux\",\"newPassword\":\"nouveaumdp1\"}"),
+        400,
+        WRONG_CURRENT);
     assertNothingChanged();
   }
 
   @Test
-  @DisplayName("SC-IDENT-018 — currentPassword absent avec newPassword → 400 « Mot de passe actuel incorrect. »")
+  @DisplayName(
+      "SC-IDENT-018 — currentPassword absent avec newPassword → 400 « Mot de passe actuel incorrect. »")
   void missingCurrent() throws Exception {
     assertError(patchMe(token, "{\"newPassword\":\"nouveaumdp1\"}"), 400, WRONG_CURRENT);
     assertNothingChanged();
   }
 
   @Test
-  @DisplayName("SC-IDENT-018 — newPassword de 7 avec bon mot de passe actuel → 400 longueur, hash inchangé")
+  @DisplayName(
+      "SC-IDENT-018 — newPassword de 7 avec bon mot de passe actuel → 400 longueur, hash inchangé")
   void newTooShort() throws Exception {
-    assertError(patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"1234567\"}"), 400, TOO_SHORT);
+    assertError(
+        patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"1234567\"}"),
+        400,
+        TOO_SHORT);
     assertNothingChanged();
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"{\"newPassword\":\"\"}", "{\"newPassword\":null}", "{\"currentPassword\":\"faux\"}", "{\"currentPassword\":\"faux\",\"newPassword\":\"\"}"})
-  @DisplayName("SC-IDENT-018 E21 — newPassword absent, null ou \"\" → aucune vérification, aucun changement")
+  @ValueSource(
+      strings = {
+        "{\"newPassword\":\"\"}",
+        "{\"newPassword\":null}",
+        "{\"currentPassword\":\"faux\"}",
+        "{\"currentPassword\":\"faux\",\"newPassword\":\"\"}"
+      })
+  @DisplayName(
+      "SC-IDENT-018 E21 — newPassword absent, null ou \"\" → aucune vérification, aucun changement")
   void noPasswordChange(String body) throws Exception {
     ok(patchMe(token, body));
     assertNothingChanged();
   }
 
   @Test
-  @DisplayName("SC-IDENT-019 — {name, currentPassword faux, newPassword} → 400 et le nom reste « Camille »")
+  @DisplayName(
+      "SC-IDENT-019 — {name, currentPassword faux, newPassword} → 400 et le nom reste « Camille »")
   void atomic() throws Exception {
     assertError(
-        patchMe(token, "{\"name\":\"Camille M.\",\"currentPassword\":\"faux\",\"newPassword\":\"nouveaumdp1\"}"),
+        patchMe(
+            token,
+            "{\"name\":\"Camille M.\",\"currentPassword\":\"faux\",\"newPassword\":\"nouveaumdp1\"}"),
         400,
         WRONG_CURRENT);
     assertNothingChanged();
@@ -183,7 +212,8 @@ class MeApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-020 — {\"email\":\"autre@exemple.fr\"} → 200, e-mail inchangé, jeton toujours valide")
+  @DisplayName(
+      "SC-IDENT-020 — {\"email\":\"autre@exemple.fr\"} → 200, e-mail inchangé, jeton toujours valide")
   void emailNotModifiable() throws Exception {
     MvcResult r = ok(patchMe(token, "{\"email\":\"autre@exemple.fr\"}"));
     assertThat(json(r).get("email").asString()).isEqualTo("camille@exemple.fr");
@@ -192,7 +222,8 @@ class MeApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-021 — après changement de mot de passe, l'ancien jeton reste accepté (E10 conservé)")
+  @DisplayName(
+      "SC-IDENT-021 — après changement de mot de passe, l'ancien jeton reste accepté (E10 conservé)")
   void oldTokenStillValid() throws Exception {
     String other = json(login("camille@exemple.fr", "ancienmdp1")).get("token").asString();
     ok(patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"nouveaumdp1\"}"));
@@ -201,10 +232,13 @@ class MeApiIT extends ApiTestBase {
   }
 
   @Test
-  @DisplayName("SC-IDENT-028 E15 — newPassword de 4097 octets, bon mot de passe actuel → 400, hash inchangé")
+  @DisplayName(
+      "SC-IDENT-028 E15 — newPassword de 4097 octets, bon mot de passe actuel → 400, hash inchangé")
   void newTooLong() throws Exception {
     assertError(
-        patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"" + "a".repeat(4097) + "\"}"),
+        patchMe(
+            token,
+            "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"" + "a".repeat(4097) + "\"}"),
         400,
         "Le mot de passe ne doit pas dépasser 4096 octets.");
     assertNothingChanged();
@@ -213,8 +247,12 @@ class MeApiIT extends ApiTestBase {
   @Test
   @DisplayName("SC-IDENT-028 E15 — newPassword de 4096 octets → 200")
   void new4096() throws Exception {
-    ok(patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"" + "a".repeat(4096) + "\"}"));
-    assertThat(login("camille@exemple.fr", "a".repeat(4096)).getResponse().getStatus()).isEqualTo(200);
+    ok(
+        patchMe(
+            token,
+            "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"" + "a".repeat(4096) + "\"}"));
+    assertThat(login("camille@exemple.fr", "a".repeat(4096)).getResponse().getStatus())
+        .isEqualTo(200);
   }
 
   @ParameterizedTest
@@ -243,12 +281,15 @@ class MeApiIT extends ApiTestBase {
   @CsvSource({
     "name,nombre", "name,booléen", "name,tableau", "name,objet",
     "avatarColor,nombre", "avatarColor,booléen", "avatarColor,tableau", "avatarColor,objet",
-    "currentPassword,nombre", "currentPassword,booléen", "currentPassword,tableau", "currentPassword,objet",
+    "currentPassword,nombre", "currentPassword,booléen", "currentPassword,tableau",
+        "currentPassword,objet",
     "newPassword,nombre", "newPassword,booléen", "newPassword,tableau", "newPassword,objet"
   })
-  @DisplayName("SC-IDENT-030 E17 — champ non chaîne → 400 « Le champ \"x\" doit être une chaîne de caractères. »")
+  @DisplayName(
+      "SC-IDENT-030 E17 — champ non chaîne → 400 « Le champ \"x\" doit être une chaîne de caractères. »")
   void nonStringField(String field, String type) throws Exception {
-    assertError(patchMe(token, "{\"" + field + "\":" + nonStringJson(type) + "}"), 400, typeError(field));
+    assertError(
+        patchMe(token, "{\"" + field + "\":" + nonStringJson(type) + "}"), 400, typeError(field));
     assertNothingChanged();
   }
 
@@ -263,20 +304,26 @@ class MeApiIT extends ApiTestBase {
           type avant contenu de name    | {"name":"","newPassword":4}                                    | newPassword
           type avant couleur invalide   | {"avatarColor":"red","currentPassword":false}                  | currentPassword
           """)
-  @DisplayName("SC-IDENT-030 E17 — types contrôlés dans l'ordre name, avatarColor, currentPassword, newPassword, avant le contenu")
+  @DisplayName(
+      "SC-IDENT-030 E17 — types contrôlés dans l'ordre name, avatarColor, currentPassword, newPassword, avant le contenu")
   void typeOrder(String label, String body, String field) throws Exception {
     assertError(patchMe(token, body), 400, typeError(field));
   }
 
   @Test
-  @DisplayName("SC-IDENT-034 E21 — {currentPassword correct, newPassword \"0\"} → 400 longueur, hash inchangé")
+  @DisplayName(
+      "SC-IDENT-034 E21 — {currentPassword correct, newPassword \"0\"} → 400 longueur, hash inchangé")
   void zeroWithCurrent() throws Exception {
-    assertError(patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"0\"}"), 400, TOO_SHORT);
+    assertError(
+        patchMe(token, "{\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"0\"}"),
+        400,
+        TOO_SHORT);
     assertNothingChanged();
   }
 
   @Test
-  @DisplayName("SC-IDENT-034 E21 — {newPassword \"0\"} seul → 400 « Mot de passe actuel incorrect. »")
+  @DisplayName(
+      "SC-IDENT-034 E21 — {newPassword \"0\"} seul → 400 « Mot de passe actuel incorrect. »")
   void zeroWithoutCurrent() throws Exception {
     assertError(patchMe(token, "{\"newPassword\":\"0\"}"), 400, WRONG_CURRENT);
     assertNothingChanged();

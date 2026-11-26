@@ -12,8 +12,8 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Jetons au format Lexik (en-tête {"typ":"JWT","alg":"RS256"}, iat/exp entiers, roles, username)
- * et leurs variantes malveillantes ou invalides (SC-IDENT-010, 012).
+ * Jetons au format Lexik (en-tête {"typ":"JWT","alg":"RS256"}, iat/exp entiers, roles, username) et
+ * leurs variantes malveillantes ou invalides (SC-IDENT-010, 012).
  */
 public final class TokenFactory {
   public static final long TTL = 604_800L;
@@ -89,8 +89,11 @@ public final class TokenFactory {
     try {
       Mac mac = Mac.getInstance("HmacSHA256");
       mac.init(
-          new SecretKeySpec(keys.publicPemText().getBytes(StandardCharsets.US_ASCII), "HmacSHA256"));
-      return signingInput + "." + B64.encodeToString(mac.doFinal(signingInput.getBytes(StandardCharsets.US_ASCII)));
+          new SecretKeySpec(
+              keys.publicPemText().getBytes(StandardCharsets.US_ASCII), "HmacSHA256"));
+      return signingInput
+          + "."
+          + B64.encodeToString(mac.doFinal(signingInput.getBytes(StandardCharsets.US_ASCII)));
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException(e);
     }
@@ -175,6 +178,7 @@ public final class TokenFactory {
 
   /** Décode une partie (0 = en-tête, 1 = charge) en texte JSON. */
   public static String decodePart(String token, int index) {
-    return new String(Base64.getUrlDecoder().decode(token.split("\\.")[index]), StandardCharsets.UTF_8);
+    return new String(
+        Base64.getUrlDecoder().decode(token.split("\\.")[index]), StandardCharsets.UTF_8);
   }
 }
