@@ -7,7 +7,7 @@ export function isHtml(value: string): boolean {
 }
 
 /** Legacy plain text and Markdown (e.g. Trello imports) → HTML. */
-export function toHtml(value: string | null | undefined): string {
+export function toHtml(value: null | string | undefined): string {
   const v = (value ?? '').trim();
   if (!v) return '';
   return isHtml(v) ? v : (marked.parse(v, { async: false, gfm: true, breaks: true }) as string);
@@ -17,7 +17,7 @@ let hooked = false;
 function ensureHooks() {
   if (hooked) return;
   hooked = true;
-  DOMPurify.addHook('afterSanitizeAttributes', node => {
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     if (node.tagName === 'A') {
       node.setAttribute('target', '_blank');
       node.setAttribute('rel', 'noopener noreferrer');
@@ -36,13 +36,24 @@ export function sanitizeHtml(html: string): string {
   ensureHooks();
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
-    FORBID_TAGS: ['style', 'form', 'iframe', 'object', 'embed', 'button', 'textarea', 'select', 'svg', 'math'],
+    FORBID_TAGS: [
+      'style',
+      'form',
+      'iframe',
+      'object',
+      'embed',
+      'button',
+      'textarea',
+      'select',
+      'svg',
+      'math',
+    ],
     FORBID_ATTR: ['srcset', 'formaction'],
     ADD_ATTR: ['type', 'checked'],
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|\/(?!\/))/i,
   });
 }
 
-export function renderRich(value: string | null | undefined): string {
+export function renderRich(value: null | string | undefined): string {
   return sanitizeHtml(toHtml(value));
 }

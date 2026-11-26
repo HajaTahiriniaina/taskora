@@ -1,22 +1,126 @@
-:host { display: block; }
-.auth { min-height: 100vh; display: grid; grid-template-columns: 1fr 1.05fr; }
-.side { position: relative; overflow: hidden; color: #fff; padding: 40px; display: flex; flex-direction: column; justify-content: space-between;
-  background: radial-gradient(at 10% 10%, #7c3aed 0, transparent 50%), radial-gradient(at 90% 20%, #06b6d4 0, transparent 45%), radial-gradient(at 60% 100%, #ec4899 0, transparent 55%), #1e1b4b; }
-.side h2 { font-size: 38px; font-weight: 800; letter-spacing: -.03em; max-width: 440px; }
-.side p { color: rgba(255,255,255,.75); font-size: 16px; max-width: 420px; line-height: 1.6; margin: 16px 0 0; }
-.quote { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(10px); border-radius: 18px; padding: 20px; max-width: 440px;
-  p { margin: 0 0 12px; color: #fff; font-size: 15px; } small { color: rgba(255,255,255,.7); } }
-.main { display: flex; align-items: center; justify-content: center; padding: 40px 24px; background: var(--bg); }
-.form-wrap { width: 100%; max-width: 400px; animation: slideUp .4s var(--ease); }
-.form-wrap h1 { font-size: 30px; font-weight: 800; margin-bottom: 8px; }
-.form-wrap > p { color: var(--text-2); margin: 0 0 28px; }
-.error { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(239,68,68,.1); color: var(--danger); font-weight: 500; margin-bottom: 16px; font-size: 13px; }
-.switch { text-align: center; margin-top: 24px; color: var(--text-2); a { font-weight: 600; } }
-.pw { position: relative; button { position: absolute; right: 6px; top: 4px; } }
-.strength { display: flex; gap: 4px; margin-top: 4px; span { flex: 1; height: 4px; border-radius: 4px; background: var(--surface-3); transition: background .2s; } }
-.mobile-logo { display: none; margin-bottom: 32px; }
+:host {
+  display: block;
+}
+.auth {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+}
+.side {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background:
+    radial-gradient(at 10% 10%, #7c3aed 0, transparent 50%),
+    radial-gradient(at 90% 20%, #06b6d4 0, transparent 45%),
+    radial-gradient(at 60% 100%, #ec4899 0, transparent 55%), #1e1b4b;
+}
+.side h2 {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  max-width: 440px;
+}
+.side p {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 16px;
+  max-width: 420px;
+  line-height: 1.6;
+  margin: 16px 0 0;
+}
+.quote {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  border-radius: 18px;
+  padding: 20px;
+  max-width: 440px;
+  p {
+    margin: 0 0 12px;
+    color: #fff;
+    font-size: 15px;
+  }
+  small {
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: var(--bg);
+}
+.form-wrap {
+  width: 100%;
+  max-width: 400px;
+  animation: slideUp 0.4s var(--ease);
+}
+.form-wrap h1 {
+  font-size: 30px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.form-wrap > p {
+  color: var(--text-2);
+  margin: 0 0 28px;
+}
+.error {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  font-weight: 500;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.switch {
+  text-align: center;
+  margin-top: 24px;
+  color: var(--text-2);
+  a {
+    font-weight: 600;
+  }
+}
+.pw {
+  position: relative;
+  button {
+    position: absolute;
+    right: 6px;
+    top: 4px;
+  }
+}
+.strength {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  span {
+    flex: 1;
+    height: 4px;
+    border-radius: 4px;
+    background: var(--surface-3);
+    transition: background 0.2s;
+  }
+}
+.mobile-logo {
+  display: none;
+  margin-bottom: 32px;
+}
 @media (max-width: 900px) {
-  .auth { grid-template-columns: 1fr; }
-  .side { display: none; }
-  .mobile-logo { display: block; }
+  .auth {
+    grid-template-columns: 1fr;
+  }
+  .side {
+    display: none;
+  }
+  .mobile-logo {
+    display: block;
+  }
 }

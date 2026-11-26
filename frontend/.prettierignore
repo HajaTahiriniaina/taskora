@@ -1,0 +1,5 @@
+# Generated output and reports (prettier 3 also honours .gitignore)
+reports
+dist
+.angular
+coverage

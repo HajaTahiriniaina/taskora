@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
+
 import { renderRich } from './rich-text';
 
 /** Read-only rendering of rich text (sanitized with DOMPurify, then trusted). */
@@ -11,6 +12,6 @@ import { renderRich } from './rich-text';
 })
 export class RichViewComponent {
   private sanitizer = inject(DomSanitizer);
-  content = input<string | null>('');
+  content = input<null | string>('');
   html = computed(() => this.sanitizer.bypassSecurityTrustHtml(renderRich(this.content())));
 }

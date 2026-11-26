@@ -1,36 +1,84 @@
-import { Component, HostListener, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  HostListener,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+
 import { ApiService } from '../../core/api.service';
-import { DialogService } from '../../core/dialog.service';
+import {
+  AttachmentUploadsService,
+  draggedFiles,
+  extColor,
+  fileExt,
+  formatSize,
+} from '../../core/attachment-uploads.service';
 import { AuthService } from '../../core/auth.service';
-import { AttachmentUploadsService, draggedFiles, extColor, fileExt, formatSize } from '../../core/attachment-uploads.service';
-import { Activity, Attachment, Board, CardDetail, Member, Comment, CustomField, PALETTE, PRIORITIES, Priority } from '../../core/models';
-import { Seg, describeActivity } from './activity-text';
+import { DialogService } from '../../core/dialog.service';
+import {
+  Activity,
+  Attachment,
+  Board,
+  CardDetail,
+  Comment,
+  CustomField,
+  Member,
+  PALETTE,
+  PRIORITIES,
+  Priority,
+} from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { AvatarComponent } from '../../shared/avatar.component';
+import { FileViewerComponent } from '../../shared/file-viewer.component';
 import { IconComponent } from '../../shared/icon.component';
-import { TimeAgoPipe } from '../../shared/time-ago.pipe';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { RichViewComponent } from '../../shared/rich-view.component';
-import { FileViewerComponent } from '../../shared/file-viewer.component';
+import { TimeAgoPipe } from '../../shared/time-ago.pipe';
+import { describeActivity, Seg } from './activity-text';
 import { dueState } from './card-format';
 
 type FeedItem =
-  | { kind: 'comment'; id: string; at: string; comment: Comment }
-  | { kind: 'activity'; id: string; at: string; activity: Activity; segs: Seg[] };
+  | { kind: 'activity'; id: string; at: string; activity: Activity; segs: Seg[] }
+  | { kind: 'comment'; id: string; at: string; comment: Comment };
 
-type PopKind = 'members' | 'labels' | 'cover' | 'priority' | 'more' | 'add';
+type PopKind = 'add' | 'cover' | 'labels' | 'members' | 'more' | 'priority';
 
 function readPref(key: string, fallback: boolean): boolean {
-  try { const v = localStorage.getItem(key); return v === null ? fallback : v === '1'; } catch { return fallback; }
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === '1';
+  } catch {
+    return fallback;
+  }
 }
 
-const FIELD_ICONS: Record<string, string> = { text: 'type', number: 'hash', date: 'calendar', checkbox: 'toggle', select: 'list', url: 'link' };
+const FIELD_ICONS: Record<string, string> = {
+  text: 'type',
+  number: 'hash',
+  date: 'calendar',
+  checkbox: 'toggle',
+  select: 'list',
+  url: 'link',
+};
 
 @Component({
   selector: 'tk-card-modal',
-  imports: [FormsModule, IconComponent, AvatarComponent, TimeAgoPipe, RichEditorComponent, RichViewComponent, FileViewerComponent],
+  imports: [
+    FormsModule,
+    IconComponent,
+    AvatarComponent,
+    TimeAgoPipe,
+    RichEditorComponent,
+    RichViewComponent,
+    FileViewerComponent,
+  ],
   templateUrl: './card-modal.component.html',
   styleUrl: './card-modal.component.scss',
 })
@@ -52,7 +100,7 @@ export class CardModalComponent {
   manageFields = output<void>();
 
   card = signal<CardDetail | null>(null);
-  pop = signal<PopKind | null>(null);
+  pop = signal<null | PopKind>(null);
   /** Comment composer: collapsed placeholder until clicked (Trello-like). */
   composing = signal(false);
   composerSeed = signal('');
@@ -62,32 +110,45 @@ export class CardModalComponent {
   activities = signal<Activity[]>([]);
   activityHasMore = signal(false);
   activityLoading = signal(false);
-  private activityTimer: ReturnType<typeof setTimeout> | null = null;
+  private activityTimer: null | ReturnType<typeof setTimeout> = null;
 
   /** Comments + activity merged, newest first (Trello-like feed). */
   feed = computed<FeedItem[]>(() => {
-    const comments: FeedItem[] = (this.card()?.comments ?? []).map(c => ({ kind: 'comment', id: 'c' + c.id, at: c.createdAt, comment: c }));
+    const comments: FeedItem[] = (this.card()?.comments ?? []).map((c) => ({
+      kind: 'comment',
+      id: 'c' + c.id,
+      at: c.createdAt,
+      comment: c,
+    }));
     const acts: FeedItem[] = this.showDetails()
-      ? this.activities().map(a => ({ kind: 'activity', id: 'a' + a.id, at: a.createdAt, activity: a, segs: describeActivity(a) }))
+      ? this.activities().map((a) => ({
+          kind: 'activity',
+          id: 'a' + a.id,
+          at: a.createdAt,
+          activity: a,
+          segs: describeActivity(a),
+        }))
       : [];
-    return [...comments, ...acts].sort((x, y) => y.at.localeCompare(x.at) || y.id.localeCompare(x.id));
+    return [...comments, ...acts].sort(
+      (x, y) => y.at.localeCompare(x.at) || y.id.localeCompare(x.id),
+    );
   });
   editingDesc = signal(false);
 
   // ---------- attachments ----------
   /** Uploads in flight for this card (progress bars in the list). */
-  pendingUploads = computed(() => this.uploads.pending().filter(p => p.cardId === this.cardId()));
+  pendingUploads = computed(() => this.uploads.pending().filter((p) => p.cardId === this.cardId()));
   /** A file is dragged over the modal (outside an editor): show the drop overlay. */
   fileOver = signal(false);
-  renaming = signal<number | null>(null);
+  renaming = signal<null | number>(null);
   showAllAttachments = signal(false);
   visibleAttachments = computed(() => {
     const all = this.card()?.attachments ?? [];
     return this.showAllAttachments() ? all : all.slice(0, 6);
   });
   /** Members offered after "@" in comments and the description (everyone but me). */
-  mentionables = computed(() => this.board().members.filter(m => m.id !== this.auth.user()?.id));
-  imageAttachments = computed(() => (this.card()?.attachments ?? []).filter(a => a.image));
+  mentionables = computed(() => this.board().members.filter((m) => m.id !== this.auth.user()?.id));
+  imageAttachments = computed(() => (this.card()?.attachments ?? []).filter((a) => a.image));
   /** Attachment shown in the in-page viewer. */
   viewing = signal<Attachment | null>(null);
   /** Names of images uploaded from the cover popover: they become the cover once stored. */
@@ -107,10 +168,12 @@ export class CardModalComponent {
   progress = computed(() => {
     const c = this.card();
     if (!c || !c.checklist.length) return 0;
-    return Math.round((c.checklist.filter(i => i.done).length / c.checklist.length) * 100);
+    return Math.round((c.checklist.filter((i) => i.done).length / c.checklist.length) * 100);
   });
-  visibleChecklist = computed(() => (this.card()?.checklist ?? []).filter(i => !this.hideDone() || !i.done));
-  priority = computed(() => this.priorities.find(p => p.value === this.card()?.priority));
+  visibleChecklist = computed(() =>
+    (this.card()?.checklist ?? []).filter((i) => !this.hideDone() || !i.done),
+  );
+  priority = computed(() => this.priorities.find((p) => p.value === this.card()?.priority));
   due = computed(() => (this.card() ? dueState(this.card()!) : null));
   dueInput = computed(() => {
     const d = this.card()?.dueDate;
@@ -122,9 +185,10 @@ export class CardModalComponent {
   constructor() {
     this.uploads.added.pipe(takeUntilDestroyed()).subscribe(({ cardId, attachment }) => {
       const c = this.card();
-      if (c && c.id === cardId && !c.attachments.some(a => a.id === attachment.id)) {
+      if (c && c.id === cardId && !c.attachments.some((a) => a.id === attachment.id)) {
         this.apply({ ...c, attachments: [attachment, ...c.attachments] });
-        if (attachment.image && this.coverUploads.delete(attachment.name)) this.setCoverImage(attachment.id);
+        if (attachment.image && this.coverUploads.delete(attachment.name))
+          this.setCoverImage(attachment.id);
       }
     });
     effect(() => {
@@ -132,7 +196,13 @@ export class CardModalComponent {
       untracked(() => {
         this.card.set(null);
         this.activities.set([]);
-        this.api.card(id).subscribe({ next: c => { this.card.set(c); this.loadActivity(); }, error: () => this.closed.emit() });
+        this.api.card(id).subscribe({
+          next: (c) => {
+            this.card.set(c);
+            this.loadActivity();
+          },
+          error: () => this.closed.emit(),
+        });
       });
     });
   }
@@ -141,7 +211,10 @@ export class CardModalComponent {
   loadActivity() {
     const id = this.card()?.id;
     if (!id) return;
-    this.api.cardActivity(id).subscribe(r => { this.activities.set(r.items); this.activityHasMore.set(r.hasMore); });
+    this.api.cardActivity(id).subscribe((r) => {
+      this.activities.set(r.items);
+      this.activityHasMore.set(r.hasMore);
+    });
   }
 
   loadMoreActivity() {
@@ -149,7 +222,11 @@ export class CardModalComponent {
     if (!last || this.activityLoading()) return;
     this.activityLoading.set(true);
     this.api.cardActivity(this.card()!.id, last.id).subscribe({
-      next: r => { this.activities.update(a => [...a, ...r.items]); this.activityHasMore.set(r.hasMore); this.activityLoading.set(false); },
+      next: (r) => {
+        this.activities.update((a) => [...a, ...r.items]);
+        this.activityHasMore.set(r.hasMore);
+        this.activityLoading.set(false);
+      },
       error: () => this.activityLoading.set(false),
     });
   }
@@ -167,7 +244,7 @@ export class CardModalComponent {
   }
 
   private patch(data: Record<string, unknown>) {
-    this.api.updateCard(this.card()!.id, data).subscribe(c => this.apply(c));
+    this.api.updateCard(this.card()!.id, data).subscribe((c) => this.apply(c));
   }
 
   // ---------- basics ----------
@@ -179,7 +256,7 @@ export class CardModalComponent {
   moveTo(listId: number) {
     const c = this.card()!;
     if (listId === c.listId) return;
-    const target = this.board().lists.find(l => l.id === listId)!;
+    const target = this.board().lists.find((l) => l.id === listId)!;
     this.api.moveCard(c.id, listId, target.cardCount).subscribe(() => {
       this.card.set({ ...c, listId, listTitle: target.title });
       this.toast.success(`Carte déplacée vers « ${target.title} »`);
@@ -197,9 +274,19 @@ export class CardModalComponent {
     );
   }
 
-  toggleCompleted() { this.patch({ completed: !this.card()!.completed }); }
-  setCover(color: string | null) { this.pop.set(null); this.patch(color || !this.card()?.coverAttachmentId ? { cover: color } : { coverAttachmentId: null }); }
-  setCoverImage(attachmentId: number | null) { this.pop.set(null); this.patch({ coverAttachmentId: attachmentId }); }
+  toggleCompleted() {
+    this.patch({ completed: !this.card()!.completed });
+  }
+  setCover(color: null | string) {
+    this.pop.set(null);
+    this.patch(
+      color || !this.card()?.coverAttachmentId ? { cover: color } : { coverAttachmentId: null },
+    );
+  }
+  setCoverImage(attachmentId: null | number) {
+    this.pop.set(null);
+    this.patch({ coverAttachmentId: attachmentId });
+  }
 
   onCoverPicked(input: HTMLInputElement) {
     const file = input.files?.[0];
@@ -215,8 +302,13 @@ export class CardModalComponent {
     e.preventDefault();
     this.viewing.set(a);
   }
-  setPriority(p: Priority) { this.pop.set(null); this.patch({ priority: p }); }
-  setDue(value: string) { this.patch({ dueDate: value ? new Date(value).toISOString() : null }); }
+  setPriority(p: Priority) {
+    this.pop.set(null);
+    this.patch({ priority: p });
+  }
+  setDue(value: string) {
+    this.patch({ dueDate: value ? new Date(value).toISOString() : null });
+  }
 
   /** Opens the editor, unless the click was on a link or a checklist box inside the description. */
   startDesc(e?: MouseEvent) {
@@ -231,22 +323,30 @@ export class CardModalComponent {
   }
 
   // ---------- members / labels ----------
-  isAssigned(userId: number) { return this.card()!.assignees.some(a => a.id === userId); }
+  isAssigned(userId: number) {
+    return this.card()!.assignees.some((a) => a.id === userId);
+  }
   toggleAssignee(userId: number) {
-    this.api.toggleAssignee(this.card()!.id, userId).subscribe(c => this.apply(c));
+    this.api.toggleAssignee(this.card()!.id, userId).subscribe((c) => this.apply(c));
   }
 
-  hasLabel(id: number) { return this.card()!.labelIds.includes(id); }
+  hasLabel(id: number) {
+    return this.card()!.labelIds.includes(id);
+  }
   toggleLabel(id: number) {
-    const ids = this.hasLabel(id) ? this.card()!.labelIds.filter(x => x !== id) : [...this.card()!.labelIds, id];
+    const ids = this.hasLabel(id)
+      ? this.card()!.labelIds.filter((x) => x !== id)
+      : [...this.card()!.labelIds, id];
     this.patch({ labelIds: ids });
   }
-  labelById(id: number) { return this.board().labels.find(l => l.id === id); }
+  labelById(id: number) {
+    return this.board().labels.find((l) => l.id === id);
+  }
 
   createLabel() {
     const name = this.newLabel.name.trim();
     if (!name) return;
-    this.api.addLabel(this.board().id, name, this.newLabel.color).subscribe(l => {
+    this.api.addLabel(this.board().id, name, this.newLabel.color).subscribe((l) => {
       this.board().labels.push(l);
       this.newLabel.name = '';
       this.toggleLabel(l.id);
@@ -254,32 +354,39 @@ export class CardModalComponent {
   }
 
   // ---------- custom fields ----------
-  fieldValue(f: CustomField) { return this.card()!.customValues[f.id] ?? null; }
+  fieldValue(f: CustomField) {
+    return this.card()!.customValues[f.id] ?? null;
+  }
   setField(f: CustomField, value: unknown) {
     if ((value ?? '') === (this.fieldValue(f) ?? '')) return;
-    this.api.setCustomValue(this.card()!.id, f.id, value).subscribe(c => this.apply(c));
+    this.api.setCustomValue(this.card()!.id, f.id, value).subscribe((c) => this.apply(c));
   }
-  optionOf(f: CustomField) { return f.options.find(o => o.id === this.fieldValue(f)); }
+  optionOf(f: CustomField) {
+    return f.options.find((o) => o.id === this.fieldValue(f));
+  }
 
   // ---------- checklist ----------
   addItem() {
     const content = this.newItem.trim();
     if (!content) return;
     this.newItem = '';
-    this.api.addChecklistItem(this.card()!.id, content).subscribe(item => {
+    this.api.addChecklistItem(this.card()!.id, content).subscribe((item) => {
       const c = this.card()!;
       this.apply({ ...c, checklist: [...c.checklist, item] });
     });
   }
   toggleItem(id: number) {
     const c = this.card()!;
-    const item = c.checklist.find(i => i.id === id)!;
-    this.apply({ ...c, checklist: c.checklist.map(i => (i.id === id ? { ...i, done: !i.done } : i)) });
+    const item = c.checklist.find((i) => i.id === id)!;
+    this.apply({
+      ...c,
+      checklist: c.checklist.map((i) => (i.id === id ? { ...i, done: !i.done } : i)),
+    });
     this.api.updateChecklistItem(id, { done: !item.done }).subscribe();
   }
   deleteItem(id: number) {
     const c = this.card()!;
-    this.apply({ ...c, checklist: c.checklist.filter(i => i.id !== id) });
+    this.apply({ ...c, checklist: c.checklist.filter((i) => i.id !== id) });
     this.api.deleteChecklistItem(id).subscribe();
   }
 
@@ -295,9 +402,11 @@ export class CardModalComponent {
   reply(author: { id: number; name: string }) {
     const name = author.name.replace(/[<>&"]/g, '');
     // Imported authors (Trello) have no account: plain text, otherwise a real mention
-    this.openComposer(author.id
-      ? `<p><span data-type="mention" data-id="${author.id}" data-label="${name}">@${name}</span>&nbsp;</p>`
-      : `<p>@${name}&nbsp;</p>`);
+    this.openComposer(
+      author.id
+        ? `<p><span data-type="mention" data-id="${author.id}" data-label="${name}">@${name}</span>&nbsp;</p>`
+        : `<p>@${name}&nbsp;</p>`,
+    );
   }
 
   cancelComposer() {
@@ -308,7 +417,11 @@ export class CardModalComponent {
   toggleDetails() {
     const v = !this.showDetails();
     this.showDetails.set(v);
-    try { localStorage.setItem('taskora.card.details', v ? '1' : '0'); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('taskora.card.details', v ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
   }
 
   sendComment(editor: RichEditorComponent) {
@@ -318,7 +431,11 @@ export class CardModalComponent {
     this.api.addComment(this.card()!.id, content).subscribe(({ attachments, ...cm }) => {
       const c = this.card()!;
       // Files posted in the comment also appear in the card attachments
-      this.apply({ ...c, comments: [cm, ...c.comments], attachments: [...attachments, ...c.attachments] });
+      this.apply({
+        ...c,
+        comments: [cm, ...c.comments],
+        attachments: [...attachments, ...c.attachments],
+      });
     });
   }
   mention(editor: RichEditorComponent, member: Member) {
@@ -326,7 +443,11 @@ export class CardModalComponent {
   }
   deleteComment(id: number) {
     const c = this.card()!;
-    this.apply({ ...c, comments: c.comments.filter(x => x.id !== id), attachments: c.attachments.filter(a => a.commentId !== id) });
+    this.apply({
+      ...c,
+      comments: c.comments.filter((x) => x.id !== id),
+      attachments: c.attachments.filter((a) => a.commentId !== id),
+    });
     this.api.deleteComment(id).subscribe();
   }
 
@@ -352,25 +473,37 @@ export class CardModalComponent {
     this.renaming.set(null);
     name = name.trim();
     if (!name || name === a.name) return;
-    this.api.renameAttachment(a.id, name).subscribe(updated => {
+    this.api.renameAttachment(a.id, name).subscribe((updated) => {
       const c = this.card()!;
-      this.apply({ ...c, attachments: c.attachments.map(x => (x.id === a.id ? updated : x)) });
+      this.apply({ ...c, attachments: c.attachments.map((x) => (x.id === a.id ? updated : x)) });
     });
   }
 
   async deleteAttachment(a: Attachment) {
-    const ok = await this.dialog.confirm(a.commentId
-      ? { title: 'Retirer la pièce jointe ?', text: `« ${a.name} » ne sera plus listée dans les pièces jointes, mais reste visible dans son commentaire.`, confirmText: 'Retirer' }
-      : { title: 'Supprimer la pièce jointe ?', text: `« ${a.name} » sera supprimée définitivement.`, confirmText: 'Supprimer' });
+    const ok = await this.dialog.confirm(
+      a.commentId
+        ? {
+            title: 'Retirer la pièce jointe ?',
+            text: `« ${a.name} » ne sera plus listée dans les pièces jointes, mais reste visible dans son commentaire.`,
+            confirmText: 'Retirer',
+          }
+        : {
+            title: 'Supprimer la pièce jointe ?',
+            text: `« ${a.name} » sera supprimée définitivement.`,
+            confirmText: 'Supprimer',
+          },
+    );
     if (!ok) return;
     const c = this.card()!;
-    this.apply({ ...c, attachments: c.attachments.filter(x => x.id !== a.id) });
-    this.api.deleteAttachment(a.id).subscribe({ error: () => this.api.card(c.id).subscribe(fresh => this.apply(fresh)) });
+    this.apply({ ...c, attachments: c.attachments.filter((x) => x.id !== a.id) });
+    this.api
+      .deleteAttachment(a.id)
+      .subscribe({ error: () => this.api.card(c.id).subscribe((fresh) => this.apply(fresh)) });
   }
 
   /** Scrolls the activity feed to the comment that holds this file. */
   showComment(commentId: number) {
-    if (!this.card()?.comments.some(cm => cm.id === commentId)) return;
+    if (!this.card()?.comments.some((cm) => cm.id === commentId)) return;
     const el = document.getElementById('comment-' + commentId);
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el?.classList.add('flash');
@@ -394,7 +527,10 @@ export class CardModalComponent {
 
   onDragLeave(e: DragEvent) {
     if (!draggedFiles(e)) return;
-    if (--this.dragDepth <= 0) { this.dragDepth = 0; this.fileOver.set(false); }
+    if (--this.dragDepth <= 0) {
+      this.dragDepth = 0;
+      this.fileOver.set(false);
+    }
   }
 
   onDrop(e: DragEvent) {
@@ -413,7 +549,7 @@ export class CardModalComponent {
 
   archive() {
     this.pop.set(null);
-    this.api.archiveCard(this.card()!.id).subscribe(c => {
+    this.api.archiveCard(this.card()!.id).subscribe((c) => {
       this.apply(c);
       this.archivedChange.emit(c);
       this.toast.success('Carte archivée : retrouvez-la dans Paramètres → Archives');
@@ -422,7 +558,7 @@ export class CardModalComponent {
 
   restore() {
     this.pop.set(null);
-    this.api.restoreCard(this.card()!.id).subscribe(c => {
+    this.api.restoreCard(this.card()!.id).subscribe((c) => {
       this.apply(c);
       this.archivedChange.emit(c);
       this.toast.success(`Carte restaurée dans « ${c.listTitle} »`);
@@ -431,11 +567,14 @@ export class CardModalComponent {
 
   async deleteCard() {
     this.pop.set(null);
-    if (!(await this.dialog.confirm({
-      title: 'Mettre la carte à la corbeille ?',
-      text: `« ${this.card()!.title} » pourra être restaurée pendant 30 jours (Paramètres → Corbeille).`,
-      confirmText: 'Mettre à la corbeille',
-    }))) return;
+    if (
+      !(await this.dialog.confirm({
+        title: 'Mettre la carte à la corbeille ?',
+        text: `« ${this.card()!.title} » pourra être restaurée pendant 30 jours (Paramètres → Corbeille).`,
+        confirmText: 'Mettre à la corbeille',
+      }))
+    )
+      return;
     const id = this.card()!.id;
     this.api.deleteCard(id).subscribe(() => {
       this.toast.success('Carte mise à la corbeille');
@@ -446,7 +585,10 @@ export class CardModalComponent {
   @HostListener('document:keydown.escape', ['$event'])
   esc(e?: Event) {
     if (e?.defaultPrevented || this.dialog.isOpen()) return; // already handled (editor, "@" list, confirmation dialog…)
-    if (this.viewing()) { this.viewing.set(null); return; } // Escape closes the viewer first
+    if (this.viewing()) {
+      this.viewing.set(null);
+      return;
+    } // Escape closes the viewer first
     // Escape inside an editor only leaves the editor
     const active = document.activeElement as HTMLElement | null;
     if (active?.closest('.ProseMirror')) {
@@ -461,23 +603,41 @@ export class CardModalComponent {
   }
 
   /** "+ Ajouter" menu: jumps to the matching control of the details column. */
-  addAction(kind: 'members' | 'labels' | 'due' | 'checklist' | 'fields' | 'attachment', e: Event) {
+  addAction(kind: 'attachment' | 'checklist' | 'due' | 'fields' | 'labels' | 'members', e: Event) {
     e.stopPropagation();
     this.pop.set(null);
-    if (kind === 'members' || kind === 'labels') { setTimeout(() => this.pop.set(kind)); return; }
-    if (kind === 'fields') { this.manageFields.emit(); return; }
-    if (kind === 'attachment') { (document.getElementById('card-attach-input') as HTMLInputElement | null)?.click(); return; }
-    const el = document.getElementById(kind === 'due' ? 'card-due' : 'card-checklist-add') as HTMLInputElement | null;
+    if (kind === 'members' || kind === 'labels') {
+      setTimeout(() => this.pop.set(kind));
+      return;
+    }
+    if (kind === 'fields') {
+      this.manageFields.emit();
+      return;
+    }
+    if (kind === 'attachment') {
+      (document.getElementById('card-attach-input') as HTMLInputElement | null)?.click();
+      return;
+    }
+    const el = document.getElementById(
+      kind === 'due' ? 'card-due' : 'card-checklist-add',
+    ) as HTMLInputElement | null;
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => { el?.focus(); if (kind === 'due') el?.showPicker?.(); }, 250);
+    setTimeout(() => {
+      el?.focus();
+      if (kind === 'due') el?.showPicker?.();
+    }, 250);
   }
 
   fullDate(d: string) {
     return new Date(d).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' });
   }
 
-  dueLabel(): string | null {
-    return ({ overdue: 'En retard', soon: 'Bientôt', done: 'Terminée' } as Record<string, string>)[this.due() ?? ''] ?? null;
+  dueLabel(): null | string {
+    return (
+      ({ overdue: 'En retard', soon: 'Bientôt', done: 'Terminée' } as Record<string, string>)[
+        this.due() ?? ''
+      ] ?? null
+    );
   }
 
   togglePop(p: PopKind, e: Event) {

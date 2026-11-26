@@ -1,6 +1,7 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
+
 import { ApiService } from './api.service';
 import { User } from './models';
 
@@ -12,20 +13,20 @@ export class AuthService {
   private api = inject(ApiService);
   private router = inject(Router);
 
-  readonly token = signal<string | null>(this.read(TOKEN_KEY));
-  readonly user = signal<User | null>(JSON.parse(this.read(USER_KEY) ?? 'null'));
+  readonly token = signal<null | string>(this.read(TOKEN_KEY));
+  readonly user = signal<null | User>(JSON.parse(this.read(USER_KEY) ?? 'null'));
   readonly isLoggedIn = computed(() => !!this.token() && !this.isExpired(this.token()!));
 
   login(email: string, password: string) {
-    return this.api.login(email, password).pipe(tap(r => this.store(r.token, r.user)));
+    return this.api.login(email, password).pipe(tap((r) => this.store(r.token, r.user)));
   }
 
   register(name: string, email: string, password: string) {
-    return this.api.register(name, email, password).pipe(tap(r => this.store(r.token, r.user)));
+    return this.api.register(name, email, password).pipe(tap((r) => this.store(r.token, r.user)));
   }
 
   refreshProfile() {
-    this.api.me().subscribe(u => this.setUser(u));
+    this.api.me().subscribe((u) => this.setUser(u));
   }
 
   setUser(user: User) {
@@ -36,7 +37,12 @@ export class AuthService {
   logout() {
     this.token.set(null);
     this.user.set(null);
-    try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    } catch {
+      /* ignore */
+    }
     this.router.navigateByUrl('/login');
   }
 
@@ -55,11 +61,19 @@ export class AuthService {
     }
   }
 
-  private read(key: string): string | null {
-    try { return localStorage.getItem(key); } catch { return null; }
+  private read(key: string): null | string {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
   }
 
   private write(key: string, value: string) {
-    try { localStorage.setItem(key, value); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* ignore */
+    }
   }
 }

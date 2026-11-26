@@ -1,6 +1,7 @@
 import { HttpEventType } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { Subject } from 'rxjs';
+
 import { ApiService } from './api.service';
 import { Attachment } from './models';
 import { ToastService } from './toast.service';
@@ -8,7 +9,10 @@ import { ToastService } from './toast.service';
 export const MAX_ATTACHMENT = 100 * 1024 * 1024;
 
 export interface PendingUpload {
-  uid: number; cardId: number; name: string; size: number;
+  uid: number;
+  cardId: number;
+  name: string;
+  size: number;
   /** 0-100: bytes sent to the server */
   progress: number;
   loaded: number;
@@ -39,7 +43,12 @@ export class AttachmentUploadsService {
       o.total += p.size;
       out.set(p.cardId, o);
     }
-    return new Map([...out].map(([id, o]) => [id, o.total ? Math.min(100, Math.floor((o.done / o.total) * 100)) : 0]));
+    return new Map(
+      [...out].map(([id, o]) => [
+        id,
+        o.total ? Math.min(100, Math.floor((o.done / o.total) * 100)) : 0,
+      ]),
+    );
   });
 
   upload(cardId: number, files: Iterable<File>) {
@@ -53,14 +62,29 @@ export class AttachmentUploadsService {
         continue;
       }
       const uid = ++this.seq;
-      this.pending.update(p => [...p, { uid, cardId, name: file.name, size: file.size || 1, progress: 0, loaded: 0, saving: false }]);
-      const done = () => this.pending.update(p => p.filter(x => x.uid !== uid));
+      this.pending.update((p) => [
+        ...p,
+        {
+          uid,
+          cardId,
+          name: file.name,
+          size: file.size || 1,
+          progress: 0,
+          loaded: 0,
+          saving: false,
+        },
+      ]);
+      const done = () => this.pending.update((p) => p.filter((x) => x.uid !== uid));
       this.api.addAttachment(cardId, file).subscribe({
-        next: e => {
+        next: (e) => {
           if (e.type === HttpEventType.UploadProgress) {
             const total = e.total ?? file.size;
             const progress = total ? Math.min(100, Math.floor((e.loaded / total) * 100)) : 0;
-            this.pending.update(p => p.map(x => (x.uid === uid ? { ...x, progress, loaded: e.loaded, saving: progress >= 100 } : x)));
+            this.pending.update((p) =>
+              p.map((x) =>
+                x.uid === uid ? { ...x, progress, loaded: e.loaded, saving: progress >= 100 } : x,
+              ),
+            );
           } else if (e.type === HttpEventType.Response && e.body) {
             done();
             this.added.next({ cardId, attachment: e.body });
@@ -98,6 +122,7 @@ export function extColor(name: string): string {
   if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return '#ea580c';
   if (['zip', 'rar', '7z', 'gz', 'tar'].includes(ext)) return '#ca8a04';
   if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav'].includes(ext)) return '#7c3aed';
-  if (['svg', 'psd', 'ai', 'fig', 'sketch', 'heic', 'tif', 'tiff', 'bmp'].includes(ext)) return '#db2777';
+  if (['svg', 'psd', 'ai', 'fig', 'sketch', 'heic', 'tif', 'tiff', 'bmp'].includes(ext))
+    return '#db2777';
   return '#64748b';
 }

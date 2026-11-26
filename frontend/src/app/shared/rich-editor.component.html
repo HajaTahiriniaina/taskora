@@ -1,90 +1,366 @@
 <div #frame class="editor" [class.compact]="compact()" (click)="pop.set(null)">
-  <div class="toolbar" role="toolbar" aria-label="Mise en forme" (mousedown)="$event.target === $event.currentTarget && $event.preventDefault()">
+  <div
+    class="toolbar"
+    role="toolbar"
+    aria-label="Mise en forme"
+    (mousedown)="$event.target === $event.currentTarget && $event.preventDefault()"
+  >
     @if (!compact()) {
-      <button type="button" class="tb" (click)="run(c => c.undo())" [disabled]="!can('undo')" title="Annuler (⌘Z)" aria-label="Annuler"><tk-icon name="undo" [size]="15" /></button>
-      <button type="button" class="tb" (click)="run(c => c.redo())" [disabled]="!can('redo')" title="Rétablir (⌘⇧Z)" aria-label="Rétablir"><tk-icon name="redo" [size]="15" /></button>
+      <button
+        type="button"
+        class="tb"
+        (click)="run((c) => c.undo())"
+        [disabled]="!can('undo')"
+        title="Annuler (⌘Z)"
+        aria-label="Annuler"
+      >
+        <tk-icon name="undo" [size]="15" />
+      </button>
+      <button
+        type="button"
+        class="tb"
+        (click)="run((c) => c.redo())"
+        [disabled]="!can('redo')"
+        title="Rétablir (⌘⇧Z)"
+        aria-label="Rétablir"
+      >
+        <tk-icon name="redo" [size]="15" />
+      </button>
       <span class="sep"></span>
       <div class="anchor">
-        <button type="button" class="tb wide" (click)="togglePop('heading', $event)" title="Style de paragraphe">{{ headingLabel() }} <tk-icon name="chevronDown" [size]="13" /></button>
+        <button
+          type="button"
+          class="tb wide"
+          (click)="togglePop('heading', $event)"
+          title="Style de paragraphe"
+        >
+          {{ headingLabel() }} <tk-icon name="chevronDown" [size]="13" />
+        </button>
         @if (pop() === 'heading') {
           <div class="pop menu" (click)="$event.stopPropagation()">
-            <button type="button" (click)="setHeading(0)" [class.on]="headingLabel() === 'Texte'">Texte normal</button>
-            <button type="button" class="h1" (click)="setHeading(1)" [class.on]="active('heading', { level: 1 })">Titre 1</button>
-            <button type="button" class="h2" (click)="setHeading(2)" [class.on]="active('heading', { level: 2 })">Titre 2</button>
-            <button type="button" class="h3" (click)="setHeading(3)" [class.on]="active('heading', { level: 3 })">Titre 3</button>
+            <button type="button" (click)="setHeading(0)" [class.on]="headingLabel() === 'Texte'">
+              Texte normal
+            </button>
+            <button
+              type="button"
+              class="h1"
+              (click)="setHeading(1)"
+              [class.on]="active('heading', { level: 1 })"
+            >
+              Titre 1
+            </button>
+            <button
+              type="button"
+              class="h2"
+              (click)="setHeading(2)"
+              [class.on]="active('heading', { level: 2 })"
+            >
+              Titre 2
+            </button>
+            <button
+              type="button"
+              class="h3"
+              (click)="setHeading(3)"
+              [class.on]="active('heading', { level: 3 })"
+            >
+              Titre 3
+            </button>
           </div>
         }
       </div>
       <span class="sep"></span>
     }
-    <button type="button" class="tb" [class.on]="active('bold')" (click)="run(c => c.toggleBold())" title="Gras (⌘B)" aria-label="Gras"><tk-icon name="bold" [size]="15" [stroke]="2.5" /></button>
-    <button type="button" class="tb" [class.on]="active('italic')" (click)="run(c => c.toggleItalic())" title="Italique (⌘I)" aria-label="Italique"><tk-icon name="italic" [size]="15" /></button>
-    <button type="button" class="tb" [class.on]="active('underline')" (click)="run(c => c.toggleUnderline())" title="Souligné (⌘U)" aria-label="Souligné"><tk-icon name="underline" [size]="15" /></button>
-    <button type="button" class="tb" [class.on]="active('strike')" (click)="run(c => c.toggleStrike())" title="Barré" aria-label="Barré"><tk-icon name="strike" [size]="15" /></button>
+    <button
+      type="button"
+      class="tb"
+      [class.on]="active('bold')"
+      (click)="run((c) => c.toggleBold())"
+      title="Gras (⌘B)"
+      aria-label="Gras"
+    >
+      <tk-icon name="bold" [size]="15" [stroke]="2.5" />
+    </button>
+    <button
+      type="button"
+      class="tb"
+      [class.on]="active('italic')"
+      (click)="run((c) => c.toggleItalic())"
+      title="Italique (⌘I)"
+      aria-label="Italique"
+    >
+      <tk-icon name="italic" [size]="15" />
+    </button>
+    <button
+      type="button"
+      class="tb"
+      [class.on]="active('underline')"
+      (click)="run((c) => c.toggleUnderline())"
+      title="Souligné (⌘U)"
+      aria-label="Souligné"
+    >
+      <tk-icon name="underline" [size]="15" />
+    </button>
+    <button
+      type="button"
+      class="tb"
+      [class.on]="active('strike')"
+      (click)="run((c) => c.toggleStrike())"
+      title="Barré"
+      aria-label="Barré"
+    >
+      <tk-icon name="strike" [size]="15" />
+    </button>
 
     <div class="anchor">
-      <button type="button" class="tb color-btn" (click)="togglePop('color', $event)" title="Couleur du texte" aria-label="Couleur du texte">
-        <tk-icon name="baseline" [size]="15" /><span class="bar" [style.background]="currentColor() ?? 'currentColor'"></span>
+      <button
+        type="button"
+        class="tb color-btn"
+        (click)="togglePop('color', $event)"
+        title="Couleur du texte"
+        aria-label="Couleur du texte"
+      >
+        <tk-icon name="baseline" [size]="15" /><span
+          class="bar"
+          [style.background]="currentColor() ?? 'currentColor'"
+        ></span>
       </button>
       @if (pop() === 'color') {
         <div class="pop swatches" (click)="$event.stopPropagation()">
           <span class="pop-title">Couleur du texte</span>
           <div class="grid">
-            <button type="button" class="sw none" (click)="setColor(null)" title="Par défaut" aria-label="Couleur par défaut">A</button>
-            @for (c of textColors; track c) { <button type="button" class="sw" [style.color]="c" (click)="setColor(c)" [attr.aria-label]="c">A</button> }
+            <button
+              type="button"
+              class="sw none"
+              (click)="setColor(null)"
+              title="Par défaut"
+              aria-label="Couleur par défaut"
+            >
+              A
+            </button>
+            @for (c of textColors; track c) {
+              <button
+                type="button"
+                class="sw"
+                [style.color]="c"
+                (click)="setColor(c)"
+                [attr.aria-label]="c"
+              >
+                A
+              </button>
+            }
           </div>
         </div>
       }
     </div>
     <div class="anchor">
-      <button type="button" class="tb" [class.on]="active('highlight')" (click)="togglePop('highlight', $event)" title="Surligner" aria-label="Surligner"><tk-icon name="highlighter" [size]="15" /></button>
+      <button
+        type="button"
+        class="tb"
+        [class.on]="active('highlight')"
+        (click)="togglePop('highlight', $event)"
+        title="Surligner"
+        aria-label="Surligner"
+      >
+        <tk-icon name="highlighter" [size]="15" />
+      </button>
       @if (pop() === 'highlight') {
         <div class="pop swatches" (click)="$event.stopPropagation()">
           <span class="pop-title">Surlignage</span>
           <div class="grid">
-            <button type="button" class="sw none" (click)="setHighlight(null)" title="Aucun" aria-label="Aucun surlignage"><tk-icon name="x" [size]="12" /></button>
-            @for (c of highlights; track c) { <button type="button" class="sw" [style.background]="c" (click)="setHighlight(c)" [attr.aria-label]="c"></button> }
+            <button
+              type="button"
+              class="sw none"
+              (click)="setHighlight(null)"
+              title="Aucun"
+              aria-label="Aucun surlignage"
+            >
+              <tk-icon name="x" [size]="12" />
+            </button>
+            @for (c of highlights; track c) {
+              <button
+                type="button"
+                class="sw"
+                [style.background]="c"
+                (click)="setHighlight(c)"
+                [attr.aria-label]="c"
+              ></button>
+            }
           </div>
         </div>
       }
     </div>
     <span class="sep"></span>
 
-    <button type="button" class="tb" [class.on]="active('bulletList')" (click)="run(c => c.toggleBulletList())" title="Liste à puces" aria-label="Liste à puces"><tk-icon name="list" [size]="15" /></button>
-    <button type="button" class="tb" [class.on]="active('orderedList')" (click)="run(c => c.toggleOrderedList())" title="Liste numérotée" aria-label="Liste numérotée"><tk-icon name="listOrdered" [size]="15" /></button>
-    <button type="button" class="tb" [class.on]="active('taskList')" (click)="run(c => c.toggleTaskList())" title="Liste de tâches" aria-label="Liste de tâches"><tk-icon name="listChecks" [size]="15" /></button>
+    <button
+      type="button"
+      class="tb"
+      [class.on]="active('bulletList')"
+      (click)="run((c) => c.toggleBulletList())"
+      title="Liste à puces"
+      aria-label="Liste à puces"
+    >
+      <tk-icon name="list" [size]="15" />
+    </button>
+    <button
+      type="button"
+      class="tb"
+      [class.on]="active('orderedList')"
+      (click)="run((c) => c.toggleOrderedList())"
+      title="Liste numérotée"
+      aria-label="Liste numérotée"
+    >
+      <tk-icon name="listOrdered" [size]="15" />
+    </button>
+    <button
+      type="button"
+      class="tb"
+      [class.on]="active('taskList')"
+      (click)="run((c) => c.toggleTaskList())"
+      title="Liste de tâches"
+      aria-label="Liste de tâches"
+    >
+      <tk-icon name="listChecks" [size]="15" />
+    </button>
 
     @if (!compact()) {
       <span class="sep"></span>
-      <button type="button" class="tb" [class.on]="activeAlign('left')" (click)="run(c => c.setTextAlign('left'))" title="Aligner à gauche" aria-label="Aligner à gauche"><tk-icon name="alignLeft" [size]="15" /></button>
-      <button type="button" class="tb" [class.on]="activeAlign('center')" (click)="run(c => c.setTextAlign('center'))" title="Centrer" aria-label="Centrer"><tk-icon name="alignCenter" [size]="15" /></button>
-      <button type="button" class="tb" [class.on]="activeAlign('right')" (click)="run(c => c.setTextAlign('right'))" title="Aligner à droite" aria-label="Aligner à droite"><tk-icon name="alignRight" [size]="15" /></button>
+      <button
+        type="button"
+        class="tb"
+        [class.on]="activeAlign('left')"
+        (click)="run((c) => c.setTextAlign('left'))"
+        title="Aligner à gauche"
+        aria-label="Aligner à gauche"
+      >
+        <tk-icon name="alignLeft" [size]="15" />
+      </button>
+      <button
+        type="button"
+        class="tb"
+        [class.on]="activeAlign('center')"
+        (click)="run((c) => c.setTextAlign('center'))"
+        title="Centrer"
+        aria-label="Centrer"
+      >
+        <tk-icon name="alignCenter" [size]="15" />
+      </button>
+      <button
+        type="button"
+        class="tb"
+        [class.on]="activeAlign('right')"
+        (click)="run((c) => c.setTextAlign('right'))"
+        title="Aligner à droite"
+        aria-label="Aligner à droite"
+      >
+        <tk-icon name="alignRight" [size]="15" />
+      </button>
     }
     <span class="sep"></span>
 
     <div class="anchor">
-      <button type="button" class="tb" [class.on]="active('link')" (click)="togglePop('link', $event)" title="Lien (⌘K)" aria-label="Lien"><tk-icon name="link" [size]="15" /></button>
+      <button
+        type="button"
+        class="tb"
+        [class.on]="active('link')"
+        (click)="togglePop('link', $event)"
+        title="Lien (⌘K)"
+        aria-label="Lien"
+      >
+        <tk-icon name="link" [size]="15" />
+      </button>
       @if (pop() === 'link') {
         <div class="pop link" (click)="$event.stopPropagation()">
-          <input class="input input-sm" placeholder="https://…" [value]="linkUrl" (input)="linkUrl = $any($event.target).value" (keydown.enter)="$event.preventDefault(); applyLink()" autofocus />
+          <input
+            class="input input-sm"
+            placeholder="https://…"
+            [value]="linkUrl"
+            (input)="linkUrl = $any($event.target).value"
+            (keydown.enter)="$event.preventDefault(); applyLink()"
+            autofocus
+          />
           <button type="button" class="btn btn-primary btn-sm" (click)="applyLink()">OK</button>
-          @if (active('link')) { <button type="button" class="btn btn-ghost btn-sm" (click)="linkUrl = ''; applyLink()">Retirer</button> }
+          @if (active('link')) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="linkUrl = ''; applyLink()">
+              Retirer
+            </button>
+          }
         </div>
       }
     </div>
-    <button type="button" class="tb" (click)="pickImage()" [disabled]="uploading() > 0" title="Insérer une image (ou coller / glisser)" aria-label="Insérer une image">
-      @if (uploading()) { <span class="spinner mini"></span> } @else { <tk-icon name="image" [size]="15" /> }
+    <button
+      type="button"
+      class="tb"
+      (click)="pickImage()"
+      [disabled]="uploading() > 0"
+      title="Insérer une image (ou coller / glisser)"
+      aria-label="Insérer une image"
+    >
+      @if (uploading()) {
+        <span class="spinner mini"></span>
+      } @else {
+        <tk-icon name="image" [size]="15" />
+      }
     </button>
-    <input #file type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden (change)="onFile(file)" />
-    <button type="button" class="tb" (click)="pickAny()" [disabled]="uploading() > 0" title="Joindre un fichier (ou glisser-déposer)" aria-label="Joindre un fichier"><tk-icon name="paperclip" [size]="15" /></button>
+    <input
+      #file
+      type="file"
+      accept="image/png,image/jpeg,image/gif,image/webp"
+      multiple
+      hidden
+      (change)="onFile(file)"
+    />
+    <button
+      type="button"
+      class="tb"
+      (click)="pickAny()"
+      [disabled]="uploading() > 0"
+      title="Joindre un fichier (ou glisser-déposer)"
+      aria-label="Joindre un fichier"
+    >
+      <tk-icon name="paperclip" [size]="15" />
+    </button>
     <input #anyFile type="file" multiple hidden (change)="onFile(anyFile)" />
 
     @if (!compact()) {
-      <button type="button" class="tb" [class.on]="active('blockquote')" (click)="run(c => c.toggleBlockquote())" title="Citation" aria-label="Citation"><tk-icon name="quote" [size]="14" /></button>
-      <button type="button" class="tb" [class.on]="active('codeBlock')" (click)="run(c => c.toggleCodeBlock())" title="Bloc de code" aria-label="Bloc de code"><tk-icon name="code" [size]="15" /></button>
-      <button type="button" class="tb" (click)="run(c => c.setHorizontalRule())" title="Séparateur" aria-label="Séparateur"><tk-icon name="minus" [size]="15" /></button>
+      <button
+        type="button"
+        class="tb"
+        [class.on]="active('blockquote')"
+        (click)="run((c) => c.toggleBlockquote())"
+        title="Citation"
+        aria-label="Citation"
+      >
+        <tk-icon name="quote" [size]="14" />
+      </button>
+      <button
+        type="button"
+        class="tb"
+        [class.on]="active('codeBlock')"
+        (click)="run((c) => c.toggleCodeBlock())"
+        title="Bloc de code"
+        aria-label="Bloc de code"
+      >
+        <tk-icon name="code" [size]="15" />
+      </button>
+      <button
+        type="button"
+        class="tb"
+        (click)="run((c) => c.setHorizontalRule())"
+        title="Séparateur"
+        aria-label="Séparateur"
+      >
+        <tk-icon name="minus" [size]="15" />
+      </button>
     }
-    <button type="button" class="tb" (click)="run(c => c.unsetAllMarks().clearNodes())" title="Effacer la mise en forme" aria-label="Effacer la mise en forme"><tk-icon name="eraser" [size]="15" /></button>
+    <button
+      type="button"
+      class="tb"
+      (click)="run((c) => c.unsetAllMarks().clearNodes())"
+      title="Effacer la mise en forme"
+      aria-label="Effacer la mise en forme"
+    >
+      <tk-icon name="eraser" [size]="15" />
+    </button>
   </div>
   <div #host class="content"></div>
   @if (fileUploads().length) {
@@ -93,18 +369,42 @@
         <li>
           <tk-icon name="paperclip" [size]="13" />
           <span class="u-name">{{ u.name }}</span>
-          <span class="u-bar" role="progressbar" [attr.aria-valuenow]="u.progress" aria-valuemin="0" aria-valuemax="100"><span [style.width.%]="u.progress"></span></span>
+          <span
+            class="u-bar"
+            role="progressbar"
+            [attr.aria-valuenow]="u.progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            ><span [style.width.%]="u.progress"></span
+          ></span>
           <b class="u-pct">{{ u.saving ? 'Enregistrement…' : u.progress + ' %' }}</b>
         </li>
       }
     </ul>
   }
   @if (mention(); as m) {
-    <div class="mention-pop" role="listbox" aria-label="Mentionner un membre" [style.top.px]="m.top" [style.left.px]="m.left" (mousedown)="$event.preventDefault()">
+    <div
+      class="mention-pop"
+      role="listbox"
+      aria-label="Mentionner un membre"
+      [style.top.px]="m.top"
+      [style.left.px]="m.left"
+      (mousedown)="$event.preventDefault()"
+    >
       @for (u of m.items; track u.id; let i = $index) {
-        <button type="button" role="option" [class.on]="i === m.index" [attr.aria-selected]="i === m.index" (click)="pickMention(u)" (mouseenter)="hoverMention(i)">
+        <button
+          type="button"
+          role="option"
+          [class.on]="i === m.index"
+          [attr.aria-selected]="i === m.index"
+          (click)="pickMention(u)"
+          (mouseenter)="hoverMention(i)"
+        >
           <tk-avatar [user]="u" [size]="26" />
-          <span class="mn"><b>{{ u.name }}</b><small>{{ u.email }}</small></span>
+          <span class="mn"
+            ><b>{{ u.name }}</b
+            ><small>{{ u.email }}</small></span
+          >
         </button>
       }
     </div>

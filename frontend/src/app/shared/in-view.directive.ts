@@ -1,4 +1,4 @@
-import { Directive, ElementRef, OnDestroy, effect, inject, input, output } from '@angular/core';
+import { Directive, effect, ElementRef, inject, input, OnDestroy, output } from '@angular/core';
 
 /**
  * Emits when the host enters its scroll container (IntersectionObserver, no scroll listeners).
@@ -22,7 +22,9 @@ export class InViewDirective implements OnDestroy {
       const margin = this.tkInViewMargin();
       this.observer?.disconnect();
       this.observer = new IntersectionObserver(
-        entries => { if (entries.some(e => e.isIntersecting)) this.tkInView.emit(); },
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) this.tkInView.emit();
+        },
         { root, rootMargin: margin },
       );
       this.observer.observe(this.el.nativeElement);

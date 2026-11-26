@@ -9,7 +9,7 @@ export interface ConfirmOptions {
   cancelText?: string;
   /** danger: red button, focus on Cancel (irreversible / destructive actions). */
   tone?: 'danger' | 'primary';
-  icon?: 'warning' | 'question' | 'info';
+  icon?: 'info' | 'question' | 'warning';
 }
 
 /**

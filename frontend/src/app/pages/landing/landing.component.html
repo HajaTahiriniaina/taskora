@@ -9,11 +9,18 @@
 
   <section class="hero">
     <div class="hero-copy">
-      <span class="pill"><tk-icon name="sparkles" [size]="14" /> Le kanban nouvelle génération</span>
-      <h1>Le travail d’équipe,<br><span class="grad">enfin limpide.</span></h1>
-      <p>Taskora réunit vos projets, vos tâches et vos collègues dans des tableaux élégants et rapides. Notifications, champs personnalisés et collaboration en temps réel inclus.</p>
+      <span class="pill"
+        ><tk-icon name="sparkles" [size]="14" /> Le kanban nouvelle génération</span
+      >
+      <h1>Le travail d’équipe,<br /><span class="grad">enfin limpide.</span></h1>
+      <p>
+        Taskora réunit vos projets, vos tâches et vos collègues dans des tableaux élégants et
+        rapides. Notifications, champs personnalisés et collaboration en temps réel inclus.
+      </p>
       <div class="cta">
-        <a routerLink="/register" class="btn btn-gradient btn-lg">Créer mon espace <tk-icon name="arrowRight" [size]="16" /></a>
+        <a routerLink="/register" class="btn btn-gradient btn-lg"
+          >Créer mon espace <tk-icon name="arrowRight" [size]="16"
+        /></a>
         <a routerLink="/login" class="btn btn-lg glass-btn">J’ai déjà un compte</a>
       </div>
     </div>
@@ -23,11 +30,16 @@
       <div class="mock-board">
         @for (col of mockCols; track col.title) {
           <div class="mock-col">
-            <div class="mock-col-title">{{ col.title }} <i>{{ col.cards.length }}</i></div>
+            <div class="mock-col-title">
+              {{ col.title }} <i>{{ col.cards.length }}</i>
+            </div>
             @for (c of col.cards; track $index) {
               <div class="mock-card" [style.animation-delay.ms]="$index * 120 + 200">
-                <div class="mock-labels"><s [style.background]="c[0]"></s><s class="short" [style.background]="c[1]"></s></div>
-                <div class="mock-line"></div><div class="mock-line short"></div>
+                <div class="mock-labels">
+                  <s [style.background]="c[0]"></s><s class="short" [style.background]="c[1]"></s>
+                </div>
+                <div class="mock-line"></div>
+                <div class="mock-line short"></div>
                 <div class="mock-foot"><em></em><em></em></div>
               </div>
             }
