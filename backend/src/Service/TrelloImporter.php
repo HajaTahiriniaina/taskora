@@ -243,7 +243,7 @@ class TrelloImporter
                 }
             }
 
-            $board->setCardSeq($maxNumber);
+            $board->setCardSeq($nextFree); // highest number actually assigned (cards without idShort go past max)
             $this->em->flush();
 
             // ---- Links to cards of this board ("https://trello.com/c/<shortLink>/…") → Taskora cards
@@ -289,7 +289,7 @@ class TrelloImporter
                 'skippedArchivedCards' => count($data['cards']) - count($cardMap), // cards of unknown lists
                 'membersMatched' => array_values(array_unique(array_map(fn (User $u) => $u->getName(), $memberMap))),
                 'membersUnmatched' => $unmatched,
-                'nextCardNumber' => $maxNumber + 1,
+                'nextCardNumber' => $nextFree + 1,
             ]];
         });
     }
