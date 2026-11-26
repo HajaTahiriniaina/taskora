@@ -8,12 +8,25 @@ import com.taskora.identity.application.port.out.OutboxPort;
 import com.taskora.identity.application.port.out.PasswordHasherPort;
 import com.taskora.identity.application.port.out.UnitOfWorkPort;
 import com.taskora.identity.application.port.out.UserRepositoryPort;
+import com.taskora.identity.domain.event.UserProfileUpdated;
+import com.taskora.identity.domain.exception.TokenRejectedException;
+import com.taskora.identity.domain.exception.TokenRejection;
 import com.taskora.identity.domain.model.ProfileUpdate;
+import com.taskora.identity.domain.model.ProfileUpdateResult;
+import com.taskora.identity.domain.model.User;
 import com.taskora.identity.domain.model.UserId;
 import java.time.Clock;
+import java.util.List;
+import java.util.UUID;
 
 /** Lecture et modification du profil (A8). */
 public class ProfileService implements GetProfileUseCase, UpdateProfileUseCase {
+  private final UserRepositoryPort users;
+  private final PasswordHasherPort hasher;
+  private final LegacyUserProjectionPort projection;
+  private final OutboxPort outbox;
+  private final UnitOfWorkPort unitOfWork;
+  private final Clock clock;
 
   public ProfileService(
       UserRepositoryPort users,
@@ -22,16 +35,50 @@ public class ProfileService implements GetProfileUseCase, UpdateProfileUseCase {
       OutboxPort outbox,
       UnitOfWorkPort unitOfWork,
       Clock clock) {
-    throw new UnsupportedOperationException("BackCodeur");
+    this.users = users;
+    this.hasher = hasher;
+    this.projection = projection;
+    this.outbox = outbox;
+    this.unitOfWork = unitOfWork;
+    this.clock = clock;
   }
 
   @Override
   public UserView get(UserId id) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return UserViews.of(load(id));
   }
 
   @Override
   public UserView update(UserId id, ProfileUpdate update) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return unitOfWork.inTransaction(
+        () -> {
+          User current = load(id);
+          // Toute la validation a lieu ici ; une exception n'écrit rien (A8, SC-IDENT-019).
+          ProfileUpdateResult result = current.updateProfile(update, hasher);
+          if (!result.anyChange()) {
+            return UserViews.of(current);
+          }
+          User next = result.user();
+          users.update(next);
+          projection.upsert(next);
+          if (!result.changedFields().isEmpty()) {
+            outbox.appendEvent(
+                new UserProfileUpdated(
+                    UUID.randomUUID(),
+                    clock.instant(),
+                    next.id(),
+                    next.name().value(),
+                    next.avatarColor().value(),
+                    List.copyOf(result.changedFields())));
+          }
+          return UserViews.of(next);
+        });
+  }
+
+  /** Compte disparu entre la validation du jeton et l'appel : même refus que le filtre. */
+  private User load(UserId id) {
+    return users
+        .findById(id)
+        .orElseThrow(() -> new TokenRejectedException(TokenRejection.ACCOUNT_NOT_FOUND));
   }
 }

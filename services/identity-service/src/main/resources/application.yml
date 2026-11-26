@@ -1,5 +1,53 @@
-# Minimal (BackTesteur) : seules les clés lues par les tests, en placeholders.
-# BackCodeur complète ce fichier (A13 : variables d'environnement, Flyway, JPA, management…).
+# identity-service (A13) : toute valeur sensible vient d'une variable d'environnement, jamais du dépôt.
+spring:
+  application:
+    name: identity-service
+  main:
+    banner-mode: "off"
+  datasource:
+    url: ${IDENTITY_DB_URL:jdbc:mariadb://database:3306/identity}
+    username: ${IDENTITY_DB_USER:identity}
+    password: ${IDENTITY_DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    # Flyway ne gère que le schéma identity, créé par l'init SQL (jamais taskora).
+    schemas: identity
+    create-schemas: false
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+    include-exception: false
+    whitelabel:
+      enabled: false
+
+management:
+  server:
+    # /actuator/health pour le healthcheck Docker, jamais routé par nginx.
+    port: 8091
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    # Les messages SQL du pilote citent les valeurs en conflit (e-mail) : jamais journalisés (A13).
+    org.hibernate.orm.jdbc.error: ERROR
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: ERROR
+
 identity:
   jwt:
     private-key-path: ${JWT_PRIVATE_KEY_PATH:}
@@ -13,7 +61,7 @@ identity:
     internal-url: ${SYMFONY_INTERNAL_URL:http://api:80}
     internal-secret: ${INTERNAL_API_SECRET:}
   password:
-    bcrypt-cost: 13
+    bcrypt-cost: ${IDENTITY_BCRYPT_COST:13}
   outbox:
     relay:
-      enabled: true
+      enabled: ${IDENTITY_OUTBOX_RELAY_ENABLED:true}

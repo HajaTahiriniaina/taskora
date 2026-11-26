@@ -1,7 +1,9 @@
 package com.taskora.identity.domain.model;
 
+import com.taskora.identity.domain.exception.ValidationException;
 import java.util.List;
 import java.util.random.RandomGenerator;
+import java.util.regex.Pattern;
 
 /** Couleur d'avatar : palette à la création, puis exactement #RRGGBB (E18). */
 public record AvatarColor(String value) {
@@ -9,8 +11,11 @@ public record AvatarColor(String value) {
       List.of(
           "#6366f1", "#ec4899", "#14b8a6", "#f59e0b", "#8b5cf6", "#ef4444", "#0ea5e9", "#22c55e");
 
+  private static final Pattern HEX = Pattern.compile("\\A#[0-9a-fA-F]{6}\\z");
+  static final String INVALID = "Couleur d'avatar invalide.";
+
   public static AvatarColor random(RandomGenerator random) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return new AvatarColor(PALETTE.get(random.nextInt(PALETTE.size())));
   }
 
   /**
@@ -18,6 +23,9 @@ public record AvatarColor(String value) {
    * d'avatar invalide.").
    */
   public static AvatarColor parse(String raw) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (!HEX.matcher(raw).matches()) {
+      throw new ValidationException(INVALID);
+    }
+    return new AvatarColor(raw);
   }
 }

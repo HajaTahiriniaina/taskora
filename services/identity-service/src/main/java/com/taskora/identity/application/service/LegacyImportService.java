@@ -5,21 +5,65 @@ import com.taskora.identity.application.port.in.ImportReport;
 import com.taskora.identity.application.port.in.VerificationReport;
 import com.taskora.identity.application.port.out.LegacyUserSourcePort;
 import com.taskora.identity.application.port.out.UnitOfWorkPort;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
 
 /** Reprise idempotente (A14, identity-migration.md §3-4). */
 public class LegacyImportService implements ImportLegacyUsersUseCase {
+  static final String DUPLICATES_CHECK = "normalizedEmailDuplicates";
+
+  private final LegacyUserSourcePort source;
+  private final UnitOfWorkPort unitOfWork;
 
   public LegacyImportService(LegacyUserSourcePort source, UnitOfWorkPort unitOfWork) {
-    throw new UnsupportedOperationException("BackCodeur");
+    this.source = source;
+    this.unitOfWork = unitOfWork;
   }
 
   @Override
   public ImportReport importAll() {
-    throw new UnsupportedOperationException("BackCodeur");
+    int duplicates = source.countNormalizedEmailDuplicates();
+    if (duplicates > 0) {
+      // Aucun e-mail dans le message : seulement le nombre de groupes en doublon.
+      throw new IllegalStateException(
+          "Reprise annulée avant toute écriture : "
+              + duplicates
+              + " groupe(s) d'e-mails en doublon après normalisation dans la source");
+    }
+    return unitOfWork.inTransaction(source::copyAllIntoIdentity);
   }
 
   @Override
   public VerificationReport verify() {
-    throw new UnsupportedOperationException("BackCodeur");
+    Map<String, String> sourceMetrics = source.sourceMetrics();
+    Map<String, String> targetMetrics = source.targetMetrics();
+    int duplicates = source.countNormalizedEmailDuplicates();
+
+    List<String> failed = new ArrayList<>();
+    if (duplicates > 0) {
+      failed.add(DUPLICATES_CHECK);
+    }
+    Map<String, String> metrics = new LinkedHashMap<>();
+    metrics.put("source." + DUPLICATES_CHECK, String.valueOf(duplicates));
+    for (String key : new TreeSet<>(union(sourceMetrics, targetMetrics))) {
+      String expected = sourceMetrics.get(key);
+      String actual = targetMetrics.get(key);
+      metrics.put("source." + key, String.valueOf(expected));
+      metrics.put("target." + key, String.valueOf(actual));
+      if (!Objects.equals(expected, actual)) {
+        failed.add(key);
+      }
+    }
+    return new VerificationReport(failed.isEmpty(), List.copyOf(failed), Map.copyOf(metrics));
+  }
+
+  private static TreeSet<String> union(Map<String, String> a, Map<String, String> b) {
+    TreeSet<String> keys = new TreeSet<>(a.keySet());
+    keys.addAll(b.keySet());
+    return keys;
   }
 }

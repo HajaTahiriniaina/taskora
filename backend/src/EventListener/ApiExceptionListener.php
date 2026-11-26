@@ -8,7 +8,7 @@ use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 
-/** Every error under /api is returned as JSON: {"error": "..."} */
+/** Every error under /api and /internal is returned as JSON: {"error": "..."} */
 #[AsEventListener(event: KernelEvents::EXCEPTION, priority: -10)]
 class ApiExceptionListener
 {
@@ -16,7 +16,8 @@ class ApiExceptionListener
 
     public function __invoke(ExceptionEvent $event): void
     {
-        if (!str_starts_with($event->getRequest()->getPathInfo(), '/api')) {
+        $path = $event->getRequest()->getPathInfo();
+        if (!str_starts_with($path, '/api') && !str_starts_with($path, '/internal')) {
             return;
         }
         $e = $event->getThrowable();

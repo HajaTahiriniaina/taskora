@@ -2,11 +2,9 @@
 
 namespace App\Controller;
 
-use App\Entity\BoardMember;
-use App\Entity\Invitation;
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\Notifier;
+use App\Service\InvitationClaimer;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 class AuthController extends ApiController
 {
     #[Route('/auth/register', methods: ['POST'])]
-    public function register(Request $request, UserRepository $users, UserPasswordHasherInterface $hasher, JWTTokenManagerInterface $jwt, Notifier $notifier): JsonResponse
+    public function register(Request $request, UserRepository $users, UserPasswordHasherInterface $hasher, JWTTokenManagerInterface $jwt, InvitationClaimer $claimer): JsonResponse
     {
         $data = $this->body($request);
         $name = $this->requireString($data, 'name', 120);
@@ -41,13 +39,7 @@ class AuthController extends ApiController
         $this->em->persist($user);
 
         // Turn pending invitations into memberships
-        foreach ($this->em->getRepository(Invitation::class)->findBy(['email' => $email]) as $inv) {
-            $board = $inv->getBoard();
-            $board->addMember(new BoardMember($board, $user));
-            $notifier->notify([$user], $inv->getInvitedBy(), 'board_invite',
-                sprintf('%s vous a ajouté au tableau « %s »', $inv->getInvitedBy()?->getName() ?? 'Quelqu\'un', $board->getTitle()), $board);
-            $this->em->remove($inv);
-        }
+        $claimer->claim($user, $email);
         $this->em->flush();
 
         return $this->json(['token' => $jwt->create($user), 'user' => $this->presenter->user($user)], 201);
