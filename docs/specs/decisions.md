@@ -22,3 +22,12 @@ Décision de l'utilisateur : **corriger** ces écarts dans identity-service. Le 
 | E16 | Corps `[]` accepté comme `{}` | `POST /api/auth/register` et `PATCH /api/me` exigent un **objet JSON** ; sinon **400** `{"error":"JSON invalide."}` |
 | E17 | Conversions PHP `(string)` : nombre → texte, `true` → `"1"`, `false`/`null` → `""`, tableau → `"Array"` | Un champ présent (`email`, `password`, `name`, `avatarColor`, `currentPassword`, `newPassword`) doit être une **chaîne JSON** ; sinon **400** `{"error":"Le champ \"<nom>\" doit être une chaîne de caractères."}`. Exception pour `PATCH /api/me` : une valeur `null` vaut « absente », comme aujourd'hui. |
 | E18 | `avatarColor` invalide ignorée en silence ; `\n` final accepté | `avatarColor` doit correspondre **exactement** à `#RRGGBB` (`\A#[0-9a-fA-F]{6}\z`) ; sinon **400** `{"error":"Couleur d'avatar invalide."}` |
+
+## 2026-11-26 : interprétations de BackAli corrigées
+Décision de l'utilisateur : **corriger** les trois points qui reprenaient encore le comportement de Symfony.
+
+| Réf. | Comportement Symfony | Comportement identity-service |
+|---|---|---|
+| E19 | Connexion : messages anglais de `json_login` (`The key "email" must be provided.`, `… must be a string.`, `Invalid JSON.`) | `POST /api/auth/login` suit les mêmes règles que l'inscription, en français :<br>• corps qui n'est pas un objet JSON → 400 `JSON invalide.` (E16) ;<br>• champ absent → 400 `Le champ "email" est obligatoire.` / `Le champ "password" est obligatoire.` ;<br>• champ qui n'est pas une chaîne, `null` compris → 400 `Le champ "<nom>" doit être une chaîne de caractères.` (E17).<br>Identifiants faux → toujours 401 au format actuel. |
+| E20 | Corps vide traité comme `{}` | Un corps vide sur `register`, `login` ou `PATCH /api/me` → 400 `JSON invalide.` |
+| E21 | `newPassword: "0"` = « pas de changement » (`empty` de PHP) | Seuls l'absence, `null` et `""` signifient « pas de changement ». Toute autre chaîne, `"0"` compris, est un vrai nouveau mot de passe, soumis aux contrôles habituels (mot de passe actuel, puis longueur). Le front n'envoie `newPassword` que s'il fait au moins 8 caractères. |
