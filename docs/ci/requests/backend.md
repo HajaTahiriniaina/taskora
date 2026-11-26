@@ -81,4 +81,11 @@ Dans `identity-compat`, le job génère la paire de clés (§1) **dans le volume
 - Sonar : quality gate vert.
 
 ## 6. Réponse de Manuel
-_(à compléter : statut `accepté | modifié | refusé`, noms des workflows, écarts)_
+Statut : **accepté avec modifications** (26/11/2026). Détail : [../README.md](../README.md).
+- Workflows : `identity-service.yml` (identity-build, identity-test-report, identity-quality, identity-sonar, identity-image), `identity-security.yml`, `identity-compat.yml`, `backend.yml` (backend-phpunit). `frontend-e2e-identity` : en attente de FrontPierre.
+- Écarts :
+  - `identity` n'a que le réseau interne `backend` ; le port 8082 (127.0.0.1) est publié par `docker-compose.identity-dev.yml` (utilisé par `identity-compat`).
+  - Init MariaDB : `docker/mariadb/initdb.d/10-taskora-init.sh` (initdb + service `db-init` du profil `identity`, après `api` sain, car le droit sur `taskora.user` exige la table).
+  - nginx : `IDENTITY_UPSTREAM` (défaut `api:80`) et `IDENTITY_WRITE_FREEZE` (`on|off`) ; changement = `docker compose up -d web`, sans reconstruction (gabarit rendu au démarrage du conteneur, pas `nginx -s reload`).
+  - Sonar : jeton lu par variable d'environnement (pas `-Dsonar.token` en ligne de commande) ; URL du serveur = variable de dépôt `SONAR_HOST_URL`.
+  - backend-phpunit : `DATABASE_URL` de compose vise déjà `/taskora` (suffixe `_test` ajouté par doctrine.yaml) ; ajout de `unset INTERNAL_API_SECRET` et de `lexik:jwt:generate-keypair`.

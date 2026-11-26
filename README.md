@@ -18,8 +18,12 @@ docker compose up -d --build
 ```
 
 - Application : http://localhost:8080
-- API : http://localhost:8081/api (aussi accessible via http://localhost:8080/api)
+- API : http://127.0.0.1:8081/api (publiée sur la boucle locale uniquement ; aussi accessible via http://localhost:8080/api)
 - MariaDB : localhost:3307 (`taskora` / `taskora`)
+
+Profils compose : `--profile identity` ajoute identity-service (migration en cours, `db-init` crée son schéma et son compte), `--profile quality` ajoute SonarQube (http://127.0.0.1:9000). L'amont nginx de `/api/auth/` et `/api/me` se choisit par `IDENTITY_UPSTREAM` (`api:80` par défaut, Symfony) puis `docker compose up -d web`, sans reconstruction.
+
+CI GitHub Actions (`.github/workflows/`) : identity-service (build, qualité, Sonar, image, sécurité OWASP, compatibilité), backend PHPUnit, frontend (build). Secrets à créer dans GitHub : `NVD_API_KEY`, `SONAR_TOKEN` (+ variable `SONAR_HOST_URL`). Détails : [docs/ci/README.md](docs/ci/README.md).
 
 Au démarrage, le conteneur `api` attend la base, génère les clés JWT (volume `jwt_keys`) et applique les migrations. Les images des textes et les pièces jointes sont stockées sur **Amazon S3** (ou dans le volume `uploads` tant que S3 n’est pas configuré, voir ci-dessous).
 

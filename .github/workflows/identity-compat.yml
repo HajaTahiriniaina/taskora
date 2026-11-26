@@ -1,0 +1,112 @@
+# Compatibilité Symfony ↔ identity-service sur la stack compose complète
+# (docs/ci/requests/backend.md §2 et §3) : tests JUnit @Tag("compat").
+name: identity-compat
+
+on:
+  pull_request:
+    paths:
+      - "services/identity-service/**"
+      - "backend/**"
+      - "docker-compose.yml"
+      - "docker-compose.identity-dev.yml"
+      - "docker/mariadb/**"
+      - "frontend/nginx.conf"
+      - "frontend/Dockerfile"
+      - ".github/workflows/identity-compat.yml"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  identity-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      COMPOSE: docker compose -f docker-compose.yml -f docker-compose.identity-dev.yml --profile identity
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: services/**/pom.xml
+
+      # Secrets de CI éphémères, masqués. api génère la paire de clés JWT dans le volume
+      # jwt_keys avec cette passphrase ; identity la lit en lecture seule.
+      - name: Secrets éphémères
+        run: |
+          for name in JWT_PASSPHRASE INTERNAL_API_SECRET IDENTITY_DB_PASSWORD DB_PASSWORD DB_ROOT_PASSWORD APP_SECRET; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Démarrer la stack (database, api, db-init, identity, web)
+        run: $COMPOSE up -d --build
+
+      - name: Attendre identity et web
+        run: |
+          deadline=$((SECONDS + 600))
+          until [ "$(docker inspect -f '{{.State.Health.Status}}' "$($COMPOSE ps -q identity)" 2>/dev/null)" = healthy ] \
+            && curl -fsS -o /dev/null http://localhost:8080/; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              $COMPOSE ps
+              echo "::error::identity ou web n'est pas prêt après 10 min"
+              exit 1
+            fi
+            sleep 5
+          done
+          $COMPOSE ps
+
+      - name: Tests compat (Symfony 8081, identity 8082, nginx 8080)
+        working-directory: services
+        run: >-
+          ./mvnw -B -ntp -pl identity-service verify -Pcompat
+          -Dcompat.symfony.url=http://localhost:8081
+          -Dcompat.identity.url=http://localhost:8082
+          -Dcompat.web.url=http://localhost:8080
+
+      - name: Rapports de tests
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: identity-compat-reports
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            services/identity-service/target/surefire-reports/
+            services/identity-service/target/failsafe-reports/
+
+      # Journaux publiés seulement s'ils ne contiennent ni la passphrase ni un jeton JWT.
+      - name: Journaux compose (échec)
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/compose-logs"
+          log="$RUNNER_TEMP/compose-logs/compose.log"
+          $COMPOSE logs --no-color > "$log" 2>&1 || true
+          leak=0
+          for name in JWT_PASSPHRASE INTERNAL_API_SECRET IDENTITY_DB_PASSWORD DB_PASSWORD DB_ROOT_PASSWORD APP_SECRET; do
+            if grep -qF -- "${!name}" "$log"; then leak=1; fi
+          done
+          if grep -qE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+' "$log"; then leak=1; fi
+          if [ "$leak" = 1 ]; then
+            rm -f "$log"
+            echo "::error::Les journaux compose contiennent un secret ou un jeton : non publiés."
+            exit 1
+          fi
+      - name: Publier les journaux compose
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: identity-compat-compose-logs
+          retention-days: 14
+          if-no-files-found: ignore
+          path: ${{ runner.temp }}/compose-logs/

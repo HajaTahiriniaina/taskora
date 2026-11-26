@@ -1,0 +1,53 @@
+# Frontend Angular : jobs évidents en attendant la demande CI de FrontPierre
+# (docs/ci/requests/frontend.md, non rédigée). frontend-e2e-identity n'est pas encore défini.
+name: frontend
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  frontend-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      # Non bloquant pour l'instant : 59 fichiers du dépôt ne sont pas formatés (26/11/2026).
+      # À rendre bloquant (retirer continue-on-error) après un « prettier --write » décidé par FrontPierre.
+      - name: Format (Prettier)
+        continue-on-error: true
+        run: npx prettier --check .
+      # angular.json n'a pas encore de cible « test » ni de fichier *.spec.ts :
+      # l'étape s'activera quand FrontTesteur en ajoutera.
+      - name: Tests unitaires (ng test)
+        if: hashFiles('frontend/src/**/*.spec.ts') != ''
+        run: npx ng test --watch=false
+      - name: Build production
+        run: npx ng build --configuration production

@@ -7,6 +7,9 @@ COPY . .
 RUN npx ng build --configuration production
 
 FROM nginx:1.29-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Gabarit rendu par envsubst au démarrage (amont d'identité commutable sans reconstruction).
+ENV IDENTITY_UPSTREAM=api:80 \
+    IDENTITY_WRITE_FREEZE=off
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/frontend/browser /usr/share/nginx/html
 EXPOSE 80
