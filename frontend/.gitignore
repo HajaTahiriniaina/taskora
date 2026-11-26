@@ -42,3 +42,8 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Tests (rapports Vitest, Playwright, couverture)
+/reports
+/playwright-report
+/test-results
