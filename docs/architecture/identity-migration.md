@@ -102,13 +102,13 @@ Le rapport n'affiche que des nombres et des empreintes. Il est conservé dans le
 Prérequis : tests critiques verts, rapport BackReviewer sans bloquant, **retour arrière répété en recette** (§6), sauvegarde `mariadb-dump` de `taskora.user` (fichier hors dépôt).
 
 Conditions préalables à la bascule (revue 2, toutes obligatoires ; aucune n'est remplie par un run local) :
-| Réf. | Condition | Responsable | Dépend de |
-|---|---|---|---|
-| **C1** | Run CI `identity-security` (OWASP dependency-check) vert : aucune dépendance CVSS ≥ 7, résumé dans `docs/ci/requests/backend.md` | Manuel | push approuvé par l'utilisateur |
-| **C2** | Runs CI `identity-service` (tests, qualité, image) et `identity-compat` verts ; `identity-compat` prouve les tests miroir SC-IDENT-001…018 et croisés SC-IDENT-010/023, jamais exécutés en local | Manuel | push approuvé par l'utilisateur |
-| **C3** | Passphrase JWT changée partout où elle a servi (elle figure dans l'historique git, revue 1 m11) ; nouvelle paire de clés générée, jetons existants invalidés (annonce aux utilisateurs) | utilisateur | — |
-| **C4** | Quality gate Sonar vert sur le serveur de CI, sur la référence de CI (exclusions limitées à A16 `e1`–`e3`) | Manuel, BackReviewer | push approuvé par l'utilisateur |
-La bascule (étape 1 ci-dessous) n'est pas annoncée tant que C1 à C4 ne sont pas consignées comme remplies.
+| Réf. | Condition | Responsable | Dépend de | Statut (recette BackAli, 26/11/2026) |
+|---|---|---|---|---|
+| **C1** | Run CI `identity-security` (OWASP dependency-check) vert : aucune dépendance CVSS ≥ 7, résumé dans `docs/ci/requests/backend.md` | Manuel | push approuvé par l'utilisateur | **remplie** : `identity-security` vert sur la PR #1 (fusion `86b3b07`), aucune dépendance CVSS ≥ 7 ; résumé chiffré encore à reporter dans `docs/ci/requests/backend.md` (Manuel) |
+| **C2** | Runs CI `identity-service` (tests, qualité, image) et `identity-compat` verts ; `identity-compat` prouve les tests miroir SC-IDENT-001…018 et croisés SC-IDENT-010/023, jamais exécutés en local | Manuel | push approuvé par l'utilisateur | **remplie** : `identity-service` (build, tests, qualité, image) et `identity-compat` (32/32, dont `MirrorCompatibilityTest`) verts sur la PR #1 ; job Sonar sauté (voir C4) |
+| **C3** | Passphrase JWT changée partout où elle a servi (elle figure dans l'historique git, revue 1 m11) ; nouvelle paire de clés générée, jetons existants invalidés (annonce aux utilisateurs) | utilisateur | — | **en attente de l'utilisateur** |
+| **C4** | Quality gate Sonar vert sur le serveur de CI, sur la référence de CI (exclusions limitées à A16 `e1`–`e3`) | Manuel, BackReviewer | push approuvé par l'utilisateur | **en attente de l'utilisateur** : variable `SONAR_HOST_URL` et secret `SONAR_TOKEN` à créer sur GitHub (job `identity-sonar` sauté sur la PR #1) |
+La bascule (étape 1 ci-dessous) n'est pas annoncée tant que C1 à C4 ne sont pas consignées comme remplies. Détail et preuves : [recette BackAli](../reviews/2026-11-26-identity-service-recette.md).
 1. **T-24 h** : annonce de la coupure des écritures d'identité (inscription, profil).
 2. **T-10 min** : `identity` déployé mais **non routé** ; `verify` lancé à blanc (la cible peut être vide ou ancienne).
 3. **T0 — gel** : nginx renvoie `503 {"error":"Maintenance en cours, réessayez dans quelques minutes."}` sur `POST /api/auth/register` et `PATCH /api/me` uniquement (login et lectures restent servis par Symfony, ils n'écrivent pas dans `user`).
