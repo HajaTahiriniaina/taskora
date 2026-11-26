@@ -1,6 +1,6 @@
 # Demande CI/CD frontend — socle de tests et e2e d'identité (phase 2)
 
-Demandeur : FrontPierre. Destinataire : Manuel. Statut : **ouverte** (26/11/2026).
+Demandeur : FrontPierre. Destinataire : Manuel. Statut : **traitée** (26/11/2026, réponse au §8).
 Références :
 - plan de Paul, `docs/reviews/2026-11-26-identity-service-validation-paul.md` §6 ;
 - `docs/architecture/frontend.md` §5 (choix d'outillage) ;
@@ -153,4 +153,38 @@ Non vérifié :
 - le fichier exact que génère `ng add angular-eslint`.
 
 ## 8. Réponse de Manuel
-_À compléter._
+
+Statut : **implémentée** dans `.github/workflows/frontend.yml` (26/11/2026), revue m7 et m8 de `docs/reviews/2026-11-26-frontend-identity.md`. Non poussé : le premier run GitHub Actions attend l'accord de l'utilisateur.
+
+### Jobs
+| Job | Bloquant | Écarts ou précisions par rapport au §2 |
+|---|---|---|
+| `frontend-quality` | oui | `ng lint --max-warnings=$LINT_MAX_WARNINGS` (904, ligne de base relevée par FrontReviewer) : échec si 1 erreur **ou** si les avertissements dépassent la ligne de base. Sortie JSON `reports/eslint.json` (artefact `frontend-lint-report`), résumé et annotations `::error` des erreurs. Une notice demande d'abaisser `LINT_MAX_WARNINGS` quand le compte baisse. Prettier bloquant (plus de `continue-on-error`). Les trois `tsc --noEmit`. |
+| `frontend-unit` | oui | `npx ng test --watch=false --coverage`, sans condition `hashFiles`. Artefact `frontend-unit-reports` (JUnit + `coverage/`). Pas de seuil (phase 2). |
+| `frontend-build` | oui | inchangé. Trois jobs séparés (un `npm ci` chacun, cache npm), comme proposé. |
+| `frontend-image` | oui | `docker build -f frontend/Dockerfile -t taskora/web:ci frontend/`, sans push. |
+| `frontend-e2e-identity` | oui, les deux branches | voir ci-dessous. |
+| `frontend-test-report` | non | `dorny/test-reporter` v3.2.0, deux rapports (« frontend unit tests », « frontend e2e identity »), après `actions/checkout`. Seul job avec `checks: write` (+ `actions: read`), ignoré sur les PR de fork. |
+
+### `frontend-e2e-identity`
+- Matrice `symfony`/`api:80` et `identity`/`identity:8080`, `fail-fast: false`, 45 min. `workflow_dispatch` : entrée `upstream` (`both` par défaut, `symfony`, `identity`) qui réduit la matrice.
+- Projet compose explicite `-p taskora-ci` (le `name: taskora` du compose n'est jamais visé) ; `down -v --remove-orphans` en `if: always()`.
+- Contrôle de l'amont : l'environnement du conteneur `web` (ligne `IDENTITY_UPSTREAM` exacte) **et** la configuration nginx rendue (`/etc/nginx/conf.d/default.conf` doit contenir `"http://<amont>"`). Rien n'est affiché hormis l'amont.
+- Playwright sur le runner : version lue dans `package-lock.json` (1.65.1), cache `~/.cache/ms-playwright` par `actions/cache` v6.1.0 (clé = OS + version + chromium), `playwright install --with-deps chromium` sans cache, `install-deps chromium` avec cache. Je n'ai pas pris l'image `mcr.microsoft.com/playwright` en CI (≈ 2,5 Go à tirer à chaque run).
+- Contrôle de fuite **avant** publication sur `frontend/reports/` (six valeurs éphémères + motif `eyJ….eyJ…`, fichiers binaires compris) : en cas de fuite, `reports/` est supprimé, rien n'est publié et le job échoue. Même contrôle sur les journaux compose en cas d'échec (artefact `frontend-compose-logs-<backend>`).
+- Artefacts : `frontend-e2e-identity-<backend>` (JUnit, HTML, captures d'échec), 14 jours.
+
+### Déclencheurs
+Un seul workflow, donc un seul filtre de chemins : l'union de ceux du §2, plus `services/pom.xml` (parent Maven du build d'`identity`) et `docker-compose*.yml`. Conséquence assumée : une PR qui ne touche que `backend/**` relance aussi qualité, unitaires, build et image du front. Je n'ai pas ajouté d'action de filtrage de chemins (non utilisée dans le dépôt, à épingler et vérifier).
+
+### Actions
+Toutes déjà épinglées dans le dépôt et revérifiées par `git ls-remote` le 26/11/2026 : `actions/checkout` v7.0.1, `actions/setup-node` v7.1.0, `actions/upload-artifact` v7.0.2, `actions/download-artifact` v8.0.2, `actions/cache` v6.1.0 (`55cc8345863c7cc4c66a329aec7e433d2d1c52a9`), `dorny/test-reporter` v3.2.0 (`d1b5dff021aa968b288b02285a8bf47471c5928a`, commit de l'étiquette annotée).
+
+### Scripts d'installation npm (m8)
+Refus explicite des scripts de `esbuild`, `lmdb`, `msgpackr-extract` et `@parcel/watcher` dans `package.json#allowScripts`, et `strict-allow-scripts=true` dans `frontend/.npmrc` (copié par le `Dockerfile`). Détail et justification : `docs/ci/README.md`. Seul le champ `allowScripts` est ajouté à `package.json` : ni dépendance, ni script, ni cible `test` modifiés (à signaler à FrontReviewer pour son `git diff` d'intégrité).
+
+### Validation locale
+- YAML analysé (Ruby, Python) ; `actionlint` 1.7.12 (image épinglée par digest, shellcheck inclus) : 0 remarque sur tous les workflows.
+- Dans `node:24-alpine` (épinglée, Node 24.22.3, npm 11.19.1), sur une copie propre (`git archive`, `node_modules` neuf) : `npm ci` sans avertissement ; `ng lint` 0 erreur, 904 avertissements, succès à 904 et échec à 903 ; `prettier --check .` conforme ; les trois `tsc` verts ; `ng test --watch=false --coverage` 16 tests verts, `unit-junit.xml`, `lcov.info` et `cobertura-coverage.xml` produits ; `ng build` vert ; `docker build` de l'image vert.
+- Logique e2e rejouée sur une stack jetable `-p taskora-ci-dry` (ports 127.0.0.1, secrets éphémères, scripts des étapes extraits du workflow) : stack prête, contrôle d'amont correct sur les deux valeurs et en échec sur une valeur fausse, Playwright 1.65.1 (image `mcr.microsoft.com/playwright:v1.65.1-noble`) **14/14 verts sur `identity:8080` et sur `api:80`**, contrôle de fuite propre sur les rapports et les journaux, et en échec sur un faux jeton ; `down -v` ne laisse rien. Non rejoué : l'installation des navigateurs et le cache sur le runner GitHub.
+
