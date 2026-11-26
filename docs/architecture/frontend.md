@@ -8,7 +8,7 @@ Créé le 26/11/2026 (phase 2 : socle de tests front et e2e d'identité).
 - `frontend/` : application Angular **22.3.0**, avec des composants autonomes, des signals et la détection de changement **sans zone.js** (zoneless). Le préfixe des sélecteurs est `tk-`.
 - Dépendances principales : HttpClient avec le backend XHR (pour la progression des envois), Tiptap, SweetAlert2 (toasts et dialogues), service worker Web Push.
 - Le build passe par `@angular/build:application`. L'image de production est `frontend/Dockerfile` : node 24 pour le build, puis nginx. nginx sert l'application et route `/api/auth/` et `/api/me` vers l'amont `IDENTITY_UPSTREAM` (`api:80` ou `identity:8080`). Le reste de `/api/` va à Symfony.
-- En développement, `ng serve` passe par le proxy `frontend/proxy.conf.mjs`. Il ne lit que les clés `API_BIND`/`API_PORT` dans l'environnement ou le `.env` racine. Le routage d'identité est à ajouter (§6).
+- En développement, `ng serve` passe par le proxy `frontend/proxy.conf.mjs`. Il ne lit que les clés `API_BIND`, `API_PORT`, `IDENTITY_UPSTREAM`, `IDENTITY_BIND` et `IDENTITY_PORT` dans l'environnement ou le `.env` racine, et route l'identité comme nginx (§6).
 - Gestion de la session :
   - `core/auth.service.ts` : jeton et profil dans `localStorage` (`taskora.token`, `taskora.user`) ; `isLoggedIn` lit `exp` ;
   - `core/auth.interceptor.ts` : ajoute `Bearer` hors `/auth/` ; un 401 hors `/auth/` déclenche la déconnexion et le toast de session ;
@@ -19,6 +19,7 @@ Créé le 26/11/2026 (phase 2 : socle de tests front et e2e d'identité).
 - Aucun secret dans le frontend. La seule clé publique admise est la clé VAPID, servie par l'API.
 - Aucun appel à un endpoint absent des contrats `docs/contracts/openapi/*.yaml`. Un besoin nouveau passe par `docs/contracts/requests/<NNN>-<sujet>.md`.
 - La migration du backend ne modifie aucune page tant que les contrats HTTP sont conservés (`docs/specs/pages.md`).
+- Accessibilité : un message d'erreur de formulaire affiché dans la page porte `role="alert"` (décision m6, `identity.md` §6). Pas d'`aria-live` en plus.
 
 ## 3. Stratégie de tests (décision phase 2)
 
@@ -74,6 +75,10 @@ frontend/
 - Interdit : les comptes de démonstration du README, les identifiants réels et les données préchargées ou partagées entre tests. Rien n'est lu dans `.env`.
 - Aucun nettoyage par l'API, puisqu'il n'existe aucune route de suppression de compte et qu'aucune n'est demandée. En CI, la stack est détruite (`down -v`). En local, les comptes `e2e-…@example.com` s'accumulent dans la base de développement ; c'est acceptable, et une stack compose dédiée est conseillée.
 - Les tests sont indépendants : `fullyParallel: true`, aucun ordre imposé. En CI : 2 workers et `retries: 0` (un test instable doit être corrigé, pas rejoué), avec `forbidOnly: true`.
+- Mots de passe (décision de recette m4, 26/11/2026) :
+  - tests qui atteignent un amont réel (`e2e/**`, création de compte réelle) : mot de passe **aléatoire par exécution**, jamais fixe ;
+  - specs unitaires et de composants (`src/**/*.spec.ts`, requêtes simulées par `HttpTestingController`, qui ne quittent pas le processus) : valeurs **manifestement factices** et fixes admises, par exemple pour les bornes de longueur. Jamais une valeur du README, un identifiant de démonstration ou réel, un littéral `eyJ…` ni une valeur qui ressemble à un secret de configuration.
+- `HttpTestingController.verify()` : en `afterEach` quand chaque test crée un seul module ; sinon à la fin de chaque test qui émet une requête (décision m5bis).
 - Tests unitaires : réponses HTTP simulées par `HttpTestingController`. Elles respectent le schéma OpenAPI : `user` = `{id, name, email, avatarColor}` et erreurs `{"error": "…"}`. Pour un jeton factice, on construit en mémoire une charge utile `{exp}`, sans signature réelle.
 
 ### 4.3 Sélecteurs
@@ -115,10 +120,17 @@ Toasts SweetAlert2 : utiliser le rôle si le toast en expose un (à vérifier pa
   - en **erreur**, car leur correction automatique est sans risque : `sort-imports`, `sort-named-imports`, `sort-named-exports`, `sort-union-types`, `sort-intersection-types` ;
   - en **avertissement** en phase 2 : `sort-classes`, `sort-objects`, `sort-interfaces`, `sort-object-types`. Un réordonnancement massif peut changer le comportement, par exemple l'ordre des initialiseurs de champs qui dépendent d'`inject()`, ou l'ordre des routes. Ces règles ne sont **pas** corrigées automatiquement sur le code existant. Elles passeront en erreur après un chantier dédié.
 - Dossiers ignorés : `dist`, `.angular`, `node_modules`, `reports`, `public`.
-- Ligne de base : une erreur non corrigible automatiquement dans le code existant fait passer la règle en `warn` dans `eslint.config.js`, avec le commentaire `// ligne de base phase 2`, et la liste va dans le rapport de FrontReviewer. Aucun `eslint-disable` dans le code. Les fichiers nouveaux ou modifiés n'ont aucun avertissement (`--max-warnings=0` sur la liste des fichiers modifiés).
+- Ligne de base : une erreur non corrigible automatiquement dans le code existant fait passer la règle en `warn` dans `eslint.config.js`, avec le commentaire `// ligne de base phase 2`, et la liste va dans le rapport de FrontReviewer. Aucun `eslint-disable` dans le code.
+- Avertissements dans une PR (règle précisée à la recette, m2, 26/11/2026) :
+  - **fichier nouveau** : aucun avertissement (`npx eslint --max-warnings=0 <fichiers>`) ;
+  - **fichier existant modifié** : pour chaque règle, le nombre d'avertissements du fichier n'augmente pas par rapport à `git merge-base` (comparaison `eslint --format json` des deux versions, donnée par le Reviewer) ;
+  - avertissements d'accessibilité de template sur les **lignes modifiées** : corrigés dans la même PR, avec un test si le comportement au clavier change ;
+  - **global** : `LINT_MAX_WARNINGS` (CI, 904 au 26/11/2026) ne fait que baisser ; une PR qui réduit le compte l'abaisse dans le même commit.
+- Réduction de la ligne de base : lots B1 à B4 de `docs/reviews/2026-11-26-frontend-identity-recette.md` §4.7 (types d'abord, puis petites règles, accessibilité page par page avec tests, `sort-objects`/`sort-classes` en dernier dans un chantier dédié).
 
 ### 5.3 Formatage
 Prettier 3.10.1 avec la configuration `.prettierrc` existante : largeur 100, guillemets simples, parseur `angular` pour le HTML. Les 59 fichiers non conformes sont reformatés dans un commit dédié (§7). Ensuite, `prettier --check` est bloquant en CI.
+- Blancs dans les templates (décision m1) : Prettier peut remettre une interpolation sur sa propre ligne ; Angular rend alors une espace de chaque côté du texte. C'est invisible en `white-space: normal`, mais **visible dans un conteneur `white-space: pre*`** (exemple : visionneuse JSON). Dans ces conteneurs, l'interpolation reste collée à ses balises, ou passe par un `computed` court qui tient sur la ligne.
 
 ### 5.4 Versions
 Le tableau détaillé des versions et de leur vérification est dans `docs/ci/requests/frontend.md` §7.
@@ -129,9 +141,14 @@ Le tableau détaillé des versions et de leur vérification est dans `docs/ci/re
 `proxy.conf.mjs` doit pouvoir envoyer `/api/auth/` (préfixe) et `/api/me` (chemin exact, comme `location = /api/me` dans nginx) vers identity-service quand l'amont choisi est identity. Le reste de `/api` et `/uploads` continue d'aller vers Symfony.
 - Le choix suit `IDENTITY_UPSTREAM`, lu dans l'environnement ou le `.env` racine. Seules les clés `IDENTITY_UPSTREAM`, `IDENTITY_BIND` et `IDENTITY_PORT` sont ajoutées à la lecture.
 - La cible est `http://<IDENTITY_BIND>:<IDENTITY_PORT, 8082 par défaut>`, publiée par `docker-compose.identity-dev.yml`.
-- Réalisation : FrontCodeur (ordre de travail, C1). Le format de clé regex du proxy Vite (`^/api/me$`) est à vérifier.
+- Réalisation : FrontCodeur (C1, `91350c8`), vérifiée par FrontReviewer : clés `'/api/auth/'` et `'^/api/me(?:[?#]|$)'` avant `/api`.
+- Limites connues (décision m9) : le proxy est un outil de développement, pas une reproduction de nginx.
+  - Seul l'hôte `identity` dans `IDENTITY_UPSTREAM` active le routage d'identité. Toute autre valeur, faute de frappe comprise, retombe **silencieusement** sur Symfony.
+  - Le gel des écritures et la limite de corps de 64 Kio de nginx ne sont pas reproduits.
+  - La référence reste l'e2e à travers nginx (`frontend-e2e-identity`, deux amonts).
 
 ## 7. Historique des décisions
 | Date | Décision |
 |---|---|
+| 26/11/2026 (recette) | Phase 2 acceptée (`docs/reviews/2026-11-26-frontend-identity-recette.md`). Règles précisées : avertissements ESLint par fichier (m2, §5.2), mots de passe des specs (m4, §4.2), `verify()` (m5bis, §4.2), blancs en `pre-wrap` (m1, §5.3), limites du proxy (m9, §6). `role="alert"` sur les messages d'erreur des formulaires (m6). Plan de réduction de la ligne de base B1–B4. |
 | 26/11/2026 | Vitest + jsdom via `@angular/build:unit-test` ; Playwright Chromium ; un fichier e2e par page avec l'étiquette `@identity` ; comptes créés par l'API dans chaque test ; ESLint (angular-eslint + perfectionist) avec ligne de base ; formatage Prettier dans un commit dédié. |
