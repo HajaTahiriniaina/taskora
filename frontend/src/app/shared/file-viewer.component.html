@@ -1,0 +1,148 @@
+@let a = attachment();
+<div class="viewer" role="dialog" aria-modal="true" [attr.aria-label]="'Aperçu de ' + a.name" (click)="closed.emit()">
+  <header class="v-top" (click)="$event.stopPropagation()">
+    <span class="badge" [style.--c]="color()">{{ ext() }}</span>
+    <div class="v-title">
+      <b [title]="a.name">{{ a.name }}</b>
+      <span>{{ formatSize(a.size) }}@if (a.uploader) { · {{ a.uploader.name }} }@if (attachments().length > 1) { · {{ index() + 1 }} / {{ attachments().length }} }</span>
+    </div>
+    @if (kind() === 'sheet' && canSheetPdf()) {
+      <div class="seg" role="tablist" aria-label="Mode d’affichage">
+        <button role="tab" [class.on]="sheetMode() === 'table'" [attr.aria-selected]="sheetMode() === 'table'" (click)="setSheetMode('table')">Tableau</button>
+        <button role="tab" [class.on]="sheetMode() === 'pdf'" [attr.aria-selected]="sheetMode() === 'pdf'" (click)="setSheetMode('pdf')">Mise en page</button>
+      </div>
+    }
+    <div class="v-actions">
+      @if (a.image) {
+        <button class="v-btn" [class.on]="isCover()" (click)="coverToggled.emit()" [title]="isCover() ? 'Retirer de la couverture' : 'Utiliser comme couverture'"><tk-icon name="image" [size]="17" /> <span class="lbl">{{ isCover() ? 'Couverture' : 'Mettre en couverture' }}</span></button>
+      }
+      <a class="v-btn" [href]="a.url + '?download=1'" [attr.download]="a.name" title="Télécharger"><tk-icon name="download" [size]="17" /> <span class="lbl">Télécharger</span></a>
+      <a class="v-btn icon" [href]="a.url" target="_blank" rel="noopener" title="Ouvrir dans un nouvel onglet" aria-label="Ouvrir dans un nouvel onglet"><tk-icon name="external" [size]="17" /></a>
+      <button class="v-btn icon" (click)="closed.emit()" title="Fermer (Échap)" aria-label="Fermer"><tk-icon name="x" [size]="19" /></button>
+    </div>
+  </header>
+
+  <div class="v-body" (click)="$event.stopPropagation()">
+    @if (attachments().length > 1) {
+      <button class="nav prev" (click)="go(-1)" aria-label="Pièce jointe précédente" title="Précédente (←)"><tk-icon name="chevronLeft" [size]="22" /></button>
+      <button class="nav next" (click)="go(1)" aria-label="Pièce jointe suivante" title="Suivante (→)"><tk-icon name="chevronRight" [size]="22" /></button>
+    }
+
+    @if (loading()) {
+      <div class="state"><span class="spinner"></span><p>{{ loadingText() }}</p></div>
+    } @else if (error(); as err) {
+      <div class="state">
+        <span class="big-badge" [style.--c]="color()">{{ ext() }}</span>
+        <p>{{ err }}</p>
+        <a class="btn btn-primary" [href]="a.url + '?download=1'" [attr.download]="a.name"><tk-icon name="download" [size]="16" /> Télécharger</a>
+      </div>
+    } @else {
+      @switch (kind()) {
+        @case ('image') {
+          <div class="img-wrap" (click)="closed.emit()"><img [src]="a.url" [alt]="a.name" (click)="$event.stopPropagation()" /></div>
+        }
+        @case ('video') {
+          <div class="media-wrap">
+            <video class="video" [src]="a.url" controls autoplay playsinline preload="metadata" (error)="mediaError()" [attr.aria-label]="a.name"></video>
+          </div>
+        }
+        @case ('audio') {
+          <div class="audio-card">
+            <div class="audio-art" [style.--c]="color()"><tk-icon name="music" [size]="44" /></div>
+            <b [title]="a.name">{{ a.name }}</b>
+            <span>{{ formatSize(a.size) }}</span>
+            <audio [src]="a.url" controls autoplay preload="metadata" (error)="mediaError()" [attr.aria-label]="a.name"></audio>
+          </div>
+        }
+        @case ('pdf') {
+          @if (frameUrl(); as u) { <iframe class="doc" [src]="u" [title]="a.name"></iframe> }
+        }
+        @case ('office') {
+          @if (frameUrl(); as u) { <iframe class="doc" [src]="u" [title]="a.name"></iframe> }
+        }
+        @case ('text') {
+          <div class="paper text">
+            @if (truncated()) { <p class="note">Aperçu limité au début du fichier. Téléchargez-le pour le lire en entier.</p> }
+            <pre>{{ text() }}</pre>
+          </div>
+        }
+        @case ('json') {
+          <div class="paper">
+            @if (json(); as j) { <tk-json-node [value]="j.value" /> }
+            @else if (text() !== null) {
+              <p class="note">JSON invalide : affiché en texte brut.</p>
+              <pre>{{ text() }}</pre>
+            }
+          </div>
+        }
+        @case ('sheet') {
+          @if (sheetMode() === 'pdf') {
+            @if (frameUrl(); as u) { <iframe class="doc" [src]="u" [title]="a.name"></iframe> }
+          } @else if (sheet(); as s) {
+            <div class="sheet-wrap">
+              <div class="grid-scroll">
+                <table class="grid">
+                  <thead><tr><th class="corner"></th>@for (c of columns(); track $index) { <th>{{ c }}</th> }</tr></thead>
+                  <tbody>
+                    @for (r of s.rows; track $index; let i = $index) {
+                      <tr><th>{{ i + 1 }}</th>@for (c of columns(); track $index; let j = $index) { <td [title]="r[j] ?? ''">{{ r[j] ?? '' }}</td> }</tr>
+                    } @empty {
+                      <tr><td class="empty" [attr.colspan]="columns().length + 1">Feuille vide</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              @if (s.totalRows > s.rows.length || s.totalCols > columns().length) {
+                <p class="note sheet-note">Aperçu limité à {{ s.rows.length }} lignes × {{ columns().length }} colonnes ({{ s.totalRows }} × {{ s.totalCols }} au total).</p>
+              }
+              @if (sheets().length > 1) {
+                <nav class="tabs" aria-label="Feuilles">
+                  @for (sh of sheets(); track $index; let i = $index) {
+                    <button [class.on]="i === sheetIndex()" (click)="sheetIndex.set(i)">{{ sh.name }}</button>
+                  }
+                </nav>
+              }
+            </div>
+          }
+        }
+        @case ('eml') {
+          @if (mail(); as m) {
+            <div class="mail">
+              <div class="mail-head">
+                <h2>{{ m.subject }}</h2>
+                <dl>
+                  <dt>De</dt><dd>{{ m.from }}</dd>
+                  @if (m.to) { <dt>À</dt><dd>{{ m.to }}</dd> }
+                  @if (m.cc) { <dt>Cc</dt><dd>{{ m.cc }}</dd> }
+                  @if (m.date) { <dt>Date</dt><dd>{{ m.date }}</dd> }
+                </dl>
+                @if (m.files.length) {
+                  <div class="mail-files">
+                    @for (f of m.files; track $index) {
+                      <a class="mail-file" [href]="f.url" [attr.download]="f.name"><tk-icon name="paperclip" [size]="13" /> {{ f.name }} <span>{{ formatSize(f.size) }}</span></a>
+                    }
+                  </div>
+                }
+                @if (m.html && !m.remoteImages && hasRemoteImages()) {
+                  <p class="remote">Les images externes sont masquées pour protéger votre vie privée. <button (click)="showRemoteImages()">Afficher les images</button></p>
+                }
+              </div>
+              @if (m.html) {
+                <iframe class="mail-body" sandbox="allow-popups allow-popups-to-escape-sandbox" [srcdoc]="m.html" title="Contenu du message"></iframe>
+              } @else {
+                <pre class="mail-text">{{ m.text }}</pre>
+              }
+            </div>
+          }
+        }
+        @default {
+          <div class="state">
+            <span class="big-badge" [style.--c]="color()">{{ ext() }}</span>
+            <p>Pas d’aperçu pour ce type de fichier.</p>
+            <a class="btn btn-primary" [href]="a.url + '?download=1'" [attr.download]="a.name"><tk-icon name="download" [size]="16" /> Télécharger ({{ formatSize(a.size) }})</a>
+          </div>
+        }
+      }
+    }
+  </div>
+</div>

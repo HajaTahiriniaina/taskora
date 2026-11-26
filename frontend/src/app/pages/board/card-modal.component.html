@@ -1,0 +1,443 @@
+<div class="backdrop cm-backdrop" (click)="closed.emit()">
+  <div class="modal cm" (click)="$event.stopPropagation(); pop.set(null)" role="dialog" aria-modal="true" [attr.aria-label]="card()?.title"
+       (dragenter)="onDragEnter($event)" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+    <input #attachInput id="card-attach-input" type="file" multiple hidden (change)="onFilesPicked(attachInput)" />
+    <input #coverInput type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden (change)="onCoverPicked(coverInput)" />
+    @if (fileOver()) {
+      <div class="drop-overlay" aria-hidden="true">
+        <div class="drop-box"><tk-icon name="upload" [size]="30" /><b>Déposez vos fichiers</b><span>Ils seront joints à cette carte (100 Mo max par fichier)</span></div>
+      </div>
+    }
+    @if (card(); as c) {
+      <!-- ===== Top bar: list, cover, menu, close ===== -->
+      <header class="cm-top" [class.has-cover]="!!c.cover && !c.coverImage" [class.has-image]="!!c.coverImage" [style.--cover]="c.cover">
+        @if (c.coverImage) {
+          <img class="cover-blur" [src]="c.coverImage" alt="" aria-hidden="true" />
+          <img class="cover-image" [src]="c.coverImage" alt="Couverture de la carte" />
+        }
+        <label class="list-pick" title="Déplacer vers une autre liste">
+          <select [ngModel]="c.listId" (ngModelChange)="moveTo($event)" aria-label="Liste de la carte" [disabled]="!!c.archivedAt || c.listArchived">
+            @if (c.listArchived) { <option [ngValue]="c.listId">{{ c.listTitle }} (archivée)</option> }
+            @for (l of board().lists; track l.id) { <option [ngValue]="l.id">{{ l.title }}</option> }
+          </select>
+          <tk-icon name="chevronDown" [size]="15" />
+        </label>
+        <div class="top-actions">
+          <div class="anchor">
+            <button class="top-btn" (click)="togglePop('cover', $event)" title="Couverture" aria-label="Couverture"><tk-icon name="image" [size]="18" /></button>
+            @if (pop() === 'cover') {
+              <div class="popover cover-pop" (click)="$event.stopPropagation()">
+                @if (imageAttachments().length) {
+                  <div class="pop-title">Images jointes</div>
+                  <div class="cover-images">
+                    @for (a of imageAttachments(); track a.id) {
+                      <button [class.sel]="c.coverAttachmentId === a.id" (click)="setCoverImage(a.id)" [title]="a.name" [attr.aria-label]="'Utiliser ' + a.name"><img [src]="a.thumbUrl ?? a.url" alt="" loading="lazy" /></button>
+                    }
+                  </div>
+                }
+                <button class="btn btn-secondary btn-sm btn-block" (click)="pickFiles(coverInput, $event)"><tk-icon name="upload" [size]="14" /> Importer une image</button>
+                <div class="pop-title">Couleur de couverture</div>
+                <div class="covers">
+                  @for (col of palette; track col) { <button [style.background]="col" [class.sel]="c.cover === col" (click)="setCover(col)" [attr.aria-label]="col"></button> }
+                </div>
+                @if (c.cover || c.coverImage) { <button class="btn btn-ghost btn-sm btn-block" (click)="setCover(null)">Retirer la couverture</button> }
+              </div>
+            }
+          </div>
+          <div class="anchor">
+            <button class="top-btn" (click)="togglePop('more', $event)" title="Plus d'actions" aria-label="Plus d'actions"><tk-icon name="more" [size]="18" /></button>
+            @if (pop() === 'more') {
+              <div class="popover more-pop" (click)="$event.stopPropagation()">
+                <button class="menu-item" (click)="toggleCompleted(); pop.set(null)"><tk-icon [name]="c.completed ? 'x' : 'check'" [size]="15" /> {{ c.completed ? 'Rouvrir la carte' : 'Marquer comme terminée' }}</button>
+                <button class="menu-item" (click)="copyLink(); pop.set(null)"><tk-icon name="link" [size]="15" /> Copier le lien (#{{ c.number }})</button>
+                <button class="menu-item" (click)="manageFields.emit()"><tk-icon name="sliders" [size]="15" /> Gérer les champs personnalisés</button>
+                <hr class="divider" />
+                @if (c.archivedAt) {
+                  <button class="menu-item" (click)="restore()"><tk-icon name="restore" [size]="15" /> Restaurer la carte</button>
+                } @else {
+                  <button class="menu-item" (click)="archive()"><tk-icon name="archive" [size]="15" /> Archiver la carte</button>
+                }
+                <button class="menu-item danger" (click)="deleteCard()"><tk-icon name="trash" [size]="15" /> Supprimer la carte</button>
+              </div>
+            }
+          </div>
+          <button class="top-btn" (click)="closed.emit()" aria-label="Fermer"><tk-icon name="x" [size]="20" /></button>
+        </div>
+      </header>
+
+      <div class="cm-body">
+        <!-- ===== Left: card details ===== -->
+        <div class="details">
+          @if (c.archivedAt) {
+            <div class="archived-banner" role="status">
+              <tk-icon name="archive" [size]="18" />
+              <span>Cette carte est archivée depuis le {{ fullDate(c.archivedAt) }}.</span>
+              <button class="btn btn-secondary btn-sm" (click)="restore()"><tk-icon name="restore" [size]="14" /> Restaurer</button>
+              <button class="btn btn-ghost btn-sm danger-text" (click)="deleteCard()"><tk-icon name="trash" [size]="14" /> Supprimer</button>
+            </div>
+          }
+          @if (c.listArchived) {
+            <div class="archived-banner" role="status">
+              <tk-icon name="archive" [size]="18" />
+              <span>La liste « {{ c.listTitle }} » de cette carte est archivée. Restaurez-la depuis Paramètres → Archives.</span>
+            </div>
+          }
+          <div class="title-row">
+            <button class="big-check" [class.on]="c.completed" (click)="toggleCompleted()" [attr.aria-label]="c.completed ? 'Rouvrir' : 'Marquer comme terminée'" [title]="c.completed ? 'Rouvrir' : 'Marquer comme terminée'">
+              <tk-icon name="check" [size]="14" [stroke]="3" />
+            </button>
+            <textarea class="title" rows="1" #t [value]="c.title" (blur)="saveTitle(t.value)" (keydown.enter)="$event.preventDefault(); t.blur()" maxlength="255" aria-label="Titre de la carte"></textarea>
+          </div>
+
+          <div class="quick">
+            <div class="anchor">
+              <button class="qbtn" (click)="togglePop('add', $event)"><tk-icon name="plus" [size]="16" /> Ajouter</button>
+              @if (pop() === 'add') {
+                <div class="popover add-pop" (click)="$event.stopPropagation()">
+                  <div class="pop-title">Ajouter à la carte</div>
+                  <button class="menu-item" (click)="addAction('members', $event)"><tk-icon name="user" [size]="15" /> Membres</button>
+                  <button class="menu-item" (click)="addAction('labels', $event)"><tk-icon name="tag" [size]="15" /> Étiquettes</button>
+                  <button class="menu-item" (click)="addAction('due', $event)"><tk-icon name="clock" [size]="15" /> Date limite</button>
+                  <button class="menu-item" (click)="addAction('checklist', $event)"><tk-icon name="checkSquare" [size]="15" /> Élément de checklist</button>
+                  <button class="menu-item" (click)="addAction('attachment', $event)"><tk-icon name="paperclip" [size]="15" /> Pièce jointe</button>
+                  <button class="menu-item" (click)="addAction('fields', $event)"><tk-icon name="sliders" [size]="15" /> Champ personnalisé</button>
+                </div>
+              }
+            </div>
+            <button class="qbtn" (click)="addAction('checklist', $event)"><tk-icon name="checkSquare" [size]="16" /> Checklist</button>
+            <button class="qbtn" (click)="pickFiles(attachInput, $event)"><tk-icon name="paperclip" [size]="16" /> Pièce jointe</button>
+          </div>
+
+          <div class="props">
+            <div class="prop">
+              <span class="prop-label">Membres</span>
+              <div class="prop-value">
+                <div class="avatar-stack">
+                  @for (a of c.assignees; track a.id) { <tk-avatar [user]="a" [size]="30" /> }
+                </div>
+                <div class="anchor">
+                  <button class="round-add" (click)="togglePop('members', $event)" aria-label="Assigner des membres"><tk-icon name="plus" [size]="14" /></button>
+                  @if (pop() === 'members') {
+                    <div class="popover" (click)="$event.stopPropagation()">
+                      <div class="pop-title">Assigner</div>
+                      @for (m of board().members; track m.id) {
+                        <button class="menu-item" (click)="toggleAssignee(m.id)">
+                          <tk-avatar [user]="m" [size]="26" /> <span class="grow">{{ m.name }}</span>
+                          @if (isAssigned(m.id)) { <tk-icon name="check" [size]="15" class="ok" /> }
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="prop">
+              <span class="prop-label">Étiquettes</span>
+              <div class="prop-value">
+                @for (lid of c.labelIds; track lid) {
+                  @if (labelById(lid); as l) { <span class="label" [style.--c]="l.color">{{ l.name }}</span> }
+                }
+                <div class="anchor">
+                  <button class="round-add" (click)="togglePop('labels', $event)" aria-label="Gérer les étiquettes"><tk-icon name="plus" [size]="14" /></button>
+                  @if (pop() === 'labels') {
+                    <div class="popover" (click)="$event.stopPropagation()">
+                      <div class="pop-title">Étiquettes</div>
+                      @for (l of board().labels; track l.id) {
+                        <button class="menu-item" (click)="toggleLabel(l.id)">
+                          <span class="swatch" [style.background]="l.color"></span><span class="grow">{{ l.name }}</span>
+                          @if (hasLabel(l.id)) { <tk-icon name="check" [size]="15" class="ok" /> }
+                        </button>
+                      }
+                      <hr class="divider" />
+                      <div class="new-label">
+                        <input class="input input-sm" placeholder="Nouvelle étiquette" [(ngModel)]="newLabel.name" (keydown.enter)="createLabel()" />
+                        <div class="mini-swatches">
+                          @for (col of palette; track col) { <button [style.background]="col" [class.sel]="newLabel.color === col" (click)="newLabel.color = col" [attr.aria-label]="col"></button> }
+                        </div>
+                        <button class="btn btn-primary btn-sm btn-block" (click)="createLabel()" [disabled]="!newLabel.name.trim()">Créer</button>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="prop">
+              <span class="prop-label">Date limite</span>
+              <div class="prop-value">
+                <div class="due-box" [class]="'due-box ' + (due() ?? '')">
+                  <input id="card-due" type="datetime-local" class="due-input" [value]="dueInput()" (change)="setDue($any($event.target).value)" aria-label="Date limite" />
+                  @if (dueLabel(); as dl) { <span class="due-tag">{{ dl }}</span> }
+                </div>
+                @if (c.dueDate) { <button class="icon-btn sm" (click)="setDue('')" aria-label="Retirer la date limite" title="Retirer"><tk-icon name="x" [size]="14" /></button> }
+              </div>
+            </div>
+
+            <div class="prop">
+              <span class="prop-label">Priorité</span>
+              <div class="prop-value anchor">
+                <button class="prio-btn" (click)="togglePop('priority', $event)" [style.--c]="priority()?.color">
+                  <tk-icon name="flag" [size]="14" [filled]="c.priority !== 'none'" /> {{ priority()?.label }}
+                </button>
+                @if (pop() === 'priority') {
+                  <div class="popover" (click)="$event.stopPropagation()">
+                    @for (p of priorities; track p.value) {
+                      <button class="menu-item" (click)="setPriority(p.value)">
+                        <tk-icon name="flag" [size]="14" [filled]="p.value !== 'none'" [style.color]="p.color" /><span class="grow">{{ p.label }}</span>
+                        @if (c.priority === p.value) { <tk-icon name="check" [size]="15" class="ok" /> }
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="prop">
+              <span class="prop-label">Numéro de carte</span>
+              <div class="prop-value">
+                <button class="num-box" (click)="copyLink()" title="Copier le lien de la carte">#{{ c.number }}</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <section class="block">
+            <h4><tk-icon name="text" [size]="18" /> Description
+              @if (!editingDesc() && c.description) { <button class="btn btn-secondary btn-sm push" (click)="startDesc()">Modifier</button> }
+            </h4>
+            @if (editingDesc()) {
+              <tk-rich-editor #descEd [value]="c.description" [autofocus]="true" [mentionables]="mentionables()" placeholder="Ajoutez une description détaillée… (collez ou glissez des images)"
+                              (submitted)="saveDesc(descEd)" (cancelled)="editingDesc.set(false)" />
+              <div class="row">
+                <button class="btn btn-primary btn-sm" (click)="saveDesc(descEd)">Enregistrer</button>
+                <button class="btn btn-ghost btn-sm" (click)="editingDesc.set(false)">Annuler</button>
+                <span class="kbd-hint"><span class="kbd">⌘/Ctrl</span> + <span class="kbd">Entrée</span> pour enregistrer</span>
+              </div>
+            } @else if (c.description) {
+              <div class="desc" (dblclick)="startDesc($event)" title="Double-cliquer pour modifier">
+                <tk-rich-view [content]="c.description" />
+              </div>
+            } @else {
+              <button class="desc placeholder" (click)="startDesc()">Ajoutez une description plus détaillée…</button>
+            }
+          </section>
+
+          <!-- Attachments -->
+          <section class="block attachments">
+            <h4><tk-icon name="paperclip" [size]="16" /> Pièces jointes
+              @if (c.attachments.length) { <span class="count">{{ c.attachments.length }}</span> }
+              <button class="btn btn-secondary btn-sm push" (click)="pickFiles(attachInput, $event)"><tk-icon name="plus" [size]="14" /> Ajouter</button>
+            </h4>
+            @if (c.attachments.length || pendingUploads().length) {
+              <ul class="files">
+                @for (p of pendingUploads(); track p.uid) {
+                  <li class="file pending">
+                    <div class="thumb"><span class="spinner mini"></span></div>
+                    <div class="f-main">
+                      <span class="f-name">{{ p.name }}</span>
+                      <div class="f-progress" role="progressbar" [attr.aria-valuenow]="p.progress" aria-valuemin="0" aria-valuemax="100" [attr.aria-label]="'Envoi de ' + p.name"><span [style.width.%]="p.progress" [class.saving]="p.saving"></span></div>
+                      <span class="f-meta pct">
+                        @if (p.saving) { Enregistrement en cours… }
+                        @else { <b>{{ p.progress }} %</b> · {{ formatSize(p.loaded) }} / {{ formatSize(p.size) }} }
+                      </span>
+                    </div>
+                  </li>
+                }
+                @for (a of visibleAttachments(); track a.id) {
+                  <li class="file">
+                    <a class="thumb" [class.img]="a.image" [href]="a.url" target="_blank" rel="noopener" (click)="view(a, $event)" [attr.aria-label]="'Aperçu de ' + a.name">
+                      @if (a.image) { <img [src]="a.thumbUrl ?? a.url" alt="" loading="lazy" /> } @else { <span class="f-ext" [style.--c]="extColor(a.name)">{{ fileExt(a.name) }}</span> }
+                    </a>
+                    <div class="f-main">
+                      @if (renaming() === a.id) {
+                        <input #rn class="input input-sm" [value]="a.name" (keydown.enter)="renameAttachment(a, rn.value)" (keydown.escape)="$event.stopPropagation(); renaming.set(null)" (blur)="renameAttachment(a, rn.value)" autofocus aria-label="Nom de la pièce jointe" />
+                      } @else {
+                        <a class="f-name" [href]="a.url" target="_blank" rel="noopener" (click)="view(a, $event)" [title]="a.name">{{ a.name }}</a>
+                      }
+                      <span class="f-meta">
+                        {{ formatSize(a.size) }} · <time [attr.datetime]="a.createdAt" [title]="fullDate(a.createdAt)">{{ a.createdAt | timeAgo }}</time>
+                        @if (a.uploader) { · {{ a.uploader.name }} }
+                        @if (a.commentId) { · <button class="in-comment" (click)="showComment(a.commentId)" title="Voir le commentaire"><tk-icon name="message" [size]="12" /> commentaire</button> }
+                        @if (c.coverAttachmentId === a.id) { · <span class="is-cover"><tk-icon name="image" [size]="12" /> couverture</span> }
+                      </span>
+                    </div>
+                    <div class="f-actions">
+                      @if (a.image) {
+                        <button class="icon-btn sm" [class.on]="c.coverAttachmentId === a.id" (click)="setCoverImage(c.coverAttachmentId === a.id ? null : a.id)"
+                                [title]="c.coverAttachmentId === a.id ? 'Retirer de la couverture' : 'Utiliser comme couverture'" [attr.aria-label]="c.coverAttachmentId === a.id ? 'Retirer de la couverture' : 'Utiliser comme couverture'"><tk-icon name="image" [size]="15" /></button>
+                      }
+                      <a class="icon-btn sm" [href]="a.url + '?download=1'" [attr.download]="a.name" title="Télécharger" aria-label="Télécharger"><tk-icon name="download" [size]="15" /></a>
+                      @if (canEditAttachment(a)) {
+                        <button class="icon-btn sm" (click)="renaming.set(a.id)" title="Renommer" aria-label="Renommer"><tk-icon name="edit" [size]="15" /></button>
+                        <button class="icon-btn sm del" (click)="deleteAttachment(a)" title="Supprimer" aria-label="Supprimer"><tk-icon name="trash" [size]="15" /></button>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+              @if (c.attachments.length > 6) {
+                <button class="btn btn-ghost btn-sm" (click)="showAllAttachments.set(!showAllAttachments())">
+                  {{ showAllAttachments() ? 'Afficher moins' : 'Afficher les ' + c.attachments.length + ' pièces jointes' }}
+                </button>
+              }
+            } @else {
+              <button class="dropzone" (click)="pickFiles(attachInput, $event)">
+                <tk-icon name="upload" [size]="18" /> Glissez des fichiers ici ou <u>parcourez</u>
+              </button>
+            }
+          </section>
+
+          <!-- Custom fields -->
+          <section class="block">
+            <h4><tk-icon name="sliders" [size]="16" /> Champs personnalisés
+              <button class="btn btn-ghost btn-sm push" (click)="manageFields.emit()"><tk-icon name="settings" [size]="14" /> Gérer</button>
+            </h4>
+            @if (board().customFields.length) {
+              <div class="fields">
+                @for (f of board().customFields; track f.id) {
+                  <div class="cfield">
+                    <label [for]="'cf-' + f.id"><tk-icon [name]="fieldIcons[f.type]" [size]="13" /> {{ f.name }}</label>
+                    @switch (f.type) {
+                      @case ('checkbox') {
+                        <label class="cb"><input [id]="'cf-' + f.id" type="checkbox" class="checkbox" [checked]="!!fieldValue(f)" (change)="setField(f, $any($event.target).checked || null)" /> {{ fieldValue(f) ? 'Oui' : 'Non' }}</label>
+                      }
+                      @case ('select') {
+                        <select [id]="'cf-' + f.id" class="input input-sm" [style.color]="optionOf(f)?.color" [value]="fieldValue(f) ?? ''" (change)="setField(f, $any($event.target).value || null)">
+                          <option value="">—</option>
+                          @for (o of f.options; track o.id) { <option [value]="o.id" [selected]="fieldValue(f) === o.id">{{ o.label }}</option> }
+                        </select>
+                      }
+                      @case ('date') {
+                        <input [id]="'cf-' + f.id" type="date" class="input input-sm" [value]="fieldValue(f) ?? ''" (change)="setField(f, $any($event.target).value || null)" />
+                      }
+                      @case ('number') {
+                        <input [id]="'cf-' + f.id" type="number" class="input input-sm" [value]="fieldValue(f) ?? ''" placeholder="0" (change)="setField(f, $any($event.target).value === '' ? null : $any($event.target).value)" />
+                      }
+                      @case ('url') {
+                        <div class="url">
+                          <input [id]="'cf-' + f.id" type="url" class="input input-sm" [value]="fieldValue(f) ?? ''" placeholder="https://…" (change)="setField(f, $any($event.target).value || null)" />
+                          @if (fieldValue(f)) { <a class="icon-btn sm" [href]="fieldValue(f)" target="_blank" rel="noopener" aria-label="Ouvrir le lien"><tk-icon name="link" [size]="14" /></a> }
+                        </div>
+                      }
+                      @default {
+                        <input [id]="'cf-' + f.id" class="input input-sm" [value]="fieldValue(f) ?? ''" placeholder="Vide" (change)="setField(f, $any($event.target).value || null)" />
+                      }
+                    }
+                  </div>
+                }
+              </div>
+            } @else {
+              <button class="hint" (click)="manageFields.emit()">
+                <tk-icon name="sparkles" [size]="16" /> Ajoutez des champs (budget, client, sprint, lien…) pour enrichir toutes les cartes de ce tableau.
+              </button>
+            }
+          </section>
+
+          <!-- Checklist -->
+          <section class="block">
+            <h4><tk-icon name="checkSquare" [size]="16" /> Checklist
+              @if (c.checklist.length) {
+                <button class="btn btn-ghost btn-sm push" (click)="hideDone.set(!hideDone())">{{ hideDone() ? 'Afficher' : 'Masquer' }} les terminés</button>
+              }
+            </h4>
+            @if (c.checklist.length) {
+              <div class="progress"><span>{{ progress() }}%</span><div class="track"><div class="fill" [style.width.%]="progress()" [class.full]="progress() === 100"></div></div></div>
+            }
+            <div class="items">
+              @for (i of visibleChecklist(); track i.id) {
+                <div class="item" [class.done]="i.done">
+                  <input type="checkbox" class="checkbox" [checked]="i.done" (change)="toggleItem(i.id)" [attr.aria-label]="i.content" />
+                  <span class="grow">{{ i.content }}</span>
+                  <button class="icon-btn sm del" (click)="deleteItem(i.id)" aria-label="Supprimer"><tk-icon name="trash" [size]="14" /></button>
+                </div>
+              }
+            </div>
+            <div class="add-item">
+              <input id="card-checklist-add" class="input input-sm" placeholder="Ajouter un élément…" [(ngModel)]="newItem" (keydown.enter)="addItem()" />
+              <button class="btn btn-secondary btn-sm" (click)="addItem()" [disabled]="!newItem.trim()">Ajouter</button>
+            </div>
+          </section>
+
+          <p class="created">
+            @if (c.createdBy) { Créée par <b>{{ c.createdBy.name }}</b> · } {{ fullDate(c.createdAt) }}
+          </p>
+        </div>
+
+        <!-- ===== Right: comments & activity ===== -->
+        <aside class="activity" aria-label="Commentaires et activité">
+          <div class="act-head">
+            <tk-icon name="message" [size]="18" />
+            <h4>Commentaires et activité @if (c.comments.length) { <span class="count">{{ c.comments.length }}</span> }</h4>
+            <button class="btn btn-secondary btn-sm" (click)="toggleDetails()" [title]="showDetails() ? 'Masquer l’historique des modifications' : 'Afficher l’historique des modifications'">{{ showDetails() ? 'Masquer les détails' : 'Afficher les détails' }}</button>
+          </div>
+
+          <div class="composer">
+            @if (composing()) {
+              <tk-rich-editor #commentEd [compact]="true" [autofocus]="true" [value]="composerSeed()" [mentionables]="mentionables()" placeholder="Écrivez un commentaire… Tapez @ pour mentionner (⌘/Ctrl+Entrée pour envoyer)"
+                              (submitted)="sendComment(commentEd)" (cancelled)="cancelComposer()" />
+              <div class="row">
+                <button class="btn btn-primary btn-sm" (click)="sendComment(commentEd)" [disabled]="commentEd.isEmpty()">Enregistrer</button>
+                <button class="btn btn-ghost btn-sm" (click)="cancelComposer()">Annuler</button>
+                <div class="mentions">
+                  @for (m of board().members; track m.id) {
+                    @if (m.id !== auth.user()?.id) { <button class="mention" (click)="mention(commentEd, m)" [title]="'Mentionner ' + m.name">&#64;{{ m.name.split(' ')[0] }}</button> }
+                  }
+                </div>
+              </div>
+            } @else {
+              <button class="fake-input" (click)="openComposer()">Écrivez un commentaire…</button>
+            }
+          </div>
+
+          <div class="feed">
+            @for (item of feed(); track item.id) {
+              @if (item.kind === 'comment') {
+                @let cm = item.comment;
+                <article class="comment" [id]="'comment-' + cm.id">
+                  <tk-avatar [user]="cm.author" [size]="36" />
+                  <div class="c-main">
+                    <div class="c-head">
+                      <b>{{ cm.author.name }}</b>
+                      @if (cm.author.external) { <span class="ext" title="Commentaire importé de Trello">Trello</span> }
+                      <time [attr.datetime]="cm.createdAt" [title]="fullDate(cm.createdAt)">{{ cm.createdAt | timeAgo }}</time>
+                    </div>
+                    <div class="bubble"><tk-rich-view [content]="cm.content" /></div>
+                    <div class="c-actions">
+                      <button (click)="reply(cm.author)">Répondre</button>
+                      @if (cm.author.id === auth.user()?.id) { <span>•</span><button (click)="deleteComment(cm.id)">Supprimer</button> }
+                    </div>
+                  </div>
+                </article>
+              } @else {
+                @let a = item.activity;
+                <div class="act">
+                  <tk-avatar [user]="a.actor" [size]="28" />
+                  <div class="act-main">
+                    <p><b>{{ a.actor.name }}</b>@if (a.actor.external) { <span class="ext">Trello</span> }{{ " " }}
+                      @for (s of item.segs; track $index) {@if (s.color) {<span class="act-label" [style.--c]="s.color">{{ s.t }}</span>} @else if (s.b) {<b>{{ s.t }}</b>} @else {{{ s.t }}}}</p>
+                    <time [attr.datetime]="a.createdAt" [title]="fullDate(a.createdAt)">{{ a.createdAt | timeAgo }}</time>
+                  </div>
+                </div>
+              }
+            } @empty {
+              <p class="no-comment">Aucun commentaire pour l’instant. Lancez la discussion !</p>
+            }
+            @if (showDetails() && activityHasMore()) {
+              <button class="more-act" (click)="loadMoreActivity()" [disabled]="activityLoading()">
+                {{ activityLoading() ? 'Chargement…' : 'Afficher plus d’activité' }}
+              </button>
+            }
+          </div>
+        </aside>
+      </div>
+    } @else {
+      <div class="cm-loading"><span class="spinner"></span></div>
+    }
+  </div>
+</div>
+
+<!-- In-page file viewer (outside the dialog so it covers the whole window) -->
+@if (viewing(); as v) {
+  <tk-file-viewer [attachment]="v" [attachments]="card()?.attachments ?? []" (navigate)="viewing.set($event)" (closed)="viewing.set(null)"
+                  [isCover]="card()?.coverAttachmentId === v.id" (coverToggled)="setCoverImage(card()?.coverAttachmentId === v.id ? null : v.id)" />
+}

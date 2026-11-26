@@ -1,0 +1,224 @@
+@if (board(); as b) {
+  <div class="board" [class]="'board bg-' + b.background">
+    <header class="bar">
+      <div class="bar-left">
+        <a routerLink="/boards" class="glass-icon" aria-label="Retour aux tableaux"><tk-icon name="chevronLeft" /></a>
+        @if (editingTitle()) {
+          <input class="title-input" #t [value]="b.title" (blur)="saveTitle(t.value)" (keydown.enter)="t.blur()" (keydown.escape)="editingTitle.set(false)" autofocus />
+        } @else {
+          <h1 (click)="editingTitle.set(true)" title="Renommer">{{ b.title }}</h1>
+        }
+        <button class="glass-icon" [class.fav]="b.favorite" (click)="toggleFavorite()" [attr.aria-label]="b.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'">
+          <tk-icon name="star" [size]="16" [filled]="b.favorite" />
+        </button>
+      </div>
+
+      <div class="bar-right">
+        @if (listCount() > 6) {
+          <div class="anchor">
+            <button class="glass-btn" (click)="$event.stopPropagation(); showJump.set(!showJump())" title="Aller à une colonne">
+              <tk-icon name="layout" [size]="15" /> {{ visible().start }}–{{ visible().end }} <span class="dim">/ {{ listCount() }}</span>
+            </button>
+            @if (showJump()) {
+              <div class="popover jump" (click)="$event.stopPropagation()">
+                <input class="input input-sm" placeholder="Aller à la colonne…" [ngModel]="jumpQuery()" (ngModelChange)="jumpQuery.set($event)"
+                       (keydown.enter)="jumpResults()[0] && jumpTo(jumpResults()[0].i)" autofocus />
+                <div class="jump-list">
+                  @for (r of jumpResults(); track r.l.id) {
+                    <button class="menu-item" [class.in-view]="r.i + 1 >= visible().start && r.i + 1 <= visible().end" (click)="jumpTo(r.i)">
+                      <span class="idx">{{ r.i + 1 }}</span><span class="grow">{{ r.l.title }}</span><span class="subtle">{{ r.l.cardCount }}</span>
+                    </button>
+                  } @empty { <p class="subtle empty-jump">Aucune colonne</p> }
+                </div>
+              </div>
+            }
+          </div>
+        }
+        <button class="glass-btn" [class.active]="showFilters() || filtering()" (click)="$event.stopPropagation(); showFilters.set(!showFilters())">
+          <tk-icon name="filter" [size]="15" /> Filtrer
+          @if (filtering()) { <span class="fcount">{{ filterCount() }}</span> }
+        </button>
+        <button class="members" (click)="settingsTab.set('members')" title="Membres">
+          <div class="avatar-stack">
+            @for (m of b.members.slice(0, 5); track m.id) { <tk-avatar [user]="m" [size]="30" /> }
+          </div>
+          @if (b.members.length > 5) { <span class="more">+{{ b.members.length - 5 }}</span> }
+        </button>
+        <button class="glass-btn primary" (click)="settingsTab.set('members')"><tk-icon name="userPlus" [size]="15" /> Partager</button>
+        <button class="glass-icon" (click)="settingsTab.set('archived')" aria-label="Cartes archivées" title="Cartes archivées"><tk-icon name="archive" [size]="17" /></button>
+        <button class="glass-icon" (click)="settingsTab.set('fields')" aria-label="Paramètres du tableau" title="Paramètres"><tk-icon name="settings" [size]="17" /></button>
+      </div>
+    </header>
+
+    @if (trelloBanner(); as t) {
+      <div class="trello-banner" role="status" aria-live="polite">
+        <span class="tb-icon"><tk-icon name="paperclip" [size]="16" /></span>
+        @if (t.running) {
+          <div class="tb-main">
+            <b>Copie des pièces jointes Trello… {{ t.done }} / {{ t.total }}</b>
+            <div class="tb-bar"><span [style.width.%]="trelloPct()"></span></div>
+            <small>
+              @if (t.waitingSeconds) { Trello demande une pause : reprise dans {{ t.waitingSeconds }} s }
+              @else if (t.recent.length) { Dernier copié : {{ t.recent[0] }} } @else { Démarrage… }
+              · {{ formatSize(t.pendingBytes) }} restants · vous pouvez continuer à travailler
+            </small>
+          </div>
+          <button class="glass-btn" (click)="trello.stop()">Pause</button>
+        } @else {
+          <div class="tb-main">
+            <b>
+              @if (t.pending) { {{ t.pending }} pièce(s) jointe(s) Trello à copier ({{ formatSize(t.pendingBytes) }}) }
+              @if (t.pending && t.failed) { · }
+              @if (t.failed) { <span [title]="trelloFailures()">{{ t.failed }} fichier(s) non copié(s)</span> }
+            </b>
+            @if (t.error) { <small class="tb-err">{{ t.error }}</small> }
+            @else if (t.failed) { <small>{{ t.failures[0]?.name }} : {{ t.failures[0]?.error }}@if (t.failed > 1) { … }</small> }
+          </div>
+          @if (t.pending) { <button class="glass-btn primary" (click)="resumeTrello()">{{ trello.credentials() ? 'Reprendre' : 'Copier maintenant' }}</button> }
+          @if (t.failed) { <button class="glass-btn" (click)="trello.retryFailed(b.id)">Réessayer</button> }
+          <button class="glass-btn" (click)="abandonTrello()" title="Ajoute un lien vers Trello sur les cartes concernées">Laisser sur Trello</button>
+        }
+      </div>
+    }
+
+    @if (showFilters()) {
+      <tk-filter-panel [board]="b" [filters]="filters()" [me]="auth.user()" (filtersChange)="filters.set($event)" (closed)="showFilters.set(false)" />
+    }
+    @if (filtering()) {
+      <div class="filter-summary">
+        <span><tk-icon name="filter" [size]="14" /> {{ filterCount() }} filtre(s) actif(s)</span>
+        <button (click)="clearFilters()"><tk-icon name="x" [size]="13" /> Effacer</button>
+      </div>
+    }
+
+    <!-- Horizontal virtualization: only the columns near the viewport are in the DOM; spacers keep the scroll width -->
+    <div class="canvas" #canvas cdkDropList cdkDropListOrientation="horizontal" [cdkDropListData]="windowLists()" (cdkDropListDropped)="dropList($event)">
+      <div class="spacer" [style.width.px]="leftSpace()"></div>
+      @for (list of windowLists(); track list.id) {
+        @let st = state(list.id);
+        <section class="list" cdkDrag [cdkDragDisabled]="filtering()" [cdkDragData]="list" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()">
+          <div class="list-head" cdkDragHandle [style.--list-color]="list.color">
+            @if (list.color) { <span class="list-color"></span> }
+            @if (editingListId() === list.id) {
+              <input class="list-title-input" #lt [value]="list.title" (blur)="renameList(list, lt.value)" (keydown.enter)="lt.blur()" (keydown.escape)="editingListId.set(null)" autofocus (mousedown)="$event.stopPropagation()" />
+            } @else {
+              <h2 (click)="editingListId.set(list.id)">{{ list.title }}</h2>
+            }
+            <span class="list-count" [title]="filtering() ? 'Cartes correspondant aux filtres' : 'Cartes dans la liste'">{{ filtering() ? (st?.total ?? '…') : list.cardCount }}</span>
+            <div class="anchor">
+              <button class="list-btn" (click)="$event.stopPropagation(); listMenu.set(listMenu() === list.id ? null : list.id)" aria-label="Actions de la liste"><tk-icon name="more" [size]="16" /></button>
+              @if (listMenu() === list.id) {
+                <div class="popover list-menu" (click)="$event.stopPropagation()">
+                  <button class="menu-item" (click)="startAddCard(list); listMenu.set(null)"><tk-icon name="plus" [size]="15" /> Ajouter une carte</button>
+                  <button class="menu-item" (click)="editingListId.set(list.id); listMenu.set(null)"><tk-icon name="edit" [size]="15" /> Renommer</button>
+                  @if (movingListId() === list.id) {
+                    <div class="move-row">
+                      <span>Position</span>
+                      <input #pos class="input input-sm" type="number" min="1" [max]="listCount()" [value]="windowIndex(list) + 1"
+                             (keydown.enter)="moveListTo(list, +pos.value)" autofocus />
+                      <span class="subtle">/ {{ listCount() }}</span>
+                      <button class="btn btn-primary btn-sm" (click)="moveListTo(list, +pos.value)">OK</button>
+                    </div>
+                  } @else {
+                    <button class="menu-item" (click)="movingListId.set(list.id)"><tk-icon name="arrowRight" [size]="15" /> Déplacer en position…</button>
+                  }
+                  <div class="menu-label">Couleur</div>
+                  <div class="swatches">
+                    <button class="sw none" [class.sel]="!list.color" (click)="setListColor(list, null)" aria-label="Aucune"><tk-icon name="x" [size]="12" /></button>
+                    @for (c of palette; track c) { <button class="sw" [style.background]="c" [class.sel]="list.color === c" (click)="setListColor(list, c)" [attr.aria-label]="c"></button> }
+                  </div>
+                  <hr class="divider" />
+                  <button class="menu-item" (click)="archiveList(list)"><tk-icon name="archive" [size]="15" /> Archiver la liste</button>
+                  <button class="menu-item danger" (click)="deleteList(list)"><tk-icon name="trash" [size]="15" /> Supprimer la liste</button>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="cards" #cardsEl cdkDropList [id]="'list-' + list.id" [cdkDropListData]="list" [cdkDropListConnectedTo]="listIds()"
+               [cdkDropListDisabled]="filtering()" (cdkDropListDropped)="dropCard($event)">
+            @if (st?.loaded) {
+              @for (card of list.cards; track card.id) {
+                <tk-card-item cdkDrag [cdkDragData]="card" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()"
+                  [card]="card" [labelMap]="labelMap()" [fields]="fieldsOnCard()" [showNumber]="b.showCardNumbers"
+                  [uploading]="uploads.progressByCard().get(card.id) ?? null"
+                  (opened)="openCard(card)" (toggled)="toggleComplete(card)" (filesDropped)="dropFiles(card, $event)" />
+              } @empty {
+                @if (filtering()) { <p class="no-match">Aucune carte ne correspond</p> }
+              }
+              @if (st?.hasMore) {
+                <!-- Vertical infinite scroll sentinel: re-armed after each page -->
+                <div class="more" tkInView [tkInViewRoot]="cardsEl" tkInViewMargin="0px 0px 400px 0px"
+                     [tkInViewKey]="list.cards.length + '-' + epoch()" (tkInView)="loadMore(list)">
+                  @if (st?.loading) { <span class="spinner sm"></span> } @else {
+                    <button class="load-more" (click)="loadMore(list)">Charger plus · {{ st!.total - list.cards.length }} restantes</button>
+                  }
+                </div>
+              }
+            } @else {
+              @for (s of skeletons.slice(0, list.cardCount); track s) { <div class="skeleton-card"></div> }
+            }
+          </div>
+
+          @if (addingCardTo() === list.id) {
+            <div class="add-card-form">
+              <textarea [id]="'new-card-' + list.id" class="input" rows="2" placeholder="Titre de la carte…  (Entrée pour ajouter)" [(ngModel)]="newCardTitle" (keydown)="onAddCardKey($event, list)"></textarea>
+              <div class="row">
+                <button class="btn btn-primary btn-sm" (click)="addCard(list)">Ajouter</button>
+                <button class="icon-btn" (click)="addingCardTo.set(null)" aria-label="Annuler"><tk-icon name="x" [size]="16" /></button>
+              </div>
+            </div>
+          } @else {
+            <button class="add-card" (click)="startAddCard(list)"><tk-icon name="plus" [size]="15" /> Ajouter une carte</button>
+          }
+        </section>
+      }
+
+      <div class="spacer" [style.width.px]="rightSpace()"></div>
+      <div class="new-list">
+        @if (addingList()) {
+          <div class="new-list-form">
+            <input class="input" placeholder="Nom de la liste…" [(ngModel)]="newListTitle" (keydown.enter)="addList()" (keydown.escape)="addingList.set(false)" autofocus />
+            <div class="row">
+              <button class="btn btn-primary btn-sm" (click)="addList()">Ajouter la liste</button>
+              <button class="icon-btn" (click)="addingList.set(false)" aria-label="Annuler"><tk-icon name="x" [size]="16" /></button>
+            </div>
+          </div>
+        } @else {
+          <button class="add-list" (click)="addingList.set(true)"><tk-icon name="plus" [size]="16" /> Ajouter une liste</button>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (openCardId(); as cid) {
+    <!-- The card modal (and the rich text editor it embeds) is a separate chunk, loaded on first open -->
+    @defer (on immediate) {
+      <tk-card-modal [cardId]="cid" [board]="b" (changed)="onCardChanged($event)" (deleted)="onCardDeleted($event)" (archivedChange)="onCardArchived($event)" (closed)="closeCard()" (moved)="refresh()" (manageFields)="settingsTab.set('fields')" />
+    } @loading (minimum 150ms) {
+      <div class="backdrop"><div class="modal modal-loading"><span class="spinner"></span></div></div>
+    }
+  }
+
+  @if (settingsTab(); as tab) {
+    <tk-board-settings [board]="b" [tab]="tab" (tabChange)="settingsTab.set($event)" (boardChange)="onBoardChanged($event)" (closed)="settingsTab.set(null)"
+                        (openCard)="openCardId$($event)" (restored)="onCardArchived($event)" (listRestored)="onListRestored($event)" />
+  }
+} @else {
+  <div class="loading"><span class="spinner"></span></div>
+}
+
+@if (showTrelloAccess()) {
+  <div class="backdrop" (click)="showTrelloAccess.set(false)">
+    <div class="modal trello-access-modal" role="dialog" aria-modal="true" aria-label="Accès à Trello" (click)="$event.stopPropagation()">
+      <h2><tk-icon name="paperclip" [size]="18" /> Copier les pièces jointes depuis Trello</h2>
+      <tk-trello-access />
+      <footer>
+        <button class="btn btn-ghost" (click)="showTrelloAccess.set(false)">Annuler</button>
+        <button class="btn btn-primary" (click)="startTrelloWithAccess()" [disabled]="trelloAccess()?.checking()">
+          @if (trelloAccess()?.checking()) { <span class="spinner mini"></span> Vérification… } @else { Lancer la copie }
+        </button>
+      </footer>
+    </div>
+  </div>
+}

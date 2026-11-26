@@ -1,0 +1,171 @@
+<div class="wrap">
+  <section class="hello">
+    <div>
+      <h1>{{ greeting }}, {{ firstName() }} 👋</h1>
+      <p class="muted">Voici un aperçu de vos espaces de travail.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="s-icon v"><tk-icon name="grid" [size]="18" /></span><div><b>{{ boards().length }}</b><small>Tableaux</small></div></div>
+      <div class="stat"><span class="s-icon c"><tk-icon name="checkSquare" [size]="18" /></span><div><b>{{ totalCards() }}</b><small>Cartes</small></div></div>
+      <div class="stat"><span class="s-icon p"><tk-icon name="users" [size]="18" /></span><div><b>{{ collaborators() }}</b><small>Collaborateurs</small></div></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <div class="search">
+      <tk-icon name="search" [size]="16" />
+      <input class="input" placeholder="Rechercher un tableau…" [ngModel]="query()" (ngModelChange)="query.set($event)" />
+    </div>
+    <div class="tb-actions">
+      <button class="btn btn-ghost" (click)="openTrash()" title="Tableaux supprimés (restaurables 30 jours)"><tk-icon name="trash" [size]="16" /> Corbeille</button>
+      <button class="btn btn-secondary" (click)="openImport()" title="Importer un export JSON de Trello"><tk-icon name="inbox" [size]="16" /> Importer depuis Trello</button>
+      <button class="btn btn-primary" (click)="openCreate()"><tk-icon name="plus" [size]="16" /> Nouveau tableau</button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="grid">
+      @for (i of [1, 2, 3, 4]; track i) { <div class="tile skeleton"></div> }
+    </div>
+  } @else {
+    @if (favorites().length) {
+      <h2 class="section"><tk-icon name="star" [size]="16" [filled]="true" class="star-c" /> Favoris</h2>
+      <div class="grid">
+        @for (b of favorites(); track b.id) {
+          <ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" />
+        }
+      </div>
+    }
+
+    <h2 class="section"><tk-icon name="layout" [size]="16" /> Tous les tableaux</h2>
+    <div class="grid">
+      @for (b of filtered(); track b.id) {
+        <ng-container *ngTemplateOutlet="tile; context: { $implicit: b }" />
+      }
+      <button class="tile create" (click)="openCreate()">
+        <span class="plus"><tk-icon name="plus" [size]="22" /></span>
+        <span>Créer un tableau</span>
+      </button>
+    </div>
+    @if (!boards().length) {
+      <div class="onboard">
+        <tk-icon name="sparkles" [size]="28" />
+        <div><h3>Bienvenue sur Taskora !</h3><p class="muted">Créez votre premier tableau : nous y ajoutons des colonnes et des étiquettes pour démarrer tout de suite.</p></div>
+      </div>
+    }
+  }
+</div>
+
+<ng-template #tile let-b>
+  <a class="tile" [routerLink]="['/boards', b.id]">
+    <div class="cover" [class]="'cover bg-' + b.background">
+      <div class="mini">
+        <i></i><i></i><i></i>
+      </div>
+      <button class="fav" [class.on]="b.favorite" (click)="toggleFavorite(b, $event)" [attr.aria-label]="b.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'">
+        <tk-icon name="star" [size]="16" [filled]="b.favorite" />
+      </button>
+    </div>
+    <div class="info">
+      <h3>{{ b.title }}</h3>
+      <p>{{ b.description || b.listCount + ' listes · ' + b.cardCount + ' cartes' }}</p>
+      <div class="foot">
+        <div class="avatar-stack">
+          @for (m of b.members.slice(0, 4); track m.id) { <tk-avatar [user]="m" [size]="26" /> }
+        </div>
+        @if (b.members.length > 4) { <small class="subtle">+{{ b.members.length - 4 }}</small> }
+        <span class="role">{{ b.role === 'owner' ? 'Propriétaire' : b.role === 'admin' ? 'Admin' : 'Membre' }}</span>
+      </div>
+    </div>
+  </a>
+</ng-template>
+
+@if (showCreate()) {
+  <div class="backdrop" (click)="closeCreate()">
+    <form class="modal create-modal" (click)="$event.stopPropagation()" (ngSubmit)="create()">
+      <div class="preview" [class]="'preview bg-' + form.background">
+        <div class="pv-cols"><i></i><i></i><i></i></div>
+        <h3>{{ form.title || 'Mon nouveau tableau' }}</h3>
+      </div>
+      <div class="body">
+        <div class="field">
+          <label>Arrière-plan</label>
+          <div class="bgs">
+            @for (bg of backgrounds; track bg) {
+              <button type="button" [class]="'bg bg-' + bg" [class.sel]="form.background === bg" (click)="form.background = bg" [attr.aria-label]="bg">
+                @if (form.background === bg) { <tk-icon name="check" [size]="14" [stroke]="3" /> }
+              </button>
+            }
+          </div>
+        </div>
+        <div class="field">
+          <label for="bt">Titre du tableau</label>
+          <input id="bt" class="input" name="title" [(ngModel)]="form.title" required maxlength="160" placeholder="ex. Refonte du site, Sprint 12…" autofocus />
+        </div>
+        <div class="field">
+          <label for="bd">Description <span class="subtle">(optionnel)</span></label>
+          <textarea id="bd" class="input" name="description" [(ngModel)]="form.description" rows="2" placeholder="À quoi sert ce tableau ?"></textarea>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreate()">Annuler</button>
+          <button class="btn btn-primary" [disabled]="!form.title.trim() || creating()">Créer le tableau</button>
+        </div>
+      </div>
+    </form>
+  </div>
+}
+
+@if (showImport()) {
+  <div class="backdrop" (click)="!importing() && showImport.set(false)">
+    <div class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title" (click)="$event.stopPropagation()">
+      <header><h2 id="import-title"><tk-icon name="inbox" [size]="20" /> Importer un tableau Trello</h2>
+        <button class="icon-btn" (click)="showImport.set(false)" [disabled]="importing()" aria-label="Fermer"><tk-icon name="x" [size]="18" /></button></header>
+      <div class="body">
+        <div class="field">
+          <label>Export JSON du tableau</label>
+          <p class="hint-text">Dans Trello : Menu du tableau → Imprimer, exporter et partager → Exporter au format JSON.</p>
+          <input #jsonFile type="file" accept=".json,application/json" hidden (change)="pickImportFile(jsonFile)" />
+          <button type="button" class="file-pick" (click)="jsonFile.click()">
+            <tk-icon [name]="importFile() ? 'file' : 'upload'" [size]="18" />
+            @if (importFile(); as f) { <b>{{ f.name }}</b> <span>{{ (f.size / 1024 / 1024).toFixed(1) }} Mo · changer</span> } @else { Choisir le fichier JSON… }
+          </button>
+        </div>
+        <label class="copy-opt">
+          <input type="checkbox" class="checkbox" [checked]="copyFiles()" (change)="copyFiles.set($any($event.target).checked)" />
+          <span><b>Copier les pièces jointes dans Taskora</b><small>Les fichiers déposés sur Trello deviennent des pièces jointes des cartes (plus aucun lien vers Trello). Sinon, vous pourrez le faire plus tard depuis le tableau.</small></span>
+        </label>
+        @if (copyFiles()) { <tk-trello-access /> }
+      </div>
+      <footer>
+        <button class="btn btn-ghost" (click)="showImport.set(false)" [disabled]="importing()">Annuler</button>
+        <button class="btn btn-primary" (click)="importTrello()" [disabled]="!importFile() || importing() || access()?.checking()">
+          @if (importing() || access()?.checking()) { <span class="spinner mini"></span> {{ importing() ? 'Import…' : 'Vérification…' }} } @else { Importer }
+        </button>
+      </footer>
+    </div>
+  </div>
+}
+
+@if (showTrash()) {
+  <div class="backdrop" (click)="showTrash.set(false)">
+    <div class="modal import-modal" role="dialog" aria-modal="true" aria-labelledby="trash-title" (click)="$event.stopPropagation()">
+      <header><h2 id="trash-title"><tk-icon name="trash" [size]="20" /> Corbeille</h2>
+        <button class="icon-btn" (click)="showTrash.set(false)" aria-label="Fermer"><tk-icon name="x" [size]="18" /></button></header>
+      <div class="body">
+        <p class="hint-text">Tableaux que vous avez supprimés. Ils sont effacés définitivement 30 jours après leur suppression. Les listes et cartes supprimées se trouvent dans la corbeille de chaque tableau (Paramètres → Corbeille).</p>
+        @if (trashedBoards(); as list) {
+          @for (b of list; track b.id) {
+            <div class="trash-row">
+              <span [class]="'trash-bg bg-' + b.background"></span>
+              <div class="trash-main"><b>{{ b.title }}</b><small>Supprimé le {{ shortDate(b.deletedAt) }} · {{ daysLeft(b.purgeAt) }} j restants</small></div>
+              <button class="btn btn-secondary btn-sm" (click)="restoreBoard(b)"><tk-icon name="restore" [size]="14" /> Restaurer</button>
+              <button class="icon-btn sm" (click)="purgeBoard(b)" title="Supprimer définitivement" aria-label="Supprimer définitivement"><tk-icon name="x" [size]="15" /></button>
+            </div>
+          } @empty {
+            <p class="trash-empty"><tk-icon name="trash" [size]="26" /> La corbeille est vide.</p>
+          }
+        } @else { <p class="hint-text">Chargement…</p> }
+      </div>
+    </div>
+  </div>
+}

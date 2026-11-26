@@ -1,0 +1,45 @@
+:host { display: block; }
+.editor { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); transition: border-color .15s, box-shadow .15s;
+  &:focus-within { border-color: var(--primary); box-shadow: var(--ring); } }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px; border-bottom: 1px solid var(--border);
+  background: var(--surface-2); border-radius: 12px 12px 0 0; position: sticky; top: 0; z-index: 2; }
+.tb { height: 30px; min-width: 30px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  border: 0; border-radius: 7px; background: none; color: var(--text-2); font-size: 13px; font-weight: 600;
+  &:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+  &.on { background: var(--primary-soft); color: var(--primary); }
+  &:disabled { opacity: .35; cursor: default; }
+  &.wide { min-width: 86px; justify-content: space-between; } }
+.sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+.anchor { position: relative; }
+.color-btn { flex-direction: column; gap: 0; padding-top: 3px; .bar { width: 14px; height: 3px; border-radius: 2px; margin-top: -1px; } }
+.pop { position: absolute; top: 34px; left: 0; z-index: 20; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-lg); padding: 8px; animation: popIn .15s var(--ease); }
+.pop-title { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); margin: 0 2px 6px; }
+.grid { display: grid; grid-template-columns: repeat(6, 26px); gap: 4px; }
+.sw { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); font-weight: 800; font-size: 14px; display: grid; place-items: center;
+  &:hover { transform: scale(1.08); } &.none { color: var(--text-3); } }
+.menu { display: flex; flex-direction: column; min-width: 160px; padding: 6px;
+  button { text-align: left; border: 0; background: none; padding: 6px 10px; border-radius: 8px; color: var(--text); font-size: 14px;
+    &:hover, &.on { background: var(--surface-3); } }
+  .h1 { font: 800 20px var(--font-display); } .h2 { font: 700 17px var(--font-display); } .h3 { font: 700 15px var(--font-display); } }
+.link { display: flex; gap: 6px; align-items: center; width: 320px; input { flex: 1; } }
+.content { padding: 10px 14px; min-height: 120px; cursor: text; }
+.compact .content { min-height: 64px; }
+.compact .toolbar { padding: 4px; }
+.spinner.mini { width: 14px; height: 14px; border-width: 2px; }
+@media (max-width: 600px) { .link { width: 260px; } }
+
+/* "@" member suggestions */
+.mention-pop { position: absolute; z-index: 30; width: 260px; max-height: 280px; overflow-y: auto; padding: 6px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); animation: popIn .12s var(--ease);
+  button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: none; text-align: left; cursor: pointer; color: var(--text);
+    &.on { background: var(--primary-soft); } }
+  .mn { display: flex; flex-direction: column; min-width: 0;
+    b { font-size: 13px; font-weight: 600; } small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } } }
+
+/* Files being uploaded from the editor */
+.uploads { list-style: none; margin: 0; padding: 6px 10px 8px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 4px;
+  li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+  .u-name { flex: 0 1 auto; min-width: 0; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .u-bar { flex: 1; height: 4px; border-radius: 4px; background: var(--surface-3); overflow: hidden; span { display: block; height: 100%; background: var(--primary); transition: width .2s; } }
+  .u-pct { min-width: 92px; text-align: right; color: var(--primary); font-variant-numeric: tabular-nums; } }

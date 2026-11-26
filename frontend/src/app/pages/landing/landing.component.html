@@ -1,0 +1,60 @@
+<div class="page">
+  <header class="nav">
+    <tk-logo [light]="true" />
+    <nav>
+      <a routerLink="/login" class="btn btn-ghost on-dark">Se connecter</a>
+      <a routerLink="/register" class="btn btn-gradient">Commencer gratuitement</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="pill"><tk-icon name="sparkles" [size]="14" /> Le kanban nouvelle génération</span>
+      <h1>Le travail d’équipe,<br><span class="grad">enfin limpide.</span></h1>
+      <p>Taskora réunit vos projets, vos tâches et vos collègues dans des tableaux élégants et rapides. Notifications, champs personnalisés et collaboration en temps réel inclus.</p>
+      <div class="cta">
+        <a routerLink="/register" class="btn btn-gradient btn-lg">Créer mon espace <tk-icon name="arrowRight" [size]="16" /></a>
+        <a routerLink="/login" class="btn btn-lg glass-btn">J’ai déjà un compte</a>
+      </div>
+    </div>
+
+    <div class="mock" aria-hidden="true">
+      <div class="mock-bar"><span></span><span></span><span></span><b>Lancement produit</b></div>
+      <div class="mock-board">
+        @for (col of mockCols; track col.title) {
+          <div class="mock-col">
+            <div class="mock-col-title">{{ col.title }} <i>{{ col.cards.length }}</i></div>
+            @for (c of col.cards; track $index) {
+              <div class="mock-card" [style.animation-delay.ms]="$index * 120 + 200">
+                <div class="mock-labels"><s [style.background]="c[0]"></s><s class="short" [style.background]="c[1]"></s></div>
+                <div class="mock-line"></div><div class="mock-line short"></div>
+                <div class="mock-foot"><em></em><em></em></div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>Tout ce qu’il faut, rien de superflu.</h2>
+    <div class="grid">
+      @for (f of features; track f.title) {
+        <article class="feature">
+          <span class="ficon"><tk-icon [name]="f.icon" [size]="20" /></span>
+          <h3>{{ f.title }}</h3>
+          <p>{{ f.text }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section class="final">
+    <h2>Prêt à y voir plus clair ?</h2>
+    <p>Créez votre premier tableau en moins de 30 secondes.</p>
+    <a routerLink="/register" class="btn btn-gradient btn-lg">Démarrer avec Taskora</a>
+  </section>
+
+  <footer>© {{ year }} Taskora — Fait avec soin.</footer>
+</div>

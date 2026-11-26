@@ -1,0 +1,43 @@
+/* content-visibility lets the browser skip layout/paint of off-screen cards */
+:host { display: block; position: relative; flex-shrink: 0; content-visibility: auto; contain-intrinsic-size: auto 72px;
+  background: var(--surface); border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.08), 0 1px 1px rgba(15,23,42,.04); cursor: pointer; overflow: hidden;
+  border: 1px solid var(--border); transition: box-shadow .15s, border-color .15s; outline: none; --avatar-ring: var(--surface); }
+:host(:hover) { box-shadow: var(--shadow); border-color: var(--border-strong); }
+:host(:hover) .check { opacity: 1; width: 18px; margin-right: 0; }
+:host(:focus-visible) { box-shadow: var(--ring); }
+:host(.cdk-drag-preview) { content-visibility: visible; }
+.cover { height: 34px; }
+/* Image cover: whole image up to 180 px high, centered on a soft background */
+.cover-img { background: var(--surface-3); display: flex; justify-content: center; max-height: 180px; overflow: hidden;
+  img { display: block; width: 100%; max-height: 180px; object-fit: cover; } }
+.card-body { padding: 10px 12px; }
+.labels { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.label { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent); }
+.title-row { display: flex; gap: 8px; align-items: flex-start; }
+.check { width: 0; height: 18px; margin-right: -8px; opacity: 0; flex-shrink: 0; margin-top: 1px; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface); color: transparent;
+  display: grid; place-items: center; padding: 0; transition: all .18s var(--ease);
+  &.on { opacity: 1; width: 18px; margin-right: 0; background: var(--success); border-color: var(--success); color: #fff; }
+  &:hover:not(.on) { border-color: var(--success); color: var(--success); } }
+h3 { font-family: var(--font); font-size: 14px; font-weight: 500; line-height: 1.4; letter-spacing: 0; word-break: break-word; margin: 0; }
+.num { font-size: 12px; font-weight: 600; color: var(--text-3); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.label:empty { width: 40px; height: 8px; padding: 0; }
+.cf { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.cf-chip { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--surface-3); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  b { font-weight: 600; color: var(--text-3); }
+  &.colored { background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); b { color: inherit; opacity: .75; } } }
+.meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; color: var(--text-3); font-size: 12px; font-weight: 500; }
+.m { display: inline-flex; align-items: center; gap: 4px;
+  &.all { color: var(--success); }
+  &.due { padding: 1px 6px; border-radius: 6px; margin-left: -2px; }
+  &.overdue { background: rgba(239,68,68,.12); color: var(--danger); }
+  &.soon { background: rgba(245,158,11,.14); color: #d97706; }
+  &.done { background: rgba(16,185,129,.14); color: var(--success); } }
+.assignees { margin-left: auto; }
+/* File dragged from the computer over the card */
+:host(.file-over) { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+.drop-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px; pointer-events: none;
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface) 86%); color: var(--primary); font-size: 13px; font-weight: 700; }
+.upload-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--primary) 18%, transparent);
+  span { display: block; height: 100%; background: var(--primary); transition: width .2s; } }
+.upload-label { position: absolute; right: 8px; bottom: 7px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 6px;
+  background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: var(--shadow-sm); pointer-events: none; }
