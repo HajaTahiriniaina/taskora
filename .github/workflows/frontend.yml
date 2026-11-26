@@ -2,26 +2,15 @@
 # (docs/ci/requests/frontend.md, réponse de Manuel au §8).
 name: frontend
 
+# PR et push sur main : appelé par ci.yml (ancien filtre : frontend/**, services/identity-service/**,
+# services/pom.xml, backend/**, docker-compose*.yml, docker/mariadb/**, ce fichier). Manuel : autonome.
 on:
-  pull_request:
-    paths:
-      - "frontend/**"
-      - "services/identity-service/**"
-      - "services/pom.xml"
-      - "backend/**"
-      - "docker-compose*.yml"
-      - "docker/mariadb/**"
-      - ".github/workflows/frontend.yml"
-  push:
-    branches: [main]
-    paths:
-      - "frontend/**"
-      - "services/identity-service/**"
-      - "services/pom.xml"
-      - "backend/**"
-      - "docker-compose*.yml"
-      - "docker/mariadb/**"
-      - ".github/workflows/frontend.yml"
+  workflow_call:
+    inputs:
+      upstream:
+        description: "Amont(s) d'identité pour frontend-e2e-identity (both, symfony, identity)"
+        type: string
+        default: both
   workflow_dispatch:
     inputs:
       upstream:
@@ -32,8 +21,9 @@ on:
 
 permissions: {}
 
+# Nom fixe : appelé, github.workflow vaudrait « ci » et le groupe de l'appelant (interblocage évité).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: frontend-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:

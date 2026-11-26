@@ -2,18 +2,74 @@
 
 Responsable : Manuel. Demandes d'entrée : [requests/backend.md](requests/backend.md) (BackAli), [requests/frontend.md](requests/frontend.md) (FrontPierre, traitée le 26/11/2026).
 
+## Orchestration : `ci.yml` et le check unique `ci-gate`
+
+Les filtres `paths` par workflow empêchaient de rendre leurs jobs obligatoires : une PR qui ne touche pas ces chemins (docs seules, par exemple) ne les déclenche jamais et GitHub attend indéfiniment (« Expected — Waiting for status »). D'où un seul workflow d'entrée.
+
+- `ci.yml` (`name: ci`) se déclenche sur **toutes** les PR (sans filtre de chemins), sur push vers `main` et en manuel (`workflow_dispatch`). Concurrence : groupe `ci-<ref>`, annulation du run précédent sur PR seulement.
+- Job `changes` : `actions/checkout` (`fetch-depth: 0`, `persist-credentials: false`) puis `git diff --name-only --no-renames` (aucune action de filtrage tierce) :
+  - PR : `base.sha...head.sha` (diff « trois points », comme les filtres GitHub) ;
+  - push sur `main` : `before..sha` ;
+  - `workflow_dispatch`, commit introuvable ou premier push : tout est relancé.
+  Il produit un booléen par zone, qui reproduit exactement les anciens filtres (rappelés en tête de chaque workflow appelé) ; toute modification de `ci.yml` relance toutes les zones.
+
+  | Sortie | Chemins | Événements |
+  |---|---|---|
+  | `backend` | `backend/**`, `docker-compose.yml`, `docker/mariadb/**`, `backend.yml` | PR |
+  | `identity_service` | `services/**`, `identity-service.yml` | PR, push `main` |
+  | `identity_security` | `services/**/pom.xml`, `identity-security.yml` | PR (+ planifié et manuel, en autonome) |
+  | `identity_compat` | `services/identity-service/**`, `backend/**`, `docker-compose.yml`, `docker-compose.identity-dev.yml`, `docker/mariadb/**`, `frontend/nginx.conf`, `frontend/Dockerfile`, `identity-compat.yml` | PR |
+  | `frontend` | `frontend/**`, `services/identity-service/**`, `services/pom.xml`, `backend/**`, `docker-compose*.yml`, `docker/mariadb/**`, `frontend.yml` | PR, push `main` |
+- Les cinq workflows sont **réutilisables** (`on: workflow_call`) et appelés par un job de même nom avec `if: needs.changes.outputs.<zone> == 'true'`. Ils n'ont plus de déclencheur `pull_request`/`push` (rien ne tourne deux fois). Restent autonomes : `identity-security` (lundi 05:00 UTC et manuel) et `frontend` (manuel, entrée `upstream`).
+- Permissions : `permissions: {}` partout au niveau du workflow. Chaque job appelant accorde l'union de ce que demandent les jobs appelés, qui gardent leurs propres permissions minimales. `checks: write` n'est accordé qu'aux appels `identity-service` et `frontend`, et seuls leurs jobs `*-test-report` l'utilisent. `security-events: write` n'est accordé qu'à l'appel `identity-security`.
+- Secrets : pas de `secrets: inherit`. Seuls `SONAR_TOKEN` (vers `identity-service`) et `NVD_API_KEY` (vers `identity-security`) sont transmis explicitement ; les autres workflows n'en reçoivent aucun. `vars.SONAR_HOST_URL` reste lu directement.
+- Concurrence : seul `ci.yml` en a pour les runs de CI. `frontend` et `identity-security` gardent un groupe à nom fixe (`frontend-<ref>`, `identity-security-<ref>`) pour leurs runs autonomes. Un appelé qui reprendrait `github.workflow` (qui vaut alors `ci`) partagerait le groupe de l'appelant et provoquerait un interblocage.
+- Artefacts : tous les appels partagent le même run, donc les noms doivent être uniques. Ils le sont déjà : `backend-phpunit-junit`, `identity-test-reports`, `identity-quality-reports`, `identity-dependency-check`, `identity-compat-reports`, `identity-compat-compose-logs`, `frontend-lint-report`, `frontend-unit-reports`, `frontend-e2e-identity-<backend>`, `frontend-compose-logs-<backend>`.
+- Job `ci-gate` (`needs` : `changes` et les cinq appels, `if: always()`) :
+  - échec si un résultat est `failure` ou `cancelled`, y compris l'échec de `changes` ;
+  - succès si tous sont `success` ou `skipped` (zone non concernée).
+  Il est rapporté sur **chaque** PR.
+
+### Noms des checks (PR)
+Format `<job appelant> / <job appelé>` ; un appel ignoré n'apparaît que sous le nom de l'appelant, avec le statut « ignoré ».
+- `changes`, `ci-gate`
+- `backend / backend-phpunit`
+- `identity-service / identity-build (verify)`, `identity-service / identity-test-report`, `identity-service / identity-quality (Spotless, Checkstyle, Nullness, OpenRewrite)`, `identity-service / identity-sonar`, `identity-service / identity-image`
+- `identity-security / identity-security`
+- `identity-compat / identity-compat`
+- `frontend / frontend-quality (lint, prettier, tsc)`, `frontend / frontend-unit (ng test, Vitest)`, `frontend / frontend-build (ng build production)`, `frontend / frontend-image`, `frontend / frontend-e2e-identity (symfony)`, `frontend / frontend-e2e-identity (identity)`, `frontend / frontend-test-report`
+- Checks créés par `dorny/test-reporter` (inchangés) : `identity-service tests`, `frontend unit tests`, `frontend e2e identity`.
+
+### Protection de `main` (à faire par l'utilisateur)
+1. Pousser la branche `ci/ci-gate` et ouvrir sa PR : `ci-gate` doit y avoir tourné **au moins une fois**, sinon GitHub ne le propose pas dans la liste des checks.
+2. Dans *Settings → Rules → Rulesets* (ou *Settings → Branches → Branch protection rules*), créer ou modifier la règle de `main` :
+   - activer *Require status checks to pass* ;
+   - ajouter **`ci-gate`** comme **seul** check requis, avec la source *GitHub Actions* ;
+   - ne pas ajouter les checks `<appelant> / <appelé>` : ils sont ignorés sur certaines PR.
+3. Facultatif mais recommandé : *Require branches to be up to date before merging*. La CI tourne alors sur la PR rebasée sur le dernier `main`, au prix de relances plus fréquentes.
+4. Supprimer des checks requis les anciens noms (`backend-phpunit`, `identity-build (verify)`, …), s'ils y figuraient : ils ne seront plus jamais rapportés sous ce nom.
+
+### Limites connues
+- **PR de fork** : `NVD_API_KEY` n'est pas transmis aux forks. Une PR de fork qui touche un `pom.xml` fait donc échouer `identity-security`, puis `ci-gate` (comportement d'avant, désormais bloquant). Un mainteneur relance alors depuis une branche du dépôt. Sonar reste ignoré et les `*-test-report` sont sautés, comme avant.
+- **Push sur `main`** : seuls `identity-service` et `frontend` tournent, comme avant. `backend`, `identity-compat` et `identity-security` ne tournent que sur PR (et `identity-security` chaque lundi).
+- **Runs autonomes** : le run planifié d'`identity-security` et les runs manuels de `frontend` ne passent pas par `ci-gate` et ne bloquent rien. Un `workflow_dispatch` de `ci.yml` relance tout, avec les deux amonts e2e.
+- **Workflows réutilisables** : au plus 4 niveaux d'imbrication et 20 workflows distincts par run (ici 1 niveau, 5 workflows). Un appelé ne voit que les secrets transmis explicitement. Dans un appelé, `github.workflow` vaut `ci`, d'où les groupes de concurrence à nom fixe.
+- **Coût** : chaque PR lance au minimum `changes` et `ci-gate`, deux jobs de quelques secondes.
+
 ## Workflows GitHub Actions (`.github/workflows/`)
+
+Tous les déclencheurs PR et push passent par `ci.yml` (voir ci-dessus) ; la colonne indique les chemins de la zone correspondante.
 
 | Workflow | Jobs | Déclencheurs |
 |---|---|---|
-| `identity-service.yml` | `identity-build` (`verify` : unitaires, ArchUnit, IT Testcontainers, JaCoCo), `identity-test-report` (publication JUnit, seul job avec `checks: write`, pas sur les PR de fork), `identity-quality` (`-Pquality`, puis `rewrite:dryRun` : échec si le patch n'est pas vide), `identity-sonar` (si `SONAR_TOKEN` + `SONAR_HOST_URL`), `identity-image` (`docker build`, sans push) | PR et push sur `main` touchant `services/**` |
-| `identity-security.yml` | `identity-security` (OWASP Dependency-Check, CVSS ≥ 7 bloquant, cache NVD hebdomadaire, SARIF → onglet Security ; **échoue** si `NVD_API_KEY` est absent — dependency-check 13 ne tourne pas sans clé, donc aussi sur les PR de fork ; clé lue par `-DnvdApiKeyEnvironmentVariable=NVD_API_KEY`, jamais en ligne de commande) | PR touchant `services/**/pom.xml`, lundi 05:00 UTC, manuel |
-| `identity-compat.yml` | `identity-compat` (stack compose complète + `-Pcompat` contre 8081 / 8082 / 8080) | PR touchant `services/identity-service/**`, `backend/**`, `docker-compose*.yml`, `docker/mariadb/**`, `frontend/nginx.conf`, `frontend/Dockerfile` |
-| `backend.yml` | `backend-phpunit` (PHPUnit sur `taskora_test`, JUnit en artefact) | PR touchant `backend/**`, `docker-compose.yml`, `docker/mariadb/**` |
-| `frontend.yml` | `frontend-quality` (`ng lint` : 0 erreur et avertissements ≤ ligne de base `LINT_MAX_WARNINGS` = 904 ; `prettier --check .` ; `tsc --noEmit` app, spec, e2e ; rapport `eslint.json`), `frontend-unit` (`ng test --watch=false --coverage` : JUnit `reports/unit-junit.xml`, couverture `reports/coverage/` sans seuil), `frontend-build` (`ng build --configuration production`), `frontend-image` (`docker build`, sans push), `frontend-e2e-identity` (matrice `symfony` = `api:80` / `identity` = `identity:8080`, `fail-fast: false`, stack compose `-p taskora-ci --profile identity`, contrôle de l'amont effectif de `web`, Playwright `--grep @identity` Chromium, contrôle de fuite avant publication, `down -v` toujours), `frontend-test-report` (JUnit unitaires + e2e, seul job avec `checks: write`, pas sur les PR de fork). Tous bloquants sauf `frontend-test-report`. | PR et push sur `main` touchant `frontend/**`, `services/identity-service/**`, `services/pom.xml`, `backend/**`, `docker-compose*.yml`, `docker/mariadb/**` ou le workflow ; `workflow_dispatch` (entrée `upstream` : `both`, `symfony`, `identity`) |
+| `identity-service.yml` | `identity-build` (`verify` : unitaires, ArchUnit, IT Testcontainers, JaCoCo), `identity-test-report` (publication JUnit, seul job avec `checks: write`, pas sur les PR de fork), `identity-quality` (`-Pquality`, puis `rewrite:dryRun` : échec si le patch n'est pas vide), `identity-sonar` (si `SONAR_TOKEN` + `SONAR_HOST_URL`), `identity-image` (`docker build`, sans push) | `ci.yml` : PR et push sur `main` touchant `services/**` |
+| `identity-security.yml` | `identity-security` (OWASP Dependency-Check, CVSS ≥ 7 bloquant, cache NVD hebdomadaire, SARIF → onglet Security ; **échoue** si `NVD_API_KEY` est absent — dependency-check 13 ne tourne pas sans clé, donc aussi sur les PR de fork ; clé lue par `-DnvdApiKeyEnvironmentVariable=NVD_API_KEY`, jamais en ligne de commande) | `ci.yml` : PR touchant `services/**/pom.xml` ; autonome : lundi 05:00 UTC, manuel |
+| `identity-compat.yml` | `identity-compat` (stack compose complète + `-Pcompat` contre 8081 / 8082 / 8080) | `ci.yml` : PR touchant `services/identity-service/**`, `backend/**`, `docker-compose*.yml`, `docker/mariadb/**`, `frontend/nginx.conf`, `frontend/Dockerfile` |
+| `backend.yml` | `backend-phpunit` (PHPUnit sur `taskora_test`, JUnit en artefact) | `ci.yml` : PR touchant `backend/**`, `docker-compose.yml`, `docker/mariadb/**` |
+| `frontend.yml` | `frontend-quality` (`ng lint` : 0 erreur et avertissements ≤ ligne de base `LINT_MAX_WARNINGS` = 904 ; `prettier --check .` ; `tsc --noEmit` app, spec, e2e ; rapport `eslint.json`), `frontend-unit` (`ng test --watch=false --coverage` : JUnit `reports/unit-junit.xml`, couverture `reports/coverage/` sans seuil), `frontend-build` (`ng build --configuration production`), `frontend-image` (`docker build`, sans push), `frontend-e2e-identity` (matrice `symfony` = `api:80` / `identity` = `identity:8080`, `fail-fast: false`, stack compose `-p taskora-ci --profile identity`, contrôle de l'amont effectif de `web`, Playwright `--grep @identity` Chromium, contrôle de fuite avant publication, `down -v` toujours), `frontend-test-report` (JUnit unitaires + e2e, seul job avec `checks: write`, pas sur les PR de fork). Tous bloquants sauf `frontend-test-report`. | `ci.yml` : PR et push sur `main` touchant `frontend/**`, `services/identity-service/**`, `services/pom.xml`, `backend/**`, `docker-compose*.yml`, `docker/mariadb/**` ou le workflow ; autonome : `workflow_dispatch` (entrée `upstream` : `both`, `symfony`, `identity`) |
 
 Non implémenté : publication d'images (GHCR) et déploiement (accord de l'utilisateur requis).
-`frontend.yml` n'a qu'un filtre de chemins (union des déclencheurs de la demande) : une PR qui ne touche que `backend/**` relance aussi qualité, unitaires, build et image du front (quelques minutes), plutôt que d'ajouter une action de filtrage non épinglée.
+`frontend` n'a qu'une zone (union des déclencheurs de la demande) : une PR qui ne touche que `backend/**` relance aussi qualité, unitaires, build et image du front (quelques minutes).
 
 Règles appliquées : `permissions: {}` au niveau du workflow puis minimales par job ; actions épinglées par SHA (version en commentaire) ; `persist-credentials: false` ; pas de `pull_request_target` ; secrets éphémères générés à l'exécution (`openssl rand`, masqués) ; paire de clés JWT de test générée par le conteneur `api` dans le volume `jwt_keys` ; artefacts conservés 14 jours ; journaux compose publiés seulement s'ils ne contiennent ni secret ni jeton `eyJ…​.eyJ…`.
 OWASP : le rapport viendra du premier run GitHub Actions de `identity-security` (après un push approuvé par l'utilisateur) ; pas de clé NVD locale.

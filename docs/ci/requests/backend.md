@@ -90,6 +90,9 @@ Statut : **accepté avec modifications** (26/11/2026). Détail : [../README.md](
   - Sonar : jeton lu par variable d'environnement (pas `-Dsonar.token` en ligne de commande) ; URL du serveur = variable de dépôt `SONAR_HOST_URL`.
   - backend-phpunit : `DATABASE_URL` de compose vise déjà `/taskora` (suffixe `_test` ajouté par doctrine.yaml) ; ajout de `unset INTERNAL_API_SECRET` et de `lexik:jwt:generate-keypair`.
 
+### Orchestration (Manuel, 26/11/2026)
+- Les workflows `identity-service`, `identity-security`, `identity-compat` et `backend` sont appelés par `ci.yml`, sans changement de leurs jobs. Ils tournent selon les mêmes chemins, calculés par le job `changes`. Le seul check requis sur `main` est `ci-gate` ; les checks s'appellent désormais `<zone> / <job>`, par exemple `identity-service / identity-build (verify)`. Détail : [../README.md](../README.md#orchestration--ciyml-et-le-check-unique-ci-gate).
+
 ### Boucle de revue 1 (Manuel, 26/11/2026)
 - B5 : `identity-security` échoue avec « NVD_API_KEY absent : dependency-check 13 ne peut pas s'exécuter » si le secret manque ; clé passée par `-DnvdApiKeyEnvironmentVariable=NVD_API_KEY`. Secret `NVD_API_KEY` créé par l'utilisateur dans GitHub.
 - Rapport OWASP : **en attente** du premier run GitHub Actions (push à approuver par l'utilisateur) ; aucune clé NVD locale, aucun run local tenté. Résumé (nombres, CVE éventuelles) à reporter ici.

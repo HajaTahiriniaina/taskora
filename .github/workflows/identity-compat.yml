@@ -2,23 +2,13 @@
 # (docs/ci/requests/backend.md §2 et §3) : tests JUnit @Tag("compat").
 name: identity-compat
 
+# Appelé par ci.yml (concurrence gérée par l'appelant) ; plus de déclencheur pull_request/push propre.
+# Ancien filtre (job « changes » de ci.yml) : services/identity-service/**, backend/**, docker-compose.yml,
+# docker-compose.identity-dev.yml, docker/mariadb/**, frontend/nginx.conf, frontend/Dockerfile, ce fichier ; PR seulement.
 on:
-  pull_request:
-    paths:
-      - "services/identity-service/**"
-      - "backend/**"
-      - "docker-compose.yml"
-      - "docker-compose.identity-dev.yml"
-      - "docker/mariadb/**"
-      - "frontend/nginx.conf"
-      - "frontend/Dockerfile"
-      - ".github/workflows/identity-compat.yml"
+  workflow_call:
 
 permissions: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   identity-compat:
