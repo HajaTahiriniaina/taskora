@@ -1,0 +1,224 @@
+[
+    {
+        "label": "symfony-2y-13-ascii8",
+        "password": "testpass",
+        "hash": "$2y$13$jnoH/ttzpf8xyip9sd/DLuUDqAQ62wb41vgJhhavdb68OAHZtObkS",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-ascii8",
+        "password": "testpass",
+        "hash": "$2y$04$2HTQIYBvtPCSrBMq5s43Hu9t7DQaI9AWKuVSsEyWfDndpIyxJSBzq",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-13-accents",
+        "password": "ééééééé8",
+        "hash": "$2y$13$tgzITogrcWJEK76vMabr2elzzCUvRY5J8ESohsaw4idKDtoRIIeXG",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-accents",
+        "password": "ééééééé8",
+        "hash": "$2y$04$.OfsoHJCwV4FkckqhmswIOtDwxLOeo4O2/RBLVZlKHXCeBgRogVG2",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-13-emoji",
+        "password": "mot🔑passe",
+        "hash": "$2y$13$xInEhuUlb9qXICVGDMM/7uWI6BIqU2s9LRKk3X3f2f65gwZypo.Hi",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-emoji",
+        "password": "mot🔑passe",
+        "hash": "$2y$04$Jsj4H7bckfb6UfinmvzXuO90jMqsJ8hjQYnQiY2QC4sTlRMP6oByq",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-13-bytes72",
+        "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "hash": "$2y$13$zcLA8YPqrBGKEbE/eXOdt.2rMSbwzRzbY9dUyqlbPYsPqOxbdhmkm",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-bytes72",
+        "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "hash": "$2y$04$2n1UARk6kPlO4RYrMhZ0UeR0SYVw9NPUAYetVt.En/9AycjgD40jO",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-13-bytes73",
+        "password": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hash": "$2y$13$xYSjiobn.RH/coY0rV7Vz.AlcXGeMzFOPPmqCIm6mk3uMBqLnSqQ2",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-bytes73",
+        "password": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hash": "$2y$04$04YzDRo4dqnoNvoR/uc3AOP4ZZe81.U.LOFfa5EhZx0ONynFSET66",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-13-bytes100",
+        "password": "ccccccccccccccccccccccccccccccccccccccccccccccccccééééééééééééééééééééééééé",
+        "hash": "$2y$13$1OOXkhBfl3RYSx1qafqfBu0Frn16EL/yQL8Ai6Tq5NZxaWGHIkNJ.",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-bytes100",
+        "password": "ccccccccccccccccccccccccccccccccccccccccccccccccccééééééééééééééééééééééééé",
+        "hash": "$2y$04$63PLCLYI4bxQIQ51CJB9.uxNf.IetBST9nTOUsPCt09qwwxUtoLHW",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-13-nul",
+        "password": "avant\u0000apres",
+        "hash": "$2y$13$q2N8JJEti5HMzGcCXr8ti.xplZ7J6wZnbR6yPqbYM.m0kSoDhfPUy",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-nul",
+        "password": "avant\u0000apres",
+        "hash": "$2y$04$ohb7.8vnoALPP0XLs6ohbemNthQ7JuZ0ij4KYKrOutexthS.2/WP2",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-13-bytes4096",
+        "password": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "hash": "$2y$13$vAF9/rvwXthcOc.tiOzhueYQDYxmxc25G57WL.sjSwZMAFpR2o0VK",
+        "expectedValid": true
+    },
+    {
+        "label": "symfony-2y-4-bytes4096",
+        "password": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "hash": "$2y$04$P6AT7qnanBtx1iWNTKhtmOCRF9QKgZ84Iku5QHHfjnN1YoWcGjJIi",
+        "expectedValid": true
+    },
+    {
+        "label": "wrong-password-2y-13",
+        "password": "mauvaismdp",
+        "hash": "$2y$13$HqnT2IQpLKJCL7Cn8.lHVOh4UQgjVMX5pTMJp6iOftbK9fAsYjOKS",
+        "expectedValid": false
+    },
+    {
+        "label": "wrong-password-72-vs-73",
+        "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX",
+        "hash": "$2y$04$jcOT/zQqzZL7JlAuh/6JnOFkJPvz5DAxbyuR8hBDsLYnvINAj1S8S",
+        "expectedValid": false
+    },
+    {
+        "label": "prefix-2a",
+        "password": "testpass",
+        "hash": "$2a$04$stzwlUjReH.oHu7X0QNdLOu9pGglNx5ceNSFiIqdK/eZhV7WKV8EG",
+        "expectedValid": true
+    },
+    {
+        "label": "prefix-2b",
+        "password": "testpass",
+        "hash": "$2b$04$stzwlUjReH.oHu7X0QNdLOu9pGglNx5ceNSFiIqdK/eZhV7WKV8EG",
+        "expectedValid": true
+    },
+    {
+        "label": "prefix-2b-bytes100",
+        "password": "ccccccccccccccccccccccccccccccccccccccccccccccccccééééééééééééééééééééééééé",
+        "hash": "$2b$04$epmbcq6NjDfMNjnJbr6U.uhdobd07ppaZCtHYcKpPuJd4yOLZMM0i",
+        "expectedValid": true
+    },
+    {
+        "label": "argon2id-ascii8",
+        "password": "testpass",
+        "hash": "$argon2id$v=19$m=65536,t=4,p=1$QW5kMHR4aVI1NG5tWHlzVA$snLn5mSubILKWtdpuG+lrncctldX7E8L1Nqs+jgtRt0",
+        "expectedValid": true
+    },
+    {
+        "label": "argon2i-ascii8",
+        "password": "testpass",
+        "hash": "$argon2i$v=19$m=65536,t=4,p=1$QWhBOVN4ZVNhcno1VWNPRQ$boiLSq8mIjmpPuyg1OqS0Kibvb/Nz2DVSX65I2EIehs",
+        "expectedValid": true
+    },
+    {
+        "label": "argon2id-accents",
+        "password": "ééééééé8",
+        "hash": "$argon2id$v=19$m=65536,t=4,p=1$WGpWZE1ZSWt1b0FHYmwzVA$RqwIUXxem9oH31x/oYTxkj7BsYFNMPAeqEIATr82cGg",
+        "expectedValid": true
+    },
+    {
+        "label": "argon2i-accents",
+        "password": "ééééééé8",
+        "hash": "$argon2i$v=19$m=65536,t=4,p=1$RkVKUG1KZkVmaGgwam5weg$pNVZzxcAw3SeRxY63x6+oERYqqZZEXBuxgQBVdSLgfs",
+        "expectedValid": true
+    },
+    {
+        "label": "argon2id-bytes100",
+        "password": "ccccccccccccccccccccccccccccccccccccccccccccccccccééééééééééééééééééééééééé",
+        "hash": "$argon2id$v=19$m=65536,t=4,p=1$a2xDbjdjekxFOWVldVB3VA$ij7+LQ9XIazOK9HGjp3UoICU367pwbh+zRDQ+lVYags",
+        "expectedValid": true
+    },
+    {
+        "label": "argon2i-bytes100",
+        "password": "ccccccccccccccccccccccccccccccccccccccccccccccccccééééééééééééééééééééééééé",
+        "hash": "$argon2i$v=19$m=65536,t=4,p=1$UEtFNkkxS0lIM0RYblh5bg$VjOcUi+86EBQORBwXfovG4P+QJNvfomctoTyLbkGdkI",
+        "expectedValid": true
+    },
+    {
+        "label": "sodium-argon2id-ascii8",
+        "password": "testpass",
+        "hash": "$argon2id$v=19$m=65536,t=2,p=1$dOXU0JPIDKOsGzIZnx4AeA$MML97xWA0yYCJsrfeSo69JQB/YWK92ITcUvvp9pDwq8",
+        "expectedValid": true
+    },
+    {
+        "label": "empty-password",
+        "password": "",
+        "hash": "$2y$04$oc4cumZAq5KRZM9GxV/tu.YDQEh72zbbcsrTE5HLaeeGKVXNDmP7m",
+        "expectedValid": false
+    },
+    {
+        "label": "bytes4097",
+        "password": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "hash": "$2y$04$HPj1vgvB0/ACqqiboefAw.ELIo4z8vTRm6rBKyc6z9MO0Uor6c5PG",
+        "expectedValid": false
+    },
+    {
+        "label": "corrupt-truncated",
+        "password": "testpass",
+        "hash": "$2y$04$xLYENzJ5cLkHtFyPdodcWOXG7rRoXzwi0",
+        "expectedValid": false
+    },
+    {
+        "label": "corrupt-bad-cost",
+        "password": "testpass",
+        "hash": "$2y$99$xLYENzJ5cLkHtFyPdodcWOXG7rRoXzwi0D5k1lcsmy4R4hRtS/N9u",
+        "expectedValid": false
+    },
+    {
+        "label": "corrupt-empty",
+        "password": "testpass",
+        "hash": "",
+        "expectedValid": false
+    },
+    {
+        "label": "unknown-md5",
+        "password": "testpass",
+        "hash": "179ad45c6ce2cb97cf1029e212046e81",
+        "expectedValid": false
+    },
+    {
+        "label": "unknown-sha512-crypt",
+        "password": "testpass",
+        "hash": "$6$saltsalt$UUTr6oVJTBk4azi0BmGqXvVgtbeWdSGG0b.P4dfxLVqqVmSL7RQXfoGFlx0.Jkt3Q2nsKyrc.M/cKE2XOCLN70",
+        "expectedValid": true
+    },
+    {
+        "label": "unknown-plain",
+        "password": "testpass",
+        "hash": "testpass",
+        "expectedValid": false
+    },
+    {
+        "label": "corrupt-argon-truncated",
+        "password": "testpass",
+        "hash": "$argon2id$v=19$m=65536,t=4,p=1$Qlk4MEpXL1loOEVmdkZ",
+        "expectedValid": false
+    }
+]

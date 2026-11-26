@@ -1,0 +1,19 @@
+# Minimal (BackTesteur) : seules les clés lues par les tests, en placeholders.
+# BackCodeur complète ce fichier (A13 : variables d'environnement, Flyway, JPA, management…).
+identity:
+  jwt:
+    private-key-path: ${JWT_PRIVATE_KEY_PATH:}
+    public-key-path: ${JWT_PUBLIC_KEY_PATH:}
+    passphrase: ${JWT_PASSPHRASE:}
+    ttl: ${JWT_TTL:604800}
+  legacy:
+    schema: ${LEGACY_SCHEMA:taskora}
+    zone: ${LEGACY_ZONE:Europe/Paris}
+  symfony:
+    internal-url: ${SYMFONY_INTERNAL_URL:http://api:80}
+    internal-secret: ${INTERNAL_API_SECRET:}
+  password:
+    bcrypt-cost: 13
+  outbox:
+    relay:
+      enabled: true

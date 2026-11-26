@@ -1,0 +1,65 @@
+[
+    {
+        "id": 1,
+        "email": "reprise-2y-13@exemple.test",
+        "password": "motdepasse13",
+        "label": "2y-13",
+        "expectLogin": true
+    },
+    {
+        "id": 2,
+        "email": "reprise-2y-4@exemple.test",
+        "password": "motdepasse04",
+        "label": "2y-4",
+        "expectLogin": true
+    },
+    {
+        "id": 3,
+        "email": "reprise-2a@exemple.test",
+        "password": "motdepasse2a",
+        "label": "2a",
+        "expectLogin": true
+    },
+    {
+        "id": 4,
+        "email": "reprise-2b@exemple.test",
+        "password": "motdepasse2b",
+        "label": "2b",
+        "expectLogin": true
+    },
+    {
+        "id": 5,
+        "email": "reprise-argon2id@exemple.test",
+        "password": "motdepasseA2id",
+        "label": "argon2id",
+        "expectLogin": true
+    },
+    {
+        "id": 8,
+        "email": "reprise-argon2i@exemple.test",
+        "password": "motdepasseA2i",
+        "label": "argon2i",
+        "expectLogin": true
+    },
+    {
+        "id": 9,
+        "email": "reprise-bytes100@exemple.test",
+        "password": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+        "label": "bytes100",
+        "expectLogin": true
+    },
+    {
+        "id": 10,
+        "email": "reprise-accent@exemple.test",
+        "password": "mötdepässe",
+        "label": "accent",
+        "expectLogin": true
+    },
+    {
+        "id": 11,
+        "email": "reprise-corrupt@exemple.test",
+        "password": "motdepasseKO",
+        "label": "corrupt",
+        "expectLogin": false
+    }
+]
