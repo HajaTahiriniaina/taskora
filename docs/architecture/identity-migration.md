@@ -141,9 +141,35 @@ Sur une copie de la base : bascule → inscription + changement de mot de passe 
   - non-régression board/notification/push ;
   - e2e `@identity` 14/14 sur les deux amonts ;
   - comptages R0 + 2 ; 0 fuite et 0 × 5xx dans les journaux.
-- **Non conforme** : `POST /api/auth/login` via identity a un p95 de 641,6 et 643,5 ms, pour un seuil < 500 ms. Symfony est à 498,3 ms sur le même hôte. Renvoi à BackAli (B1) ; seuil à confirmer par Paul.
+- **Non conforme** : `POST /api/auth/login` via identity a un p95 de 641,6 et 643,5 ms, pour un seuil < 500 ms. Symfony est à 498,3 ms sur le même hôte. Renvoi à BackAli (B1).
+  - Seuil tranché par Paul : décision **PERF-IDENT-1** (`docs/specs/identity.md` §6.1). Le critère devient relatif à Symfony : p95 et p50 ≤ 1,15 × Symfony, plus un plafond de p95 ≤ 1 000 ms, à coût 13 inchangé.
+  - Avec ce critère, **B1 reste bloquant** (+29 % au login, +34 % à l'inscription).
+  - Cible : login p95 ≤ ~573 ms, inscription p95 ≤ ~566 ms, contre la référence Symfony actuelle.
 - Écart : la base de recette a été remplie par l'API avec des comptes synthétiques au lieu d'une copie de la base de travail, qui contient des données personnelles.
-- Nouvelle répétition requise après le traitement de B1, au minimum R7–R9.
+
+#### Reprise de R8 après correction de B1 (Paul, 26/11/2026)
+Cette reprise remplace la « nouvelle répétition R7–R9 » demandée plus haut. R1–R7 et R9 sont acquis le 26/11/2026 : on ne les rejoue pas, **à condition** que la correction ne touche ni au routage nginx, ni au gel, ni à la reprise (`legacy-import`), ni à la projection `taskora.user`, ni à l'outbox. Si elle y touche, la répétition complète R0–R10 est rejouée.
+
+Préalables (BackAli) :
+- correction sur une branche dédiée, avec un rapport BackReviewer sans bloquant ;
+- aucun test modifié ni affaibli ;
+- tests verts : `SymfonyCompatiblePasswordHasherTest` (hashes de référence PHP), `LoginTimingIT` (SC-IDENT-008) ;
+- CI `identity-compat` verte (`CrossPasswordCompatibilityTest`, SC-IDENT-017/023), car la vérification des mots de passe change d'implémentation.
+
+| # | Étape | Qui | Attendu |
+|---|---|---|---|
+| M0 | Stack `taskora-rehearsal` **neuve**, construite depuis le commit corrigé, données synthétiques `@exemple.test` remplies par l'API Symfony (comptes `$2y$` coût 13) | Manuel (stack), BackAli (données) | stack saine ; stack `taskora` jamais visée |
+| M1 | Préparation : gel, `--identity.legacy-import=run`, `verify`, routage vers identity (§5, étapes 3 à 5) | BackAli, Manuel | `verify` vert (non rejugé au-delà) |
+| M2 | Contrôles fonctionnels via identity : login d'un compte haché par Symfony (200), mauvais mot de passe (401), e-mail inconnu (401, même corps) | BackAli | 200 / 401 / 401 |
+| M3 | Mesures selon le protocole PERF-IDENT-1 : blocs alternés Symfony / identity / Symfony / identity ; login, inscription, `GET /api/me` ; mesure informative à 4 requêtes simultanées | BackAli (mesures), Manuel (commutations) | L1, L2, L3, L5 conformes ; `GET /api/me` p95 < 50 ms |
+| M4 | e2e `@identity` contre identity | BackAli | 14/14 |
+| M5 | Journaux `identity` et `web` : 0 mot de passe, hash, jeton ni secret (SC-IDENT-024) ; 0 × 5xx | BackAli | 0 / 0 |
+| M6 | Nettoyage : `down -v` du seul projet `taskora-rehearsal`, images et fichier de secrets supprimés | Manuel | aucune ressource `taskora-rehearsal` restante |
+
+- Compte rendu : `docs/reviews/<date>-identity-r8-rerun.md`, rédigé par BackAli. Il contient l'environnement, le commit, un tableau par bloc, les ratios et le verdict L1–L5. Il ne contient que des nombres.
+- Si M2–M5 sont conformes, Paul déclare la répétition §6.3 **réussie** (R1–R7 et R9 du 26/11, R8 repris), passe les lignes back IDENT à `validé` et déclare la sortie de phase 1.
+- Sinon, renvoi à BackAli.
+- **Condition supplémentaire avant d'annoncer la bascule** : si la production tourne sur un autre matériel que le poste de recette, M0–M3 et M6 sont rejoués sur ce matériel (BackAli, Manuel). Les mêmes seuils s'appliquent. Le p95 Symfony obtenu devient la référence figée de l'après-coexistence.
 
 ## 7. Jeu d'essai versionné (tests)
 `services/identity-service/src/test/resources/fixtures/legacy-users.sql` : comptes **fictifs** (`@exemple.test`), mots de passe de test documentés dans le fichier, hashes générés **une fois** par PHP dans le conteneur `api` (`password_hash`, `sodium_crypto_pwhash_str`) : `$2y$` coût 13, `$2y$` coût 4, `$2a$`, `$2b$`, `$argon2id$`, `$argon2i$`, mot de passe de 100 octets (pré-hachage), mot de passe contenant un caractère accentué, hash tronqué (corrompu). Aucune donnée réelle.
