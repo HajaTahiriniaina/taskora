@@ -30,6 +30,9 @@ final class InternalInvitationControllerTest extends WebTestCase
     protected function setUp(): void
     {
         $this->previousSecret = $_SERVER['INTERNAL_API_SECRET'] ?? null;
+        // Indépendant de l'environnement du processus : une vraie variable INTERNAL_API_SECRET
+        // (injectée par compose) l'emporterait sur .env.test ; on force la valeur de test.
+        $this->setServerSecret(self::SECRET);
         $this->boot();
     }
 
@@ -50,9 +53,17 @@ final class InternalInvitationControllerTest extends WebTestCase
         if (!str_ends_with($database, '_test')) {
             self::fail(sprintf('Base "%s" refusée : les tests PHPUnit ne tournent que sur une base *_test.', $database));
         }
+        // API non dépréciée (Doctrine ORM 3.x → 4.0) : failOnDeprecation reste actif.
+        $this->em->getConfiguration()->setUseSchemaEditorApi(true);
         $tool = new SchemaTool($this->em);
         $metadata = $this->em->getMetadataFactory()->getAllMetadata();
-        $tool->dropSchema($metadata);
+        // Base *_test vidée entièrement (tables d'éventuelles migrations comprises), puis schéma recréé.
+        $connection = $this->em->getConnection();
+        $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
+        foreach ($connection->createSchemaManager()->listTableNames() as $table) {
+            $connection->executeStatement('DROP TABLE '.$connection->quoteSingleIdentifier($table));
+        }
+        $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
         $tool->createSchema($metadata);
     }
 

@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -36,6 +37,13 @@ import org.springframework.test.web.servlet.MvcResult;
     webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @Import(TestClockConfig.class)
+@TestPropertySource(
+    properties = {
+      // Valeurs par défaut : un @DynamicPropertySource de sous-classe les remplace (priorité supérieure).
+      "identity.password.bcrypt-cost=4",
+      // Symfony injoignable (port fermé) ; RegistrationInvitationClaimIT et OutboxRelayIT pointent sur WireMock.
+      "identity.symfony.internal-url=http://127.0.0.1:9"
+    })
 public abstract class ApiTestBase {
   protected static final MutableClock CLOCK = TestClockConfig.CLOCK;
   protected static final TestKeys KEYS = TestKeys.shared();
@@ -51,16 +59,10 @@ public abstract class ApiTestBase {
     registry.add("identity.jwt.public-key-path", () -> KEYS.publicPem().toString());
     registry.add("identity.jwt.passphrase", KEYS::passphrase);
     registry.add("identity.jwt.ttl", () -> "604800");
-    registry.add("identity.password.bcrypt-cost", () -> "4");
     registry.add("identity.outbox.relay.enabled", () -> "false");
-    registry.add("identity.symfony.internal-url", ApiTestBase::symfonyUrl);
     registry.add("identity.symfony.internal-secret", () -> INTERNAL_SECRET);
   }
 
-  /** Surchargé par les tests qui démarrent WireMock. Par défaut : port fermé. */
-  protected static String symfonyUrl() {
-    return "http://127.0.0.1:9";
-  }
 
   @BeforeEach
   void resetDatabaseAndClock() {

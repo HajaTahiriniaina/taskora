@@ -21,6 +21,11 @@ class LegacyProjectionIT extends ApiTestBase {
     MariaDbContainerSupport.rootExecute(List.of("SET GLOBAL general_log = 0"));
   }
 
+  /** Le pilote renvoie DATETIME en java.sql.Timestamp sur la connexion root. */
+  private static LocalDateTime localDateTime(Object value) {
+    return value instanceof java.sql.Timestamp t ? t.toLocalDateTime() : (LocalDateTime) value;
+  }
+
   private static Map<String, Object> identityRow(String email) {
     return query("SELECT * FROM identity.user_account WHERE email = ?", email).getFirst();
   }
@@ -41,8 +46,8 @@ class LegacyProjectionIT extends ApiTestBase {
     assertThat(legacy.get("password")).isEqualTo(id.get("password_hash"));
     assertThat(legacy.get("avatar_color")).isEqualTo(id.get("avatar_color"));
     assertThat(legacy.get("roles")).isEqualTo("[]");
-    assertThat(legacy.get("created_at")).isEqualTo(LocalDateTime.of(2026, 7, 1, 12, 0, 0));
-    assertThat(id.get("created_at")).isEqualTo(LocalDateTime.of(2026, 7, 1, 12, 0, 0));
+    assertThat(localDateTime(legacy.get("created_at"))).isEqualTo(LocalDateTime.of(2026, 7, 1, 12, 0, 0));
+    assertThat(localDateTime(id.get("created_at"))).isEqualTo(LocalDateTime.of(2026, 7, 1, 12, 0, 0));
   }
 
   @Test
@@ -64,14 +69,14 @@ class LegacyProjectionIT extends ApiTestBase {
   void profileProjected() throws Exception {
     CLOCK.set(SUMMER);
     String token = registeredToken("Camille", "camille@exemple.fr", "ancienmdp1");
-    CLOCK.set(Instant.parse("2026-12-01T10:00:00Z"));
+    CLOCK.set(Instant.parse("2026-07-05T10:00:00Z")); // jeton encore valide (7 jours), autre jour
     assertThat(patchMe(token, "{\"name\":\"Camille M.\",\"avatarColor\":\"#0EA5E9\",\"currentPassword\":\"ancienmdp1\",\"newPassword\":\"nouveaumdp1\"}")
             .getResponse().getStatus()).isEqualTo(200);
     Map<String, Object> legacy = legacyRow("camille@exemple.fr");
     assertThat(legacy.get("name")).isEqualTo("Camille M.");
     assertThat(legacy.get("avatar_color")).isEqualTo("#0EA5E9");
     assertThat(legacy.get("password")).isEqualTo(identityRow("camille@exemple.fr").get("password_hash"));
-    assertThat(legacy.get("created_at")).isEqualTo(LocalDateTime.of(2026, 7, 1, 12, 0, 0));
+    assertThat(localDateTime(legacy.get("created_at"))).isEqualTo(LocalDateTime.of(2026, 7, 1, 12, 0, 0));
   }
 
   @Test

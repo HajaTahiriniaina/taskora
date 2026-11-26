@@ -49,7 +49,7 @@ class UserPersistenceIT extends ApiTestBase {
     List<Map<String, Object>> rows =
         query("SELECT version, success FROM identity.flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
     assertThat(rows).extracting(r -> r.get("version")).containsExactly("1", "2");
-    assertThat(rows).allSatisfy(r -> assertThat(((Number) r.get("success")).intValue()).isEqualTo(1));
+    assertThat(rows).allSatisfy(r -> assertThat(r.get("success")).isEqualTo(Boolean.TRUE));
   }
 
   @Test

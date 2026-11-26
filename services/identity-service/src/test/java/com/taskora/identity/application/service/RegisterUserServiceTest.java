@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -127,7 +128,7 @@ class RegisterUserServiceTest {
   @Test
   @DisplayName("SC-IDENT-002 — course perdue (violation d'unicité à l'insertion) → EmailAlreadyUsedException, ni projection ni outbox")
   void duplicateRace() {
-    when(users.insert(any())).thenThrow(new EmailAlreadyUsedException());
+    doThrow(new EmailAlreadyUsedException()).when(users).insert(any());
     assertThatThrownBy(this::registerCamille).isInstanceOf(EmailAlreadyUsedException.class);
     verifyNoInteractions(projection, outbox, delivery, tokens);
   }
