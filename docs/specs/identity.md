@@ -1,0 +1,255 @@
+# Identité : authentification, inscription, JWT, profil
+
+Service cible : **identity-service** (premier service migré, voir [phase-1-identity.md](phase-1-identity.md)).
+Code actuel : `AuthController`, `User`, `UserRepository`, `JwtSuccessListener`, `config/packages/security.yaml`, `config/packages/lexik_jwt_authentication.yaml` ; front : `pages/auth/*`, `pages/profile/*`, `core/auth.service.ts`, `core/auth.interceptor.ts`, `core/auth.guard.ts`.
+
+## 1. Contexte et règles métier
+
+### Modèle `User` (table `user`)
+| Champ | Type / contrainte | Règle |
+|---|---|---|
+| `id` | INT auto-incrément | Exposé tel quel ; référencé par toutes les autres tables (membres, cartes, notifications…) |
+| `email` | VARCHAR(180), **unique** | `trim` + minuscules à l'écriture ; identifiant de connexion ; **non modifiable** par l'API |
+| `name` | VARCHAR(120) | `trim` ; obligatoire |
+| `password` | VARCHAR(255) | Hash produit par le hasher Symfony `auto` ; jamais exposé |
+| `avatar_color` | VARCHAR(20) | Tirée au hasard à la création dans la palette `#6366f1 #ec4899 #14b8a6 #f59e0b #8b5cf6 #ef4444 #0ea5e9 #22c55e` ; modifiable avec une couleur `#RRGGBB` |
+| `roles` | JSON | `ROLE_USER` toujours ajouté ; aucun autre rôle utilisé aujourd'hui |
+| `created_at` | DATETIME | Date d'inscription |
+
+Représentation publique d'un utilisateur (`Presenter::user`), reprise partout : `{"id", "name", "email", "avatarColor"}`.
+
+### Rôles
+- **Anonyme** : accès à `/api/auth/*` et `/api/health` uniquement.
+- **Utilisateur authentifié** (`ROLE_USER`) : tout le reste de `/api`. Il n'y a pas de rôle d'administration global.
+- Les rôles propriétaire / admin / membre sont propres à chaque tableau (voir [boards-members.md](boards-members.md)).
+
+### JWT (LexikJWTAuthenticationBundle)
+- Sans état (`stateless: true`), transmis dans `Authorization: Bearer <jeton>`.
+- Durée de vie : **604 800 s (7 jours)**, sans jeton de rafraîchissement ni révocation.
+- Signature asymétrique avec la paire de clés générée au démarrage du conteneur `api` (`lexik:jwt:generate-keypair --skip-if-exists`, volume `jwt_keys`, clé privée protégée par `JWT_PASSPHRASE`).
+  HYPOTHÈSE: algorithme **RS256** (valeur par défaut du bundle, aucun `signature_algorithm` configuré).
+- Revendications (claims) : `iat`, `exp`, `roles`, `username` (= **e-mail** de l'utilisateur, `user_id_claim` par défaut). HYPOTHÈSE: aucune revendication `sub`, `iss`, `aud` ni identifiant numérique.
+- À chaque requête, l'utilisateur est rechargé **par e-mail** depuis la base (provider `entity`, propriété `email`) : un jeton dont l'e-mail n'existe plus est refusé.
+- Le front lit `exp` pour considérer un jeton expiré comme une déconnexion (`AuthService.isExpired`).
+
+### Hachage des mots de passe
+- `password_hashers: auto` (Symfony 8.1, PHP 8.4). HYPOTHÈSE: hashes **bcrypt** `$2y$` coût 13 ; des hashes `$argon2id$` sont possibles si l'extension sodium était présente. BackAli doit compter les préfixes en base (requête d'agrégat sur `LEFT(password, 7)`, sans afficher les hashes).
+- Environnement de test : coût réduit (bcrypt 4).
+- `UserRepository` n'implémente pas `PasswordUpgraderInterface` : aucun re-hachage à la connexion.
+
+### Effet de bord de l'inscription (couplage avec le domaine tableaux)
+À l'inscription, les **invitations en attente** (table `invitation`, même e-mail) sont transformées en adhésions (rôle `member`), une notification `board_invite` est créée pour le nouvel utilisateur (acteur = l'inviteur) et les invitations sont supprimées, dans la même transaction.
+
+## 2. Routes HTTP actuelles (contrat à conserver)
+
+| Méthode et route | Accès | Corps | Succès | Erreurs |
+|---|---|---|---|---|
+| `POST /api/auth/register` | public | `{"name","email","password"}` | **201** `{"token","user"}` | 400 `JSON invalide.` ; 400 `Le champ "name" est obligatoire.` ; 400 `Le champ "email" est obligatoire.` ; 400 `Adresse e-mail invalide.` ; 400 `Le mot de passe doit contenir au moins 8 caractères.` ; **409** `Un compte existe déjà avec cette adresse e-mail.` |
+| `POST /api/auth/login` | public | `{"email","password"}` (JSON) | **200** `{"token","user"}` | **401** `{"code":401,"message":"Invalid credentials."}` (HYPOTHÈSE: message par défaut Lexik) ; 400 si champ manquant ou JSON invalide (HYPOTHÈSE: message du `json_login` Symfony) |
+| `GET /api/me` | JWT | — | **200** utilisateur | 401 |
+| `PATCH /api/me` | JWT | `{"name"?, "avatarColor"?, "currentPassword"?, "newPassword"?}` | **200** utilisateur | 400 `Le champ "name" est obligatoire.` ; 400 `Mot de passe actuel incorrect.` ; 400 `Le mot de passe doit contenir au moins 8 caractères.` ; 400 `JSON invalide.` ; 401 |
+| `GET /api/health` | public | — | **200** `{"status":"ok","app":"Taskora"}` | — |
+| toute autre route `/api/**` sans jeton valide | — | — | — | **401** `{"code":401,"message":"JWT Token not found" \| "Expired JWT Token" \| "Invalid JWT Token"}` (HYPOTHÈSE: messages Lexik) |
+
+Ordre des contrôles de `register` : JSON → `name` → `email` (obligatoire, puis format) → longueur du mot de passe → unicité.
+Ordre des contrôles de `PATCH /me` : `name` (si la clé est présente) → `avatarColor` (ignorée si invalide) → mot de passe (si `newPassword` non vide : mot de passe actuel, puis longueur). L'enregistrement n'a lieu qu'à la fin : **une erreur n'applique aucune modification**.
+
+## 3. Comportements attendus
+1. Un visiteur crée un compte et est connecté immédiatement (jeton renvoyé), puis redirigé vers `/boards`.
+2. Un utilisateur se connecte par e-mail et mot de passe ; le jeton et le profil sont stockés dans `localStorage` (`taskora.token`, `taskora.user`).
+3. Toute réponse **401** hors `/auth/` déconnecte le front et affiche « Votre session a expiré, reconnectez-vous. »
+4. L'utilisateur modifie son nom, la couleur de son avatar et son mot de passe depuis `/profile`.
+5. La déconnexion est locale (suppression du jeton) ; elle désabonne d'abord ce navigateur des notifications push (voir notifications-push.md).
+
+## 4. Scénarios
+
+### SC-IDENT-001 — Inscription nominale (critique)
+Étant donné aucun compte pour `camille@exemple.fr`
+Quand un visiteur envoie `POST /api/auth/register` avec `{"name":"  Camille Martin ","email":" Camille@Exemple.FR ","password":"motdepasse"}`
+Alors la réponse est 201 avec un `token` JWT valide et `user` = `{"id", "name":"Camille Martin", "email":"camille@exemple.fr", "avatarColor"}` ; `avatarColor` appartient à la palette ; le mot de passe est stocké haché
+Limites : le corps de réponse ne contient jamais `password` ni hash
+Validation : unitaire (domaine `User`, normalisation), API, intégration (persistance) [back] ; e2e page Inscription [front] — Acceptation : statut, schéma OpenAPI et normalisation vérifiés ; le hash en base commence par un préfixe reconnu (`$2y$`, `$2a$`, `$2b$` ou `$argon2id$`)
+
+### SC-IDENT-002 — Inscription avec un e-mail déjà utilisé (critique)
+Étant donné un compte `camille@exemple.fr`
+Quand un visiteur s'inscrit avec `CAMILLE@exemple.fr`
+Alors la réponse est 409 `{"error":"Un compte existe déjà avec cette adresse e-mail."}` et aucun compte n'est créé
+Limites : deux inscriptions simultanées avec le même e-mail → un seul compte (contrainte unique) ; la seconde reçoit 409, jamais 500
+Validation : API, intégration (concurrence) [back] ; e2e (message affiché sous le formulaire) [front] — Acceptation : 409 dans les deux cas, une seule ligne en base
+
+### SC-IDENT-003 — Validation des champs d'inscription (critique)
+Étant donné un visiteur
+Quand il s'inscrit avec : `name` vide ou composé d'espaces ; `email` absent ; `email` = `pas-un-email` ; `password` de 7 caractères ; corps `"texte"` non JSON
+Alors la réponse est 400 avec respectivement `Le champ "name" est obligatoire.`, `Le champ "email" est obligatoire.`, `Adresse e-mail invalide.`, `Le mot de passe doit contenir au moins 8 caractères.`, `JSON invalide.`
+Limites : mot de passe de **8** caractères exactement → accepté ; la longueur est comptée en caractères Unicode (`mb_strlen`) : `ééééééé` (7) refusé ; aucun maximum de longueur de mot de passe (HYPOTHÈSE: bcrypt tronque à 72 octets ; à reproduire à l'identique pour la compatibilité)
+Validation : unitaire (validateurs), API (tests paramétrés) [back] ; composant (bouton désactivé si `minlength` non atteint) [front] — Acceptation : chaque cas renvoie le message exact
+
+### SC-IDENT-004 — Longueurs maximales à l'inscription (important)
+Étant donné un visiteur
+Quand il s'inscrit avec un `name` de 150 caractères
+Alors le compte est créé avec le nom tronqué à 120 caractères (pas d'erreur)
+Limites : `email` de plus de 180 caractères → tronqué à 180 **avant** la validation de format (peut donc devenir invalide → 400) ; HYPOTHÈSE: la troncature silencieuse est conservée pour la compatibilité
+Validation : API [back] — Acceptation : longueur stockée = 120
+
+### SC-IDENT-005 — L'inscription consomme les invitations en attente (critique)
+Étant donné une invitation en attente pour `camille@exemple.fr` sur les tableaux « Sprint » (invitée par Alice) et « Roadmap »
+Quand Camille s'inscrit avec cet e-mail
+Alors Camille est membre (`member`) des deux tableaux, reçoit une notification `board_invite` par tableau (« Alice vous a ajouté au tableau « Sprint » »), et les invitations sont supprimées
+Limites : tout ou rien (si l'adhésion échoue, le compte n'est pas créé, ou l'opération est rejouable de façon idempotente : décision d'architecture, voir phase-1) ; un tableau dans la corbeille reçoit quand même l'adhésion (comportement actuel)
+Validation : intégration (transaction), API, compatibilité (pendant la coexistence avec Symfony) [back] ; e2e (inscription puis tableau visible sur `/boards`) [front] — Acceptation : adhésions, notifications et suppression des invitations constatées
+
+### SC-IDENT-006 — Invitation dont l'auteur n'existe plus (secondaire)
+Étant donné une invitation dont `invited_by` est NULL
+Quand l'invité s'inscrit
+Alors il devient membre et la notification indique « Quelqu'un vous a ajouté au tableau « … » » avec un acteur nul
+Validation : intégration [back] — Acceptation : message exact
+
+### SC-IDENT-007 — Connexion nominale (critique)
+Étant donné un compte `camille@exemple.fr` / `motdepasse`
+Quand elle envoie `POST /api/auth/login` `{"email":"camille@exemple.fr","password":"motdepasse"}`
+Alors la réponse est 200 `{"token","user"}` ; le jeton donne accès à `GET /api/me`
+Limites : e-mail saisi avec une autre casse (`Camille@Exemple.fr`) → connexion acceptée (HYPOTHÈSE: grâce à la collation `utf8mb4_unicode_ci` ; la cible doit normaliser explicitement en minuscules) ; espaces autour de l'e-mail : HYPOTHÈSE refusés aujourd'hui (pas de `trim` à la connexion) — à confirmer par test miroir
+Validation : API, compatibilité [back] ; e2e page Connexion [front] — Acceptation : 200 et jeton accepté par **les deux** backends pendant la coexistence
+
+### SC-IDENT-008 — Connexion refusée sans fuite d'information (critique)
+Étant donné un compte existant
+Quand on se connecte avec un mauvais mot de passe, ou avec un e-mail inconnu
+Alors la réponse est 401 avec **le même corps** dans les deux cas ; le front affiche « E-mail ou mot de passe incorrect. »
+Limites : temps de réponse comparable dans les deux cas (pas d'oracle temporel flagrant : écart médian < 50 %) ; le mot de passe n'apparaît pas dans les journaux
+Validation : API, sécurité [back] ; e2e [front] — Acceptation : corps identiques ; aucun mot de passe dans les logs capturés
+
+### SC-IDENT-009 — Connexion avec un corps incomplet (important)
+Étant donné un visiteur
+Quand il envoie `POST /api/auth/login` sans `password`, ou avec un corps non JSON
+Alors la réponse est 400 (HYPOTHÈSE: forme et message à figer par test miroir sur Symfony)
+Validation : API, compatibilité [back] — Acceptation : même statut que Symfony
+
+### SC-IDENT-010 — Contenu et signature du JWT (critique)
+Étant donné une connexion réussie
+Quand on décode le jeton
+Alors l'en-tête indique l'algorithme asymétrique attendu (HYPOTHÈSE: RS256), `exp − iat = 604800`, `username` = e-mail, `roles` contient `ROLE_USER`
+Limites : un jeton émis par identity-service est accepté par Symfony et inversement pendant la coexistence (même paire de clés) ; revendications ajoutées par identity-service (ex. `uid`) ignorées par Symfony
+Validation : unitaire (émetteur), intégration, compatibilité [back] — Acceptation : test croisé vert dans les deux sens
+
+### SC-IDENT-011 — Accès sans jeton (critique)
+Étant donné un visiteur sans en-tête `Authorization`
+Quand il appelle une route protégée (`GET /api/me`, `GET /api/boards`…)
+Alors la réponse est 401 ; `/api/auth/register`, `/api/auth/login` et `/api/health` restent accessibles
+Validation : API, sécurité (parcours de toutes les routes de l'OpenAPI) [back] — Acceptation : 401 sur 100 % des routes protégées
+
+### SC-IDENT-012 — Jeton invalide (critique)
+Étant donné un jeton expiré, un jeton à la signature altérée, un jeton `alg: none`, un jeton HS256 signé avec la clé publique, ou un jeton signé par une autre clé
+Quand il est utilisé
+Alors la réponse est 401 dans tous les cas
+Validation : sécurité [back] — Acceptation : aucun de ces jetons n'est accepté
+
+### SC-IDENT-013 — Jeton d'un compte disparu (important)
+Étant donné un jeton valide dont l'e-mail n'existe plus en base
+Quand il est utilisé
+Alors la réponse est 401
+Limites : HYPOTHÈSE: comportement du provider `entity` ; la cible doit vérifier l'existence du compte (au moins dans identity-service ; la gateway peut se contenter de la signature)
+Validation : API, sécurité [back] — Acceptation : 401
+
+### SC-IDENT-014 — Lire son profil (critique)
+Étant donné un utilisateur connecté
+Quand il appelle `GET /api/me`
+Alors il reçoit `{"id","name","email","avatarColor"}` de **son** compte uniquement
+Validation : API [back] ; composant (`AuthService.refreshProfile`) [front] — Acceptation : schéma conforme
+
+### SC-IDENT-015 — Modifier son nom (important)
+Étant donné un utilisateur connecté
+Quand il envoie `PATCH /api/me` `{"name":"  Camille M. "}`
+Alors le nom devient `Camille M.` et la réponse 200 contient le profil à jour ; le nom affiché dans l'en-tête et sur les tableaux change
+Limites : `{"name":""}` → 400 `Le champ "name" est obligatoire.` ; clé absente → nom inchangé ; 150 caractères → tronqué à 120 ; `{"name":null}` → nom inchangé (`isset`)
+Validation : API [back] ; e2e page Profil [front] — Acceptation : persistance et messages exacts
+
+### SC-IDENT-016 — Modifier la couleur de l'avatar (secondaire)
+Étant donné un utilisateur connecté
+Quand il envoie `PATCH /api/me` `{"avatarColor":"#0EA5E9"}`
+Alors la couleur est enregistrée telle quelle
+Limites : valeur invalide (`"red"`, `"#12345"`, `"#1234567"`) → **ignorée**, réponse 200 avec la couleur inchangée
+Validation : API [back] ; e2e page Profil [front] — Acceptation : valeur stockée ou inchangée selon le cas
+
+### SC-IDENT-017 — Changer son mot de passe (critique)
+Étant donné un utilisateur dont le mot de passe est `ancienmdp1`
+Quand il envoie `PATCH /api/me` `{"currentPassword":"ancienmdp1","newPassword":"nouveaumdp1"}`
+Alors la réponse est 200 ; la connexion avec `nouveaumdp1` réussit et celle avec `ancienmdp1` échoue (401)
+Validation : API, intégration [back] ; e2e page Profil (toast « Mot de passe modifié », champs vidés) [front] — Acceptation : les deux connexions donnent le résultat attendu
+
+### SC-IDENT-018 — Changement de mot de passe refusé (critique)
+Étant donné un utilisateur connecté
+Quand il envoie un `currentPassword` faux ; ou un `newPassword` de 7 caractères avec le bon mot de passe actuel
+Alors 400 `Mot de passe actuel incorrect.` ; ou 400 `Le mot de passe doit contenir au moins 8 caractères.` ; le mot de passe n'est pas modifié
+Limites : `newPassword` vide ou absent → aucune vérification, aucun changement ; `currentPassword` absent avec `newPassword` → 400 `Mot de passe actuel incorrect.`
+Validation : unitaire, API [back] ; composant (bouton désactivé tant que `newPassword` < 8) [front] — Acceptation : hash inchangé en base
+
+### SC-IDENT-019 — Une modification de profil en erreur n'est pas appliquée partiellement (important)
+Étant donné un utilisateur connecté nommé « Camille »
+Quand il envoie `{"name":"Camille M.","currentPassword":"faux","newPassword":"nouveaumdp1"}`
+Alors la réponse est 400 et le nom reste « Camille »
+Validation : intégration [back] — Acceptation : aucune donnée modifiée
+
+### SC-IDENT-020 — L'e-mail n'est pas modifiable (important)
+Étant donné un utilisateur connecté
+Quand il envoie `PATCH /api/me` `{"email":"autre@exemple.fr"}`
+Alors la réponse est 200 et l'e-mail est inchangé (le JWT, fondé sur l'e-mail, reste valide)
+Validation : API, sécurité [back] — Acceptation : e-mail inchangé
+
+### SC-IDENT-021 — Jetons existants après changement de mot de passe (secondaire)
+Étant donné un utilisateur connecté sur deux navigateurs
+Quand il change son mot de passe sur l'un
+Alors le jeton de l'autre navigateur reste valide jusqu'à son expiration (comportement actuel, écart E10)
+Validation : API [back] — Acceptation : comportement documenté et testé ; à inverser seulement sur décision
+
+### SC-IDENT-022 — Point de santé (secondaire)
+Étant donné le service démarré
+Quand on appelle `GET /api/health` sans jeton
+Alors 200 `{"status":"ok","app":"Taskora"}`
+Limites : identity-service expose en plus `/actuator/health` pour Docker (non routé publiquement)
+Validation : API [back] ; CI (healthcheck Docker) [Manuel] — Acceptation : 200 sans authentification
+
+### SC-IDENT-023 — Compatibilité des mots de passe migrés (critique)
+Étant donné des comptes créés par Symfony (hashes existants, tous préfixes présents en base)
+Quand ils se connectent via identity-service après la reprise des données
+Alors la connexion réussit avec le mot de passe d'origine ; un compte créé ou modifié par identity-service peut se connecter via Symfony (tant que Symfony sert encore `/api/auth/login`, si c'est le cas)
+Limites : jeux d'essai couvrant `$2y$` coût 13, `$2y$` coût 4, `$2a$`, `$2b$` et `$argon2id$` ; hash inconnu ou corrompu → 401, jamais 500
+Validation : unitaire (encodeur délégant), intégration (base reprise), compatibilité [back] — Acceptation : 100 % des comptes de l'échantillon se connectent
+
+### SC-IDENT-024 — Les secrets ne fuient pas (critique)
+Étant donné n'importe quelle réponse de l'API ou ligne de journal
+Quand on y cherche le mot de passe saisi, le hash ou la clé privée JWT
+Alors on ne les trouve jamais ; les erreurs 5xx renvoient `Erreur interne du serveur.` sans trace
+Validation : sécurité (capture des logs pendant les tests API), revue de code [back] — Acceptation : aucune occurrence
+
+### SC-IDENT-025 — Expiration de session côté front (important)
+Étant donné un utilisateur connecté dont le jeton expire ou est refusé
+Quand une requête API reçoit 401 (hors `/auth/`)
+Alors le front supprime le jeton, redirige vers `/login` et affiche « Votre session a expiré, reconnectez-vous. »
+Limites : un 401 sur `/api/auth/login` n'affiche pas ce toast (message propre au formulaire)
+Validation : composant (intercepteur), e2e [front] — Acceptation : redirection et toast constatés
+
+### SC-IDENT-026 — Gardes de navigation (important)
+Étant donné un visiteur non connecté (ou dont le jeton stocké est expiré)
+Quand il ouvre `/boards`, `/boards/12` ou `/profile`
+Alors il est redirigé vers `/login` ; inversement un utilisateur connecté qui ouvre `/`, `/login` ou `/register` est redirigé vers `/boards`
+Limites : jeton illisible dans `localStorage` → considéré comme expiré ; `localStorage` indisponible → pas d'erreur bloquante
+Validation : composant (guards), e2e [front] — Acceptation : redirections constatées
+
+### SC-IDENT-027 — Limitation des tentatives de connexion (secondaire)
+Étant donné un attaquant
+Quand il envoie un grand nombre de tentatives de connexion
+Alors aujourd'hui rien ne les limite (écart E9). Cible proposée, **sous réserve de décision** : 429 après N échecs par IP et par e-mail sur une fenêtre glissante, appliqué par la gateway
+Validation : sécurité [back], CI [Manuel] — Acceptation : à définir après décision
+
+## 5. Cas critiques et limites (synthèse)
+- Valeurs vides : `name` d'espaces, mot de passe vide, corps vide → 400 attendus (SC-IDENT-003).
+- Valeurs maximales : nom 120, e-mail 180, mot de passe sans maximum (attention à la limite bcrypt de 72 octets) (SC-IDENT-004).
+- Concurrence : double inscription simultanée (SC-IDENT-002) ; inscription concurrente avec un ajout de membre sur le même e-mail (l'invitation et l'adhésion ne doivent pas être créées deux fois).
+- IDOR : `/api/me` ne prend aucun identifiant ; il n'existe aucune route de lecture d'un autre utilisateur.
+- Coexistence : jetons croisés, hashes croisés (SC-IDENT-010, SC-IDENT-023).
+- Services externes : aucun (pas d'envoi d'e-mail aujourd'hui).
+
+## 6. Exigences non fonctionnelles
+- **Performance** : `POST /api/auth/login` p95 < 500 ms (hachage compris, coût 13) ; `GET /api/me` p95 < 50 ms hors réseau ; validation du JWT sans appel réseau (clé publique en mémoire).
+- **Sécurité** : clé privée lue depuis un volume ou un secret, jamais dans l'image ni dans Git ; comparaison de hash à temps constant ; dépendances sans CVE critique (OWASP Dependency-Check) ; CORS limité à l'origine du front.
+- **Accessibilité** : formulaires avec `<label for>` ; bouton « Afficher le mot de passe » avec `aria-label` ; messages d'erreur annoncés (`role="alert"` à ajouter : HYPOTHÈSE, absent aujourd'hui) ; navigation au clavier complète.

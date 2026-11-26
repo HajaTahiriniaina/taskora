@@ -1,0 +1,295 @@
+# Matrice de traçabilité
+
+Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape 7). Une ligne par couple scénario × type de test ; `↳` = même scénario.
+- **Fichier / méthode** : renseigné par le Testeur au commit `test(<scope>): …` (chemin du fichier et nom de la méthode ou du `it()`, dont le titre commence par l'identifiant du scénario).
+- **Statut** : `à écrire` → `rouge` (test commité, code absent) → `vert` (test passant) → `validé` (Reviewer sans point bloquant et validation Paul). `écart` = comportement volontairement différent de Symfony, avec renvoi au registre des écarts (`README.md`).
+- Les scénarios critiques doivent tous être `validé` avant la bascule du service concerné.
+
+## Synthèse au 26/11/2026
+
+| Domaine | Fichier | Scénarios | Critiques | Importants | Secondaires | Statut |
+|---|---|---|---|---|---|---|
+| IDENT | identity.md | 27 | 14 | 8 | 5 | à écrire |
+| BOARD | boards-members.md | 19 | 10 | 6 | 3 | à écrire |
+| LIST | lists.md | 10 | 5 | 3 | 2 | à écrire |
+| CARD | cards.md | 31 | 13 | 13 | 5 | à écrire |
+| COMMENT | comments-mentions.md | 12 | 5 | 4 | 3 | à écrire |
+| ACTIVITY | activity.md | 7 | 3 | 3 | 1 | à écrire |
+| ARCHIVE | archives-trash.md | 7 | 3 | 3 | 1 | à écrire |
+| TRASH | archives-trash.md | 10 | 8 | 1 | 1 | à écrire |
+| ATTACH | attachments.md | 17 | 7 | 9 | 1 | à écrire |
+| NOTIF | notifications-push.md | 7 | 3 | 3 | 1 | à écrire |
+| PUSH | notifications-push.md | 10 | 5 | 5 | 0 | à écrire |
+| IMPORT | trello-import.md | 16 | 9 | 6 | 1 | à écrire |
+| **Total** | | **173** | **85** | **64** | **24** | |
+
+## Matrice détaillée
+
+| Scénario | Titre | Priorité | Service | Type de test prévu | Pôle (auteur) | Fichier / méthode | Statut |
+|---|---|---|---|---|---|---|---|
+| SC-IDENT-001 | Inscription nominale | critique | identity-service | unitaire (domaine `User`, normalisation), API, intégration (persistance) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e page Inscription | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-002 | Inscription avec un e-mail déjà utilisé | critique | identity-service | API, intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (message affiché sous le formulaire) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-003 | Validation des champs d'inscription | critique | identity-service | unitaire (validateurs), API (tests paramétrés) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant (bouton désactivé si `minlength` non atteint) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-004 | Longueurs maximales à l'inscription | important | identity-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-005 | L'inscription consomme les invitations en attente | critique | identity-service | intégration (transaction), API, compatibilité (pendant la coexistence avec Symfony) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (inscription puis tableau visible sur `/boards`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-006 | Invitation dont l'auteur n'existe plus | secondaire | identity-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-007 | Connexion nominale | critique | identity-service | API, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e page Connexion | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-008 | Connexion refusée sans fuite d'information | critique | identity-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-009 | Connexion avec un corps incomplet | important | identity-service | API, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-010 | Contenu et signature du JWT | critique | identity-service | unitaire (émetteur), intégration, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-011 | Accès sans jeton | critique | identity-service | API, sécurité (parcours de toutes les routes de l'OpenAPI) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-012 | Jeton invalide | critique | identity-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-013 | Jeton d'un compte disparu | important | identity-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-014 | Lire son profil | critique | identity-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant (`AuthService.refreshProfile`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-015 | Modifier son nom | important | identity-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e page Profil | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-016 | Modifier la couleur de l'avatar | secondaire | identity-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e page Profil | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-017 | Changer son mot de passe | critique | identity-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e page Profil (toast « Mot de passe modifié », champs vidés) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-018 | Changement de mot de passe refusé | critique | identity-service | unitaire, API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant (bouton désactivé tant que `newPassword` < 8) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-019 | Une modification de profil en erreur n'est pas appliquée partiellement | important | identity-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-020 | L'e-mail n'est pas modifiable | important | identity-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-021 | Jetons existants après changement de mot de passe | secondaire | identity-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-022 | Point de santé | secondaire | identity-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | CI (healthcheck Docker) | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| SC-IDENT-023 | Compatibilité des mots de passe migrés | critique | identity-service | unitaire (encodeur délégant), intégration (base reprise), compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-024 | Les secrets ne fuient pas | critique | identity-service | sécurité (capture des logs pendant les tests API), revue de code | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-025 | Expiration de session côté front | important | identity-service | composant (intercepteur), e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-026 | Gardes de navigation | important | identity-service | composant (guards), e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IDENT-027 | Limitation des tentatives de connexion | secondaire | identity-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | CI | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| SC-BOARD-001 | Créer un tableau avec le contenu par défaut | critique | board-service | unitaire (fabrique de tableau), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e accueil → création → tableau | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-002 | Lister mes tableaux | critique | board-service | API, intégration (compteurs) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e accueil (état vide, chargement) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-003 | Ouvrir un tableau | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e page Tableau | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-004 | Tableau inexistant ou dans la corbeille | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (message et retour à l'accueil) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-005 | Modifier un tableau | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Général | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-006 | Non-membre | critique | board-service | sécurité (matrice route × rôle) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-007 | Supprimer un tableau | critique | board-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (confirmation puis disparition) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-008 | Favori propre à chaque membre | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (étoile sur l'accueil, section Favoris) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-009 | Ajouter un membre existant | critique | board-service | API, intégration (notifications) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Membres | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-010 | Simple membre et actions de gestion | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (boutons de gestion masqués pour un membre) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-011 | Inviter un e-mail sans compte | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Membres (invitation en attente listée) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-012 | Annuler une invitation | important | board-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-013 | Invitations sans expiration | secondaire | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-014 | Changer le rôle d'un membre | important | board-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-015 | Retirer un membre | critique | board-service | API, intégration (désassignation en masse) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-016 | Quitter un tableau | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (bouton « Quitter le tableau ») | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-017 | Concurrence sur les adhésions | important | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-018 | Invitations visibles par tous les membres | secondaire | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-019 | Recherche locale de l'accueil | secondaire | board-service | composant, e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-001 | Créer une liste | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e « Ajouter une liste » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-002 | Renommer et colorer une liste | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e menu de liste | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-003 | Réordonner les listes | critique | board-service | unitaire (réordonnancement), API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e glisser-déposer de colonne | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-004 | Déplacer une colonne loin sans la faire glisser | secondaire | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-005 | Pagination des cartes d'une liste | critique | board-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e défilement infini (page suivante 400 px avant la fin) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-006 | Chargement groupé des premières pages | critique | board-service | API, sécurité (IDOR) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (colonnes révélées ensemble = une seule requête) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-007 | Liste dans la corbeille ou tableau dans la corbeille | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-008 | Accès d'un non-membre | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-009 | Virtualisation et chargement paresseux | important | board-service | e2e (mesure du DOM et des requêtes) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-010 | Sélecteur de colonnes | secondaire | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-001 | Créer une carte | critique | board-service | unitaire, API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e « Ajouter une carte » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-002 | Numéros uniques sous concurrence | critique | board-service | intégration (concurrence, MariaDB réel) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-003 | Numéros jamais réutilisés | critique | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-004 | Lire le détail d'une carte | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e fiche carte (ouverture par `?card=<id>`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-005 | Renommer et décrire une carte | important | board-service | unitaire (nettoyage), API, sécurité (XSS) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e éditeur riche (⌘/Ctrl + Entrée) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-006 | Déplacer une carte dans la même liste | critique | board-service | unitaire (algorithme de décalage), intégration (2 UPDATE groupés), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e glisser-déposer | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-007 | Déplacer une carte vers une autre liste | critique | board-service | unitaire, intégration, API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e glisser-déposer entre colonnes | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-008 | Déplacements concurrents | important | board-service | intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-009 | Assigner et désassigner un membre | critique | board-service | API, intégration (notification) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e menu Membres de la fiche | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-010 | Étiquettes d'une carte | important | board-service | API, sécurité (IDOR) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-011 | Gérer les étiquettes du tableau | important | board-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Étiquettes | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-012 | Checklist | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e fiche carte (barre de progression) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-013 | Échéance | critique | board-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e sélecteur de date | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-014 | Date d'échéance invalide | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-015 | Terminer et rouvrir | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e case « Terminé » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-016 | Priorité | secondaire | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-017 | Couverture couleur | secondaire | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e menu Couverture | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-018 | Couverture image | important | board-service | API, intégration (S3/LocalStack), sécurité (IDOR) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (bouton sur la pièce jointe, visionneuse, menu Couverture avec import d'image) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-019 | Définir un champ personnalisé | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Champs | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-020 | Valeurs typées | critique | board-service | unitaire (normalisation par type), API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant (affichage sur l'aperçu si `showOnCard`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-021 | Champ d'un autre tableau | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-022 | Modifier ou supprimer un champ | important | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-023 | Recherche par mot-clé | critique | board-service | intégration (requêtes réelles), API, sécurité (injection) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e panneau Filtre | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-024 | Combinaison des filtres | critique | board-service | unitaire (construction de la spécification de requête), intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-025 | Filtres sur champs personnalisés | important | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-026 | Glisser des fichiers sur une carte du tableau | important | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-027 | Mises à jour immuables et rendu | secondaire | board-service | composant | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-028 | Lien direct vers une carte | important | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-029 | Masquer les numéros | secondaire | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-030 | Accès d'un non-membre aux cartes | critique | board-service | sécurité (matrice) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-031 | Identifiant non numérique | secondaire | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-001 | Commenter une carte | critique | board-service | API, intégration (notifications) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e fiche carte (⌘/Ctrl + Entrée pour envoyer) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-002 | Commentaire vide | important | board-service | unitaire (nettoyage), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-003 | Mention par puce | critique | board-service | unitaire (extraction), API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e liste « @ » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-004 | Mention en texte brut | important | board-service | unitaire | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-005 | Nettoyage XSS | critique | board-service | unitaire (corpus OWASP), sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant `rich-view` (même corpus) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-006 | Liens forcés en nouvel onglet | secondaire | board-service | unitaire | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-007 | Fichiers postés dans un commentaire | critique | board-service | intégration (stockage), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (coller / glisser une image dans le commentaire) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-008 | Supprimer un commentaire | critique | board-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (bouton visible seulement si autorisé) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-009 | Suppression d'un commentaire avec fichiers | important | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-010 | Commentaires importés de Trello | secondaire | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-011 | Contenus hérités en Markdown | secondaire | board-service | composant, e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-012 | Longueur maximale | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-001 | Journal des modifications d'une carte | critique | board-service | unitaire (calcul du différentiel), intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-002 | Couverture : entrées exclusives | important | board-service | unitaire | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-003 | Pagination par curseur | critique | board-service | API, intégration, sécurité (IDOR) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e défilement du fil | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-004 | Acteurs particuliers | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant (texte d'activité) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-005 | Fil mixte et « Masquer les détails » | important | board-service | composant, e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-006 | Textes d'activité en français | secondaire | board-service | unitaire (`activity-text.ts`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-007 | Accès | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ARCHIVE-001 | Archiver une carte | critique | board-service | unitaire, API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e menu « ⋯ » → « Archiver la carte » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ARCHIVE-002 | Archivage idempotent | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ARCHIVE-003 | Restaurer une carte archivée | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Archives | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ARCHIVE-004 | Une carte archivée ne se déplace pas | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ARCHIVE-005 | Archiver et restaurer une liste | critique | board-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e menu de liste + onglet Archives | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ARCHIVE-006 | Recherche dans les cartes archivées | important | board-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Archives | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ARCHIVE-007 | Ouvrir une carte archivée | secondaire | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-001 | Mettre une carte à la corbeille | critique | board-service | unitaire, API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (confirmation puis disparition) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-002 | Mettre une liste à la corbeille | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-003 | Restaurer une carte | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Corbeille | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-004 | Restaurer une liste | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-005 | Purge définitive réservée aux gestionnaires | critique | board-service | API, sécurité, intégration (LocalStack) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (confirmation « irréversible ») | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-006 | Purger une liste ou un tableau | critique | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-007 | Corbeille des tableaux | critique | board-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e bouton « Corbeille » de l'accueil (jours restants) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-008 | Purge automatique après 30 jours | critique | board-service | unitaire (calcul de l'échéance, horloge injectée), intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | CI (tâche planifiée déclarée) | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| SC-TRASH-009 | Droits sur la corbeille d'un tableau | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-010 | Affichage des jours restants | secondaire | board-service | unitaire (`daysLeft`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-001 | Joindre un fichier à une carte | critique | attachment-service | API, intégration (LocalStack) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e bouton « Pièce jointe » avec barre de progression | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-002 | Limite de 100 Mo | critique | attachment-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (message d'erreur) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | CI (limite nginx/gateway ≥ 105 Mo) | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| SC-ATTACH-003 | Type détecté sur le contenu | critique | attachment-service | unitaire (`Uploads::delivery`, détection), sécurité, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-004 | Fichier inséré dans le texte riche | important | attachment-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (bouton, coller, glisser-déposer) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-005 | Miniatures | important | attachment-service | unitaire, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-006 | Diffusion d'un fichier via S3 | critique | attachment-service | intégration (LocalStack), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-007 | Clé invalide | important | attachment-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-008 | Aperçu PDF d'un document bureautique | important | attachment-service | intégration (Gotenberg en Testcontainers ou simulé), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e visionneuse Word/PowerPoint/Excel | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-009 | Contenu brut pour les visionneuses | important | attachment-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-010 | Visionneuses intégrées | important | attachment-service | composant, e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-011 | Renommer une pièce jointe | secondaire | attachment-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-012 | Droits de modification | critique | attachment-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (actions masquées) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-013 | Supprimer une pièce jointe | critique | attachment-service | intégration (LocalStack), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-014 | Glisser-déposer et progression | important | attachment-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-015 | URL de fichier sans authentification | important | attachment-service | sécurité (entropie, absence de listing) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-016 | Panne du stockage à l'envoi | important | attachment-service | intégration (panne simulée) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ATTACH-017 | Accès d'un non-membre | critique | attachment-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-NOTIF-001 | Recevoir et lister ses notifications | critique | notification-service | API, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e panneau 🔔 (badge, filtre « non lues ») | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-NOTIF-002 | Jamais l'acteur, jamais en double | critique | notification-service | unitaire (calcul des destinataires) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-NOTIF-003 | Catalogue des déclencheurs | critique | notification-service | RabbitMQ en Testcontainers après migration) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-NOTIF-004 | Marquer comme lue | important | notification-service | API, sécurité (IDOR) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (clic sur la notification → lue et ouverture de la carte) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-NOTIF-005 | Tout marquer comme lu | important | notification-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-NOTIF-006 | Actualisation toutes les 15 s | important | notification-service | composant (minuterie simulée), e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-NOTIF-007 | Notification sans tableau ou tableau purgé | secondaire | notification-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-001 | Activer les notifications du navigateur | critique | notification-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (permission simulée) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-002 | Liste blanche anti-SSRF | critique | notification-service | unitaire (`isAllowedEndpoint`), sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-003 | Clés invalides | important | notification-service | unitaire, API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-004 | Même navigateur, autre compte | important | notification-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-005 | Envoi après la réponse | critique | notification-service | unitaire (charge utile), intégration (serveur push simulé type WireMock) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-006 | Abonnements expirés supprimés | important | notification-service | intégration (serveur push simulé) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-007 | Notification de test | important | notification-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-008 | Désactiver, retirer un appareil, se déconnecter | critique | notification-service | API, sécurité (IDOR) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-009 | Clic sur une bannière | important | notification-service | e2e (service worker) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-PUSH-010 | Clés VAPID conservées | critique | notification-service | intégration, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | CI (secret injecté) | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| SC-IMPORT-001 | Importer un export Trello complet | critique | import-service | intégration (fixture), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e accueil → import → tableau | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-002 | Numérotation après import | critique | import-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-003 | Fichier refusé | critique | import-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (message dans la fenêtre d'import) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-004 | Atomicité de l'import | critique | import-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-005 | Rapprochement des membres | important | import-service | unitaire (normalisation), intégration, sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-006 | Liens internes réécrits | important | import-service | unitaire, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-007 | Vérifier les identifiants Trello | important | import-service | API (Trello simulé, WireMock), sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (explications pour créer clé et jeton) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-008 | Les identifiants Trello ne sont jamais conservés | critique | import-service | sécurité (recherche de la clé de test dans logs, base et messages capturés) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-009 | Transférer les fichiers par tranches | critique | import-service | intégration (Trello simulé + LocalStack), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (barre, pause / reprise) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-010 | Erreurs par fichier | important | import-service | intégration (Trello simulé) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-011 | Jeton expiré et limitation de débit | critique | import-service | intégration (Trello simulé) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant (`TrelloTransferService`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-012 | Anti-SSRF sur les URL de fichiers | critique | import-service | unitaire (`isTrelloFileUrl`), sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-013 | Couverture et liens réécrits après copie | important | import-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-014 | Réessayer et abandonner | important | import-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-015 | Droits sur le transfert | critique | import-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-IMPORT-016 | Import en ligne de commande | secondaire | import-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
