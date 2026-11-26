@@ -31,14 +31,37 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
   /** Hash factice $2y$ au coût configuré, prêt dès le démarrage (A2, SC-IDENT-008). */
   private final String dummyHash;
 
+  /** Moteur bcrypt (B1) : natif par défaut, Java sur configuration explicite. */
+  private final BcryptEngine engine;
+
+  /**
+   * Hacheur avec le moteur bcrypt par défaut (B1 : natif libxcrypt après correction ; le squelette
+   * garde le comportement Java actuel).
+   */
   public SymfonyCompatiblePasswordHasher(int bcryptCost) {
     if (bcryptCost < 4 || bcryptCost > 31) {
       throw new IllegalArgumentException("Coût bcrypt hors de [4, 31] : " + bcryptCost);
     }
     this.bcryptCost = bcryptCost;
+    this.engine = new JavaBcryptEngine();
     byte[] secret = new byte[32];
     random.nextBytes(secret);
     this.dummyHash = bcrypt(HexFormat.of().formatHex(secret), bcryptCost, random);
+  }
+
+  /**
+   * Hacheur avec un moteur bcrypt explicite (B1). Squelette : implémentation par BackCodeur.
+   *
+   * @param bcryptCost coût bcrypt des nouveaux hashes, dans [4, 31]
+   * @param engine moteur bcrypt utilisé pour le hachage, la vérification et le hash factice
+   */
+  public SymfonyCompatiblePasswordHasher(int bcryptCost, BcryptEngine engine) {
+    throw new UnsupportedOperationException("BackCodeur");
+  }
+
+  /** Moteur bcrypt effectif (contrôle de configuration, B1). */
+  BcryptEngine engine() {
+    return engine;
   }
 
   @Override
