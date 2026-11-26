@@ -132,5 +132,18 @@ Dégel nginx, rien d'autre : Symfony n'a jamais cessé d'être l'écrivain.
 ### 6.3 Répétition en recette (critère de sortie, Paul)
 Sur une copie de la base : bascule → inscription + changement de mot de passe via identity → retour arrière → login avec le nouveau mot de passe **via Symfony** → nouvelle inscription via Symfony → re-bascule → `verify` vert → login des deux comptes via identity. Résultat consigné dans `docs/reviews/`.
 
+**Statut (répétition R0–R10 du 26/11/2026, stack `taskora-rehearsal`, `main` `934dd2c`) : ÉCHOUÉE**, sur la seule étape R8 (performance). Détail : [compte rendu](../reviews/2026-11-26-identity-rollback-rehearsal.md).
+- **Conforme** :
+  - deux bascules (16 s et 14 s, gel 503 sur les deux écritures, lectures servies), avec `verify` vert à chaque fois ;
+  - retour arrière : routage en 1 s, outbox vidée (`PENDING` = 0 en 38 s, 0 `FAILED`) ;
+  - mot de passe changé via identity, accepté par Symfony ; ancien mot de passe refusé ; jetons acceptés dans les deux sens ;
+  - inscription via Symfony rapatriée, login des deux comptes via identity ;
+  - non-régression board/notification/push ;
+  - e2e `@identity` 14/14 sur les deux amonts ;
+  - comptages R0 + 2 ; 0 fuite et 0 × 5xx dans les journaux.
+- **Non conforme** : `POST /api/auth/login` via identity a un p95 de 641,6 et 643,5 ms, pour un seuil < 500 ms. Symfony est à 498,3 ms sur le même hôte. Renvoi à BackAli (B1) ; seuil à confirmer par Paul.
+- Écart : la base de recette a été remplie par l'API avec des comptes synthétiques au lieu d'une copie de la base de travail, qui contient des données personnelles.
+- Nouvelle répétition requise après le traitement de B1, au minimum R7–R9.
+
 ## 7. Jeu d'essai versionné (tests)
 `services/identity-service/src/test/resources/fixtures/legacy-users.sql` : comptes **fictifs** (`@exemple.test`), mots de passe de test documentés dans le fichier, hashes générés **une fois** par PHP dans le conteneur `api` (`password_hash`, `sodium_crypto_pwhash_str`) : `$2y$` coût 13, `$2y$` coût 4, `$2a$`, `$2b$`, `$argon2id$`, `$argon2i$`, mot de passe de 100 octets (pré-hachage), mot de passe contenant un caractère accentué, hash tronqué (corrompu). Aucune donnée réelle.
