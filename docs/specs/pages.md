@@ -24,7 +24,7 @@ La migration du backend **ne doit modifier aucune page** tant que les contrats H
 | Rôle | anonyme (`guestGuard`) |
 | Composants | `LoginComponent`, `LogoComponent`, `IconComponent` |
 | Formulaire | e-mail (requis, `type=email`), mot de passe (requis, bouton Afficher/Masquer) ; bouton désactivé si formulaire invalide ou envoi en cours |
-| États | chargement (spinner dans le bouton) ; erreur 401 → « E-mail ou mot de passe incorrect. » ; autre erreur → « Impossible de se connecter pour le moment. » ; succès → `/boards` |
+| États | chargement (spinner dans le bouton) ; erreur 401 → « E-mail ou mot de passe incorrect. » ; autre erreur → « Impossible de se connecter pour le moment. » (message dans un élément `role="alert"`, identity.md §6) ; succès → `/boards` |
 | Scénarios | SC-IDENT-007, 008, 025, 026 |
 
 ## 3. Inscription — `/register`
@@ -33,7 +33,7 @@ La migration du backend **ne doit modifier aucune page** tant que les contrats H
 | Rôle | anonyme (`guestGuard`) |
 | Composants | `RegisterComponent`, `LogoComponent`, `IconComponent` |
 | Formulaire | nom (requis), e-mail (requis, format), mot de passe (requis, `minlength=8`, jauge de robustesse 4 niveaux) |
-| États | chargement ; erreur → message `error` de l'API (ex. 409) ou « Inscription impossible pour le moment. » ; succès → `/boards` |
+| États | chargement ; erreur → message `error` de l'API (ex. 409) ou « Inscription impossible pour le moment. » (message dans un élément `role="alert"`, identity.md §6) ; succès → `/boards` |
 | Scénarios | SC-IDENT-001, 002, 003, 005 |
 
 ## 4. Coquille de l'application (routes protégées)
