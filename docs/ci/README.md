@@ -16,6 +16,7 @@ Non implémenté : `frontend-e2e-identity` (à définir par FrontPierre), public
 
 Règles appliquées : `permissions: {}` au niveau du workflow puis minimales par job ; actions épinglées par SHA (version en commentaire) ; `persist-credentials: false` ; pas de `pull_request_target` ; secrets éphémères générés à l'exécution (`openssl rand`, masqués) ; paire de clés JWT de test générée par le conteneur `api` dans le volume `jwt_keys` ; artefacts conservés 14 jours ; journaux compose publiés seulement s'ils ne contiennent ni secret ni jeton `eyJ…​.eyJ…`.
 OWASP : le rapport viendra du premier run GitHub Actions de `identity-security` (après un push approuvé par l'utilisateur) ; pas de clé NVD locale.
+Profil `quality` : ne **jamais** exécuter de tests sur des classes compilées avec `-Pquality` (le Checker Framework y écrit `@Pure` dans le bytecode, ArchUnit échoue) ; les jobs `quality` et `security-scan` passent `-DskipTests -DskipITs` (`-DskipTests` seul ne saute pas Failsafe), et en local toujours `clean` entre un build `-Pquality` et un build de tests.
 Validation : `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest`.
 
 ### Secrets et variables à créer dans GitHub (par l'utilisateur)

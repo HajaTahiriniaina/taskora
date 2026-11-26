@@ -57,7 +57,7 @@ jobs:
             echo "::error::NVD_API_KEY absent : dependency-check 13 ne peut pas s'exécuter (secret de dépôt à créer ; indisponible pour les PR de fork)."
             exit 1
           fi
-          ./mvnw -B -ntp -pl identity-service -am -Psecurity-scan verify -DskipTests -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+          ./mvnw -B -ntp -pl identity-service -am -Psecurity-scan verify -DskipTests -DskipITs -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
       - name: Rapports OWASP
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

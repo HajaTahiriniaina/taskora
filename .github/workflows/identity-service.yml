@@ -98,7 +98,9 @@ jobs:
           cache: maven
           cache-dependency-path: services/**/pom.xml
       - name: Profil quality
-        run: ./mvnw -B -ntp -pl identity-service -am -Pquality verify -DskipTests
+        # -DskipITs : -DskipTests ne saute pas Failsafe ici, et les classes compilées en -Pquality
+        # (@Pure du Checker Framework) font échouer ArchUnit. Ne jamais tester ces classes.
+        run: ./mvnw -B -ntp -pl identity-service -am -Pquality verify -DskipTests -DskipITs
       - name: OpenRewrite (dryRun, patch vide attendu)
         run: |
           ./mvnw -B -ntp -pl identity-service rewrite:dryRun
