@@ -4,7 +4,7 @@
 exec python3 -I -c '
 import json, re, sys
 
-TEST_PATH = re.compile(r"(^|/)(services/[^ ]*/src/test/|frontend/e2e/)|\.spec\.ts\b|(^|/)e2e/")
+TEST_PATH = re.compile(r"(^|/)(services/[^ ]*/src/test/|frontend/e2e/|backend/tests/)|\.spec\.ts\b|(^|/)e2e/")
 WRITE_CMD = re.compile(r"(>|\btee\b|\bsed\s+-i|\bperl\s+-[a-z]*i|\brm\b|\bmv\b|\bcp\b|\btruncate\b|"
                        r"\bgit\s+(checkout|restore|rm|mv|stash|reset|apply)\b|\bpatch\b|\bspotless:apply\b|"
                        r"\beslint\b.*--fix|\bprettier\b.*--write)")

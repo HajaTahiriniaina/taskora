@@ -63,7 +63,8 @@ Validation : unitaire (domaine), API, sécurité, e2e page Tableau
 - Les Codeurs n'écrivent pas dans les fichiers de test. Un hook (`.claude/hooks/protect-tests.sh`) bloque leurs écritures dans :
   - `services/**/src/test/**` ;
   - `frontend/**/*.spec.ts` ;
-  - `frontend/e2e/**`.
+  - `frontend/e2e/**` ;
+  - `backend/tests/**` (tests PHPUnit du backend Symfony).
 - Le Reviewer vérifie que `git diff <commit test>..HEAD` ne touche à aucun fichier de test. Il refuse aussi tout affaiblissement : `@Disabled`, `skip`, assertion supprimée, seuil baissé, exclusion de couverture.
 - Si un test est faux, le Codeur l'écrit dans son rapport ; seul le Testeur le corrige, après accord du chef de pôle.
 
