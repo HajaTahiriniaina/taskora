@@ -32,7 +32,7 @@ Validation : `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest`.
 | `identity` | + `db-init`, `identity` | `docker compose --profile identity up -d --build` |
 | `quality` | + `sonarqube` (http://127.0.0.1:9000) | `docker compose --profile quality up -d sonarqube` |
 
-- Ports : `web` 8080 ; `api` **127.0.0.1**:8081 ; `identity` non publié (réseau interne `backend`), ou 127.0.0.1:8082 avec `-f docker-compose.yml -f docker-compose.identity-dev.yml` ; 8091 (management) jamais publié.
+- Ports (réglables dans `.env` : `*_PORT` et `*_BIND`, voir README) : `web` 8080 ; `api` **127.0.0.1**:8081 ; `identity` non publié (réseau interne `backend`), ou 127.0.0.1:8082 avec `-f docker-compose.yml -f docker-compose.identity-dev.yml` ; 8091 (management) jamais publié.
 - Réseaux : `backend` interne (database, api, identity, web), `converter` interne (api, Gotenberg).
 
 ### Base de données (`docker/mariadb/initdb.d/10-taskora-init.sh`)

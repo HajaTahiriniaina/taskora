@@ -24,7 +24,7 @@ services:
       #   docker compose exec database /docker-entrypoint-initdb.d/10-taskora-init.sh
       - ./docker/mariadb/initdb.d:/docker-entrypoint-initdb.d:ro
     ports:
-      - "${DB_PORT:-3307}:3306"
+      - "${DB_BIND:-127.0.0.1}:${DB_PORT:-3307}:3306"
     networks: [default, backend]
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -56,9 +56,9 @@ services:
     volumes:
       - jwt_keys:/app/config/jwt
       - uploads:/app/public/uploads
-    # Publié sur la boucle locale uniquement : /internal/* n'est pas joignable depuis le réseau.
+    # API_BIND=127.0.0.1 par défaut : /internal/* n'est pas joignable depuis le réseau. Ne l'ouvrir qu'en connaissance de cause.
     ports:
-      - "127.0.0.1:${API_PORT:-8081}:80"
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8081}:80"
     networks: [default, backend, converter]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:80/api/health"]
@@ -88,7 +88,7 @@ services:
       # on = gel des écritures d'identité (503 sur POST /api/auth/register et PATCH /api/me).
       IDENTITY_WRITE_FREEZE: ${IDENTITY_WRITE_FREEZE:-off}
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:80"
     networks: [default, backend]
 
   # ---------------------------------------------------------------- profil identity
@@ -172,7 +172,7 @@ services:
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
     ports:
-      - "127.0.0.1:${SONAR_PORT:-9000}:9000"
+      - "${SONAR_BIND:-127.0.0.1}:${SONAR_PORT:-9000}:9000"
     networks: [quality]
 
 networks:
