@@ -29,8 +29,14 @@ export async function storeSession(page: Page, account: TestAccount): Promise<vo
   );
 }
 
+/** Jeton stocké, pour le réutiliser par l'API : ne jamais le passer à expect() ni l'afficher. */
 export function readStoredToken(page: Page): Promise<null | string> {
   return page.evaluate((key) => localStorage.getItem(key), TOKEN_KEY);
+}
+
+/** Présence du jeton, sans exposer sa valeur dans les messages d'échec. */
+export function hasStoredToken(page: Page): Promise<boolean> {
+  return page.evaluate((key) => localStorage.getItem(key) !== null, TOKEN_KEY);
 }
 
 export async function readStoredUser(page: Page): Promise<null | PublicUser> {
