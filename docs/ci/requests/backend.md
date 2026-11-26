@@ -89,3 +89,10 @@ Statut : **accepté avec modifications** (26/11/2026). Détail : [../README.md](
   - nginx : `IDENTITY_UPSTREAM` (défaut `api:80`) et `IDENTITY_WRITE_FREEZE` (`on|off`) ; changement = `docker compose up -d web`, sans reconstruction (gabarit rendu au démarrage du conteneur, pas `nginx -s reload`).
   - Sonar : jeton lu par variable d'environnement (pas `-Dsonar.token` en ligne de commande) ; URL du serveur = variable de dépôt `SONAR_HOST_URL`.
   - backend-phpunit : `DATABASE_URL` de compose vise déjà `/taskora` (suffixe `_test` ajouté par doctrine.yaml) ; ajout de `unset INTERNAL_API_SECRET` et de `lexik:jwt:generate-keypair`.
+
+### Boucle de revue 1 (Manuel, 26/11/2026)
+- B5 : `identity-security` échoue avec « NVD_API_KEY absent : dependency-check 13 ne peut pas s'exécuter » si le secret manque ; clé passée par `-DnvdApiKeyEnvironmentVariable=NVD_API_KEY`. Secret `NVD_API_KEY` créé par l'utilisateur dans GitHub.
+- Rapport OWASP : **en attente** du premier run GitHub Actions (push à approuver par l'utilisateur) ; aucune clé NVD locale, aucun run local tenté. Résumé (nombres, CVE éventuelles) à reporter ici.
+- m2 : nginx `client_max_body_size 64k` + 413 JSON sur `/api/auth/` et `location = /api/me` (vérifié : 65 536 octets → 400 du backend, 65 537 → 413, `chunked` → 413).
+- m9 : fait par le coordinateur (`DB_BIND=127.0.0.1` par défaut, 0b6af27).
+- m10 : digests pour mariadb, gotenberg, sonarqube, node, nginx ; `mem_limit`/`pids_limit` sur `identity`. `eclipse-temurin` (Dockerfile d'identity) reste à épingler par BackCodeur.

@@ -8,7 +8,7 @@ name: taskora
 
 services:
   database:
-    image: mariadb:11.8
+    image: mariadb:11.8@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: ${DB_NAME:-taskora}
@@ -70,7 +70,7 @@ services:
   # Office / LibreOffice documents → PDF for the in-page viewer (Gotenberg = LibreOffice over HTTP).
   # Only reachable by the API, on an internal network: no Internet access, no access to the database.
   converter:
-    image: gotenberg/gotenberg:8
+    image: gotenberg/gotenberg:8@sha256:53073e798c8ef39ea2187e44cb67bab77894ea2509100b94c4fe3b461f7b2996
     restart: unless-stopped
     command: ["gotenberg", "--api-timeout=240s", "--libreoffice-restart-after=20", "--log-level=warn"]
     networks: [converter]
@@ -95,7 +95,7 @@ services:
   # Init root idempotente sur un volume existant, après les migrations Symfony
   # (le droit sur taskora.user exige que la table existe).
   db-init:
-    image: mariadb:11.8
+    image: mariadb:11.8@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     profiles: [identity]
     restart: "no"
     user: "999:999"
@@ -128,6 +128,9 @@ services:
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
+    # m10 : JVM à 75 % de mem_limit (JAVA_TOOL_OPTIONS de l'image).
+    mem_limit: 768m
+    pids_limit: 256
     depends_on:
       database:
         condition: service_healthy
@@ -161,7 +164,7 @@ services:
 
   # ---------------------------------------------------------------- profil quality
   sonarqube:
-    image: sonarqube:26.10.0.133078-community
+    image: sonarqube:26.10.0.133078-community@sha256:f95aaa9016dd4e92c7d70691167a6d96dbb5d8acffd61eba1cb4335d364a7840
     profiles: [quality]
     restart: unless-stopped
     environment:

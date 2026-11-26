@@ -45,14 +45,19 @@ jobs:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: dependency-check-data-${{ steps.week.outputs.week }}
           restore-keys: dependency-check-data-
+      # La clé reste dans l'environnement : le plugin la lit par son nom
+      # (nvdApiKeyEnvironmentVariable), jamais en argument de ligne de commande ni affichée.
+      # Secret absent (non créé, ou PR de fork) : échec explicite, dependency-check 13 refuse
+      # de tourner sans clé (« Invalid API Key, length of 0 »).
       - name: Dependency-Check (CVSS >= 7 bloquant)
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           if [ -z "$NVD_API_KEY" ]; then
-            echo "::warning::NVD_API_KEY absent : mise à jour NVD lente ou limitée."
+            echo "::error::NVD_API_KEY absent : dependency-check 13 ne peut pas s'exécuter (secret de dépôt à créer ; indisponible pour les PR de fork)."
+            exit 1
           fi
-          ./mvnw -B -ntp -pl identity-service -am -Psecurity-scan verify -DskipTests -DnvdApiKey="$NVD_API_KEY"
+          ./mvnw -B -ntp -pl identity-service -am -Psecurity-scan verify -DskipTests -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
       - name: Rapports OWASP
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
