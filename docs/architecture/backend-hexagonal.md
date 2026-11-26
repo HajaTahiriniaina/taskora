@@ -171,10 +171,11 @@ Méthode : lecture de la configuration, du code vendor (`lexik/jwt-authenticatio
 | `GET` | 405 | `{"error":"No route found for \"GET http://…/api/auth/login\": Method Not Allowed (Allow: POST)"}` |
 
 Les 400 passent par `ApiExceptionListener` (forme `{"error"}`), les 401 par le gestionnaire d'échec Lexik (forme `{"code","message"}`).
+**Corrigé (décision utilisateur E19, E20)** dans identity-service : les 400 et le 404 de ce tableau sont remplacés par les règles françaises de l'inscription (A15) ; les 401 restent identiques.
 
 ### 8.5 Autres constats utiles
 - `POST /api/auth/register` (Symfony) : `[]` est accepté comme `{}` — **corrigé (décision utilisateur E16)** dans identity-service ; conversions PHP `(string)` : nombre → texte, `true` → `"1"`, `false`/`null` → `""`, tableau → `"Array"` (un `name` tableau est accepté et vaut `"Array"`) — **corrigé (décision utilisateur E17)** ; reproduits tels quels : `trim` PHP = espaces, `\t \n \r \0 \x0B` uniquement ; longueurs en points de code (`mb_*`).
-- `PATCH /api/me` (Symfony) : `isset` (une valeur `null` vaut « absente », **conservé** par E17) ; `!empty($newPassword)` (`""`, `"0"` → aucun changement de mot de passe, conservé : hors E15–E18) ; une couleur invalide est ignorée et l'expression `/^#[0-9a-fA-F]{6}$/` accepte un `\n` final — **corrigé (décision utilisateur E18)** : 400 `Couleur d'avatar invalide.`
+- `PATCH /api/me` (Symfony) : `isset` (une valeur `null` vaut « absente », **conservé** par E17) ; `!empty($newPassword)` (`""`, `"0"` → aucun changement de mot de passe) — **corrigé (décision utilisateur E21)** : seuls l'absence, `null` et `""` valent « pas de changement » ; une couleur invalide est ignorée et l'expression `/^#[0-9a-fA-F]{6}$/` accepte un `\n` final — **corrigé (décision utilisateur E18)** : 400 `Couleur d'avatar invalide.`
 - Mot de passe > 4096 octets à l'inscription ou dans `newPassword` → 500 chez Symfony — **corrigé (décision utilisateur E15)** : 400 `Le mot de passe ne doit pas dépasser 4096 octets.`
 - Inscription concurrente avec le même e-mail : Symfony ne capture pas la violation d'unicité (→ 500) ; la cible renvoie 409 (SC-IDENT-002, déjà spécifié par Paul).
 - `JsonResponse` échappe `"`, `/` et les caractères non ASCII (`"`, `\/`, `è`) : l'équivalence est **sémantique** (même JSON après analyse), pas octet par octet.
@@ -213,7 +214,7 @@ Format : contexte → décision → conséquences. Statut : **acceptée** (étap
 - **Décision** : un seul `@RestControllerAdvice` (`ApiErrorHandler`) et un seul point d'entrée sécurité (`LexikAuthenticationEntryPoint`).
   - Erreurs métier et de validation : `{"error":"<message exact>"}` avec les statuts de Symfony.
   - Erreurs d'authentification JWT et échec de login : `{"code":401,"message":"<message Lexik exact>"}` + `WWW-Authenticate: Bearer`.
-  - Erreurs du parseur de login (`json_login`) : `{"error":"<message anglais exact>"}` en 400, 404 si le `Content-Type` ne contient pas `json` (§8.4).
+  - Erreurs de forme du login : **corrigé (décision utilisateur E19, E20)** : mêmes règles et messages français que l'inscription (`JSON invalide.`, `Le champ "<nom>" doit être une chaîne de caractères.`, `Le champ "<nom>" est obligatoire.`), `Content-Type` non contrôlé ; plus de messages anglais `json_login` ni de 404.
   - 404/405 Spring : `{"error":"…"}` avec le bon statut ; le texte n'est pas contractuel (il contient l'hôte côté Symfony).
   - 5xx : `{"error":"Erreur interne du serveur."}`, jamais de trace, d'exception ni de SQL ; `server.error.include-*` à `never`.
   - Jackson sérialise en UTF-8 sans échappement `\uXXXX` : équivalence sémantique avec Symfony (§8.5), les tests de compatibilité comparent le JSON analysé.
@@ -235,7 +236,7 @@ Paquet racine `com.taskora.identity`.
 | `application.port.in` | `RegisterUserUseCase`, `AuthenticateUseCase`, `GetProfileUseCase`, `UpdateProfileUseCase`, `ResolveAuthenticatedUserUseCase`, `DeliverPendingMessagesUseCase`, `ImportLegacyUsersUseCase` |
 | `application.port.out` | `UserRepositoryPort`, `PasswordHasherPort`, `TokenIssuerPort`, `TokenVerifierPort`, `LegacyUserProjectionPort`, `OutboxPort`, `InvitationClaimPort`, `LegacyUserSourcePort`, `UnitOfWorkPort` |
 | `application.service` | implémentations des cas d'utilisation, Java pur (pas d'annotation Spring ; transactions via `UnitOfWorkPort`) |
-| `adapter.in.web` | `AuthController`, `MeController`, `PhpJsonBody` (nom conservé ; lecture stricte : objet JSON exigé, champs chaîne, `null` = absent sur `PATCH` ; E16, E17), `JsonLoginRequestParser`, `ApiErrorHandler`, `ErrorMessages`, DTO |
+| `adapter.in.web` | `AuthController`, `MeController`, `PhpJsonBody` (nom conservé ; lecture stricte : objet JSON exigé, corps vide refusé, champs chaîne, `null` = absent sur `PATCH` ; E16, E17, E20), `JsonLoginRequestParser` (règles françaises, E19), `ApiErrorHandler`, `ErrorMessages`, DTO |
 | `adapter.in.web.security` | `LexikCompatibleJwtFilter`, `LexikAuthenticationEntryPoint`, `LexikTokenExtractor` |
 | `adapter.in.scheduling` | `OutboxRelayScheduler` (appelle `DeliverPendingMessagesUseCase`) |
 | `adapter.in.cli` | `LegacyImportRunner` (`--identity.legacy-import=run|verify`) |
@@ -253,7 +254,7 @@ Paquet racine `com.taskora.identity`.
 - **Conséquences** : test d'intégration avec N inscriptions parallèles (même e-mail, casses différentes) → 1 ligne, N−1 × 409, 0 × 500.
 
 ### A8 — Mise à jour atomique du profil
-- **Décision** : `User.applyProfileUpdate(ProfileUpdate, PasswordHasherPort)` valide tout dans l'ordre (`name` si présent → `avatarColor` exactement `#RRGGBB` sinon 400 `Couleur d'avatar invalide.` — **corrigé (décision utilisateur E18)** → si `newPassword` non vide : mot de passe actuel, longueur ≥ 8, puis ≤ 4096 octets — E15) ; la forme du corps et le type des champs (E16, E17) sont vérifiés avant, par l'adapter web, produit un **nouvel** état, et n'est persisté qu'à la fin dans une seule transaction (`UnitOfWorkPort`) avec la projection et l'événement. Toute exception → rien n'est écrit (SC-IDENT-019).
+- **Décision** : `User.applyProfileUpdate(ProfileUpdate, PasswordHasherPort)` valide tout dans l'ordre (`name` si présent → `avatarColor` exactement `#RRGGBB` sinon 400 `Couleur d'avatar invalide.` — **corrigé (décision utilisateur E18)** → si `newPassword` présent, non `null` et ≠ `""` (`"0"` compris — **corrigé (décision utilisateur E21)**) : mot de passe actuel, longueur ≥ 8, puis ≤ 4096 octets — E15) ; la forme du corps et le type des champs (E16, E17) sont vérifiés avant, par l'adapter web, produit un **nouvel** état, et n'est persisté qu'à la fin dans une seule transaction (`UnitOfWorkPort`) avec la projection et l'événement. Toute exception → rien n'est écrit (SC-IDENT-019).
 - `UserProfileUpdated` est ajouté à l'outbox seulement si `name` ou `avatarColor` change réellement (pas pour un changement de mot de passe seul).
 
 ### A9 — Projection historique `taskora.user` (U1-B)
@@ -292,13 +293,16 @@ Paquet racine `com.taskora.identity`.
 - **Contexte** : Paul proposait `V2__import_legacy_users.sql`. Une migration Flyway ne s'exécute qu'une fois, alors qu'il faut copier à la bascule (après gel des écritures) et resynchroniser après un retour arrière.
 - **Décision** : Flyway ne crée que le schéma (`V1`, `V2`) ; la copie est le cas d'utilisation `ImportLegacyUsersUseCase`, lancé par `LegacyImportRunner` (`java -jar identity-service.jar --identity.legacy-import=run`), idempotent (`INSERT … ON DUPLICATE KEY UPDATE` par id), avec rapport de contrôle. Détails : [identity-migration.md](identity-migration.md).
 
-### A15 — Écarts E15–E18 corrigés dans identity-service (décision utilisateur du 26/11/2026)
+### A15 — Écarts E15–E21 corrigés dans identity-service (décisions utilisateur du 26/11/2026)
 - **Contexte** : l'utilisateur a choisi de **corriger** ces écarts plutôt que de les reproduire (docs/specs/decisions.md). Symfony n'est pas modifié.
 - **Décision** — statut : **corrigé (décision utilisateur)** :
   | Réf. | identity-service | Où | Scénario |
   |---|---|---|---|
   | E15 | mot de passe > 4096 octets UTF-8 (inscription, `newPassword`) → 400 `Le mot de passe ne doit pas dépasser 4096 octets.` ; login → 401 inchangé | domaine (`PlainPassword`) | SC-IDENT-028 |
-  | E16 | `register` et `PATCH /me` : corps JSON non objet → 400 `JSON invalide.` (corps vide = `{}`, règle transverse conservée) | adapter web (`PhpJsonBody`) | SC-IDENT-029 |
-  | E17 | champ présent non chaîne → 400 `Le champ "<nom>" doit être une chaîne de caractères.` ; `null` refusé à l'inscription, « absent » sur `PATCH` ; contrôle de type de tous les champs connus avant les contrôles de contenu, dans l'ordre du contrat ; login inchangé (messages `json_login`) | adapter web | SC-IDENT-030 |
+  | E16 | `register`, `login` et `PATCH /me` : corps JSON non objet → 400 `JSON invalide.` | adapter web (`PhpJsonBody`) | SC-IDENT-029 |
+  | E17 | champ présent non chaîne → 400 `Le champ "<nom>" doit être une chaîne de caractères.` ; `null` refusé à l'inscription, « absent » sur `PATCH` ; contrôle de type de tous les champs connus avant les contrôles de contenu, dans l'ordre du contrat ; s'applique aussi au login (E19) | adapter web | SC-IDENT-030 |
   | E18 | `avatarColor` doit correspondre à `\A#[0-9a-fA-F]{6}\z`, sinon 400 `Couleur d'avatar invalide.` (sans modification partielle) | domaine (`AvatarColor`) | SC-IDENT-031 |
-- **Conséquences** : ces cas sont des **divergences voulues** : les tests `compat` (miroir Symfony) les excluent explicitement (liste dans l'ordre de travail) ; les autres comportements PHP (trim, points de code, collation, `"0"` vide pour `newPassword`) restent reproduits. Le contrat public documente les quatre nouveaux 400.
+  | E19 | `login` : objet JSON (E16) → type de `email` puis `password` (non chaîne, `null` compris → 400 E17) → présence de `email` puis `password` (absent ou `""` → 400 `Le champ "<nom>" est obligatoire.`) ; `Content-Type` non contrôlé ; identifiants faux → 401 `{"code":401,"message":"Invalid credentials."}` inchangé | adapter web (`JsonLoginRequestParser`) | SC-IDENT-032 (et SC-IDENT-009 ajusté) |
+  | E20 | corps vide sur `register`, `login`, `PATCH /me` → 400 `JSON invalide.` (la règle transverse « vide = `{}` » ne s'applique plus à ces routes) | adapter web (`PhpJsonBody`) | SC-IDENT-033 |
+  | E21 | `PATCH /me` : seuls `newPassword` absent, `null` ou `""` = pas de changement ; `"0"` et toute autre chaîne passent les contrôles (mot de passe actuel, longueurs) | adapter web + domaine | SC-IDENT-034 |
+- **Conséquences** : ces cas sont des **divergences voulues** : les tests `compat` (miroir Symfony) les excluent explicitement (liste dans l'ordre de travail) ; les autres comportements (trim PHP à l'inscription, points de code, collation, recherche de l'e-mail brut au login, 401 Lexik) restent reproduits. Le contrat public documente tous les nouveaux 400.

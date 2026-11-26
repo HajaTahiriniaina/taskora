@@ -17,11 +17,13 @@ info:
     - 5xx : `{"error": "Erreur interne du serveur."}`, sans trace.
     - Les champs texte sont tronqués silencieusement à leur longueur maximale (en points de code),
       après suppression des espaces de début et de fin (`trim` PHP : espace, \t, \n, \r, \0, \x0B).
-    - Écarts **corrigés** dans identity-service (décisions utilisateur E15–E18, docs/specs/decisions.md),
+    - Écarts **corrigés** dans identity-service (décisions utilisateur E15–E21, docs/specs/decisions.md),
       volontairement différents de Symfony et exclus des tests `compat` :
-      E15 mot de passe > 4096 octets → 400 ; E16 `register` et `PATCH /me` exigent un objet JSON ;
+      E15 mot de passe > 4096 octets → 400 ; E16 `register`, `login` et `PATCH /me` exigent un objet JSON ;
       E17 tout champ texte présent doit être une chaîne JSON (pas de conversion PHP) ;
-      E18 `avatarColor` doit valoir exactement `#RRGGBB`.
+      E18 `avatarColor` doit valoir exactement `#RRGGBB` ; E19 `login` suit les règles et messages
+      français de l'inscription ; E20 un corps vide → 400 `JSON invalide.` sur les trois routes ;
+      E21 `newPassword` `"0"` est un vrai mot de passe.
 
     Références : docs/specs/identity.md (scénarios SC-IDENT-*), décisions docs/specs/decisions.md.
 servers:
@@ -38,8 +40,8 @@ paths:
       operationId: register
       summary: Créer un compte et être connecté immédiatement
       description: |
-        Ordre des contrôles : corps = objet JSON (un corps vide équivaut à `{}`, tout autre JSON
-        non objet → 400, E16) → type des champs présents `name`, `email`, `password` (chaîne JSON,
+        Ordre des contrôles : corps = objet JSON (corps vide, non JSON ou JSON non objet → 400,
+        E16/E20) → type des champs présents `name`, `email`, `password` (chaîne JSON,
         `null` refusé, E17) → `name` → `email` (obligatoire, troncature à 180, minuscules, puis format
         `FILTER_VALIDATE_EMAIL` de PHP) → mot de passe (≥ 8 points de code, puis ≤ 4096 octets UTF-8, E15)
         → unicité (collation `utf8mb4_unicode_ci` : casse, accents et espaces finaux ignorés).
@@ -50,7 +52,7 @@ paths:
         Les inscriptions concurrentes avec le même e-mail donnent un seul compte ; les autres reçoivent 409.
       x-scenarios: [SC-IDENT-001, SC-IDENT-002, SC-IDENT-003, SC-IDENT-004, SC-IDENT-005, SC-IDENT-006, SC-IDENT-010, SC-IDENT-023, SC-IDENT-024, SC-IDENT-028, SC-IDENT-029, SC-IDENT-030]
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/RegisterRequest' }
@@ -76,7 +78,10 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               examples:
                 invalidJson:
-                  summary: Corps non vide qui n'est pas du JSON (SC-IDENT-003)
+                  summary: Corps qui n'est pas du JSON (SC-IDENT-003)
+                  value: { error: JSON invalide. }
+                emptyBody:
+                  summary: corps vide — E20 (SC-IDENT-033)
                   value: { error: JSON invalide. }
                 notAnObject:
                   summary: JSON valide mais pas un objet ([], "texte", 42, true) — E16 (SC-IDENT-029)
@@ -121,14 +126,17 @@ paths:
       operationId: login
       summary: Se connecter par e-mail et mot de passe
       description: |
-        Reproduit `json_login` de Symfony + LexikJWT :
-        - le `Content-Type` doit contenir `json`, sinon 404 ;
-        - l'e-mail est recherché **tel que saisi** (pas de trim ni de minuscules côté code) avec la
+        Règles d'identity-service (E19, E20 ; Symfony utilisait les messages anglais de `json_login`) :
+        - le `Content-Type` n'est pas contrôlé (comme pour l'inscription) ;
+        - corps vide, non JSON ou JSON non objet → 400 `JSON invalide.` ;
+        - type des champs présents, dans l'ordre `email`, `password` : non chaîne, `null` compris → 400 ;
+        - puis présence, dans le même ordre : clé absente ou chaîne vide `""` → 400 `Le champ "<nom>" est obligatoire.` ;
+        - l'e-mail est ensuite recherché **tel que saisi** (pas de trim ni de minuscules côté code) avec la
           collation `utf8mb4_unicode_ci` : casse, accents et espaces **finaux** ignorés, espaces initiaux
           significatifs (→ 401) ;
-        - e-mail ou mot de passe vide, e-mail > 4096 octets, mot de passe > 4096 octets → 401 ;
-        - même corps 401 pour un e-mail inconnu et un mauvais mot de passe, temps comparable.
-      x-scenarios: [SC-IDENT-007, SC-IDENT-008, SC-IDENT-009, SC-IDENT-010, SC-IDENT-017, SC-IDENT-023, SC-IDENT-024]
+        - e-mail > 4096 octets, mot de passe > 4096 octets, e-mail inconnu, mauvais mot de passe → 401 au format
+          actuel, même corps, temps comparable.
+      x-scenarios: [SC-IDENT-007, SC-IDENT-008, SC-IDENT-009, SC-IDENT-010, SC-IDENT-017, SC-IDENT-023, SC-IDENT-024, SC-IDENT-032, SC-IDENT-033]
       requestBody:
         required: true
         content:
@@ -149,24 +157,28 @@ paths:
                     token: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE3OTQ5MDYwMDAsImV4cCI6MTc5NTUxMDgwMCwicm9sZXMiOlsiUk9MRV9VU0VSIl0sInVzZXJuYW1lIjoiY2FtaWxsZUBleGVtcGxlLmZyIiwidWlkIjo0fQ.c2lnbmF0dXJl
                     user: { id: 4, name: Camille Martin, email: camille@exemple.fr, avatarColor: '#14b8a6' }
         '400':
-          description: Corps incomplet ou non JSON (messages anglais de Symfony json_login, SC-IDENT-009)
+          description: Corps invalide ou incomplet — messages français (E19, SC-IDENT-009, SC-IDENT-032)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               examples:
                 invalidJson:
-                  summary: corps vide, non JSON, ou JSON qui n'est pas un objet ([] ou "x")
-                  value: { error: Invalid JSON. }
-                emailMissing:
-                  summary: clé email absente (contrôlée avant password)
-                  value: { error: 'The key "email" must be provided.' }
-                passwordMissing:
-                  value: { error: 'The key "password" must be provided.' }
+                  summary: corps non JSON, ou JSON qui n'est pas un objet ([], "x", 42) — E16/E19
+                  value: { error: JSON invalide. }
+                emptyBody:
+                  summary: corps vide — E20 (SC-IDENT-033)
+                  value: { error: JSON invalide. }
                 emailNotString:
-                  summary: email nombre, booléen, null, tableau ou objet
-                  value: { error: 'The key "email" must be a string.' }
+                  summary: email nombre, booléen, null, tableau ou objet (contrôlé avant password) — E17/E19
+                  value: { error: 'Le champ "email" doit être une chaîne de caractères.' }
                 passwordNotString:
-                  value: { error: 'The key "password" must be a string.' }
+                  value: { error: 'Le champ "password" doit être une chaîne de caractères.' }
+                emailMissing:
+                  summary: clé email absente ou "" (contrôlée avant password) — E19
+                  value: { error: 'Le champ "email" est obligatoire.' }
+                passwordMissing:
+                  summary: clé password absente ou "" — E19
+                  value: { error: 'Le champ "password" est obligatoire.' }
         '401':
           description: Identifiants refusés (SC-IDENT-008)
           headers:
@@ -178,14 +190,6 @@ paths:
               examples:
                 invalidCredentials:
                   value: { code: 401, message: Invalid credentials. }
-        '404':
-          description: Content-Type sans « json » (comportement Symfony conservé)
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-              examples:
-                notJson:
-                  value: { error: 'Unable to find the controller for path "/api/auth/login". The route is wrongly configured.' }
   /me:
     get:
       tags: [profile]
@@ -209,17 +213,17 @@ paths:
       operationId: updateMe
       summary: Modifier son nom, la couleur de son avatar et son mot de passe
       description: |
-        Ordre : corps = objet JSON (vide équivaut à `{}`, autre JSON non objet → 400, E16) → type des
+        Ordre : corps = objet JSON (vide, non JSON ou non objet → 400, E16/E20) → type des
         champs présents et non `null` `name`, `avatarColor`, `currentPassword`, `newPassword` (chaîne
         JSON, E17 ; `null` vaut « absent ») → `name` → `avatarColor` (exactement `#RRGGBB`, sinon 400, E18)
-        → mot de passe (si `newPassword` est non vide : d'abord `currentPassword`, puis longueur ≥ 8,
-        puis ≤ 4096 octets, E15). Toute erreur → **aucune** modification.
+        → mot de passe (si `newPassword` est présent, non `null` et différent de `""` — `"0"` compris, E21 :
+        d'abord `currentPassword`, puis longueur ≥ 8, puis ≤ 4096 octets, E15). Toute erreur → **aucune** modification.
         `email` et toute autre clé sont ignorés.
-      x-scenarios: [SC-IDENT-015, SC-IDENT-016, SC-IDENT-017, SC-IDENT-018, SC-IDENT-019, SC-IDENT-020, SC-IDENT-021, SC-IDENT-011, SC-IDENT-012, SC-IDENT-028, SC-IDENT-029, SC-IDENT-030, SC-IDENT-031]
+      x-scenarios: [SC-IDENT-015, SC-IDENT-016, SC-IDENT-017, SC-IDENT-018, SC-IDENT-019, SC-IDENT-020, SC-IDENT-021, SC-IDENT-011, SC-IDENT-012, SC-IDENT-028, SC-IDENT-029, SC-IDENT-030, SC-IDENT-031, SC-IDENT-033, SC-IDENT-034]
       security:
         - bearerAuth: []
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/UpdateMeRequest' }
@@ -248,6 +252,9 @@ paths:
                 notAnObject:
                   summary: JSON valide mais pas un objet — E16 (SC-IDENT-029)
                   value: { error: JSON invalide. }
+                emptyBody:
+                  summary: corps vide — E20 (SC-IDENT-033)
+                  value: { error: JSON invalide. }
                 fieldNotString:
                   summary: champ présent, non null et non chaîne ; même forme pour name, currentPassword, newPassword — E17 (SC-IDENT-030)
                   value: { error: 'Le champ "avatarColor" doit être une chaîne de caractères.' }
@@ -255,10 +262,10 @@ paths:
                   summary: name présent mais vide ou composé d'espaces (SC-IDENT-015)
                   value: { error: 'Le champ "name" est obligatoire.' }
                 wrongCurrentPassword:
-                  summary: currentPassword faux ou absent alors que newPassword est fourni (SC-IDENT-018, SC-IDENT-019)
+                  summary: currentPassword faux ou absent alors que newPassword est fourni, y compris "0" (SC-IDENT-018, SC-IDENT-019, SC-IDENT-034)
                   value: { error: Mot de passe actuel incorrect. }
                 newPasswordTooShort:
-                  summary: newPassword de moins de 8 points de code, mot de passe actuel correct (SC-IDENT-018)
+                  summary: newPassword de moins de 8 points de code (dont "0", E21), mot de passe actuel correct (SC-IDENT-018, SC-IDENT-034)
                   value: { error: Le mot de passe doit contenir au moins 8 caractères. }
                 newPasswordTooLong:
                   summary: newPassword de plus de 4096 octets, mot de passe actuel correct — E15 (SC-IDENT-028)
@@ -323,24 +330,26 @@ components:
         user: { $ref: '#/components/schemas/User' }
     RegisterRequest:
       type: object
-      description: Objet JSON obligatoire (E16). Champs présents de type chaîne (E17) ; leur absence produit les 400 documentés. Clés inconnues ignorées.
+      description: Objet JSON obligatoire, corps vide refusé (E16, E20). Champs présents de type chaîne (E17) ; leur absence produit les 400 documentés. Clés inconnues ignorées.
       properties:
         name: { type: string, description: obligatoire après trim ; tronqué à 120 }
         email: { type: string, description: obligatoire après trim ; tronqué à 180 puis mis en minuscules }
         password: { type: string, description: 'au moins 8 points de code, au plus 4096 octets UTF-8 (E15)' }
     LoginRequest:
       type: object
+      description: Objet JSON obligatoire, corps vide refusé (E16, E19, E20). `email` et `password` obligatoires, de type chaîne, non vides.
+      required: [email, password]
       properties:
         email: { type: string }
         password: { type: string }
     UpdateMeRequest:
       type: object
-      description: Objet JSON obligatoire (E16). Tous les champs sont facultatifs ; `null` vaut « absent » ; sinon chaîne (E17). Les clés inconnues (dont email) sont ignorées.
+      description: Objet JSON obligatoire, corps vide refusé (E16, E20). Tous les champs sont facultatifs ; `null` vaut « absent » ; sinon chaîne (E17). Les clés inconnues (dont email) sont ignorées.
       properties:
         name: { type: [string, 'null'], description: si présent et non null, obligatoire après trim, tronqué à 120 }
         avatarColor: { type: [string, 'null'], pattern: '^#[0-9a-fA-F]{6}$', description: 'exactement #RRGGBB, sans caractère final (E18), sinon 400' }
         currentPassword: { type: [string, 'null'], description: obligatoire si newPassword est non vide }
-        newPassword: { type: [string, 'null'], description: 'au moins 8 points de code, au plus 4096 octets UTF-8 (E15)' }
+        newPassword: { type: [string, 'null'], description: 'absent, null ou "" = pas de changement ; toute autre chaîne, "0" compris (E21), est contrôlée : au moins 8 points de code, au plus 4096 octets UTF-8 (E15)' }
     Error:
       type: object
       additionalProperties: false
