@@ -96,6 +96,8 @@ Même stack que la CI : `IDENTITY_UPSTREAM` dans `.env`, puis `docker compose --
 | `NVD_API_KEY` | secret (**créé**) | `identity-security` (obligatoire : sans lui le job échoue) |
 | `SONAR_TOKEN` | secret | `identity-sonar` (facultatif : job ignoré s'il manque) |
 | `SONAR_HOST_URL` | variable de dépôt | URL du serveur Sonar (facultatif, avec `SONAR_TOKEN`) |
+| `SONAR_ORGANIZATION` | variable de dépôt | Clé d'organisation SonarQube Cloud (`-Dsonar.organization`) ; inutile pour un serveur auto-hébergé |
+| `SONAR_PROJECT_KEY` | variable de dépôt | Clé de projet Sonar (`-Dsonar.projectKey`) ; sinon clé Maven par défaut |
 
 ## Docker Compose
 
