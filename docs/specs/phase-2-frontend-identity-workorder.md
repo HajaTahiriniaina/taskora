@@ -172,3 +172,8 @@ Un point bloquant renvoie à FrontCodeur (C2) ou, si c'est un test, à FrontTest
 ## Recette (FrontPierre) puis validation (Paul)
 - Recette : tests verts, y compris l'e2e sur les deux amonts en CI quand Manuel aura livré `frontend-e2e-identity`. Rapport du Reviewer sans point bloquant, intégrité respectée, scénarios couverts.
 - Paul valide SC-IDENT-025 et 026, puis passe les lignes front à `validé`.
+
+## Statut (26/11/2026)
+- **Recette FrontPierre : ACCEPTÉ** — `docs/reviews/2026-11-26-frontend-identity-recette.md`. PR #3 fusionnée (`531cbf2`) ; CI frontend verte, e2e `@identity` sur `api:80` et `identity:8080`.
+- Points de revue m1–m9 tranchés. Suites (m1, m5bis, m6, lots B1–B2 de la ligne de base) : ordre de travail en §5 de la recette (FrontTesteur, puis FrontCodeur, puis FrontReviewer).
+- Prochaine étape : validation de Paul (lignes front SC-IDENT → `validé`).
