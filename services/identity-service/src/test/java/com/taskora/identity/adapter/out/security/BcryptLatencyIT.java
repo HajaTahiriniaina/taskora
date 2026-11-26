@@ -72,7 +72,7 @@ class BcryptLatencyIT {
       [, $op, $warmup, $n, $password] = $argv;
       $hash = $argv[5] ?? '';
       if ($op === 'make') {
-          echo password_hash($password, PASSWORD_BCRYPT, ['cost' => %d]), "\\n";
+          echo password_hash($password, PASSWORD_BCRYPT, ['cost' => {COST}]), "\\n";
           exit(0);
       }
       $run = $op === 'verify'
@@ -83,7 +83,7 @@ class BcryptLatencyIT {
               }
           }
           : static function () use ($password): void {
-              password_hash($password, PASSWORD_BCRYPT, ['cost' => %d]);
+              password_hash($password, PASSWORD_BCRYPT, ['cost' => {COST}]);
           };
       for ($i = 0; $i < (int) $warmup; $i++) {
           $run();
@@ -94,7 +94,7 @@ class BcryptLatencyIT {
           echo hrtime(true) - $t, "\\n";
       }
       """
-          .formatted(COST, COST);
+          .replace("{COST}", Integer.toString(COST));
 
   private static GenericContainer<?> php;
 
@@ -171,7 +171,7 @@ class BcryptLatencyIT {
             "B1 %s — médiane identity %.1f ms, médiane PHP %.1f ms, rapport %.2f (seuil %.2f ;"
                 + " n = %d par implémentation ; %s)",
             what, javaMedian, phpMedian, ratio, MAX_RATIO, MEASURED, String.join(" ; ", blocks));
-    System.out.println(report);
+    IO.println(report);
     assertThat(javaMedian).as(report).isLessThanOrEqualTo(MAX_RATIO * phpMedian);
   }
 
