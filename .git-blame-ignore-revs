@@ -1,0 +1,7 @@
+# Mechanical formatting commits, ignored by git blame
+# (git config blame.ignoreRevsFile .git-blame-ignore-revs)
+
+# style(front): prettier --write (formatage seul)
+489578a6d3d9b5c984cbca614da0aa29de09f8b3
+# style(front): eslint --fix (perfectionist : imports, unions)
+a74eb3467a8484920809c92acf2a01484dbe9f59
