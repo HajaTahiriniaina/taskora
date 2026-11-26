@@ -1,4 +1,12 @@
-import { Component, HostListener, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  HostListener,
+  OnInit,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -14,7 +22,14 @@ import { IconComponent } from '../../shared/icon.component';
 
 @Component({
   selector: 'tk-dashboard',
-  imports: [NgTemplateOutlet, FormsModule, RouterLink, IconComponent, AvatarComponent, TrelloAccessComponent],
+  imports: [
+    NgTemplateOutlet,
+    FormsModule,
+    RouterLink,
+    IconComponent,
+    AvatarComponent,
+    TrelloAccessComponent,
+  ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
@@ -42,11 +57,16 @@ export class DashboardComponent implements OnInit {
 
   filtered = computed(() => {
     const q = this.query().toLowerCase().trim();
-    return this.boards().filter(b => !q || b.title.toLowerCase().includes(q) || (b.description ?? '').toLowerCase().includes(q));
+    return this.boards().filter(
+      (b) =>
+        !q || b.title.toLowerCase().includes(q) || (b.description ?? '').toLowerCase().includes(q),
+    );
   });
-  favorites = computed(() => this.filtered().filter(b => b.favorite));
+  favorites = computed(() => this.filtered().filter((b) => b.favorite));
   totalCards = computed(() => this.boards().reduce((s, b) => s + b.cardCount, 0));
-  collaborators = computed(() => new Set(this.boards().flatMap(b => b.members.map(m => m.id))).size);
+  collaborators = computed(
+    () => new Set(this.boards().flatMap((b) => b.members.map((m) => m.id))).size,
+  );
 
   greeting = (() => {
     const h = new Date().getHours();
@@ -60,24 +80,29 @@ export class DashboardComponent implements OnInit {
   openTrash() {
     this.trashedBoards.set(null);
     this.showTrash.set(true);
-    this.api.trashBoards().subscribe(b => this.trashedBoards.set(b));
+    this.api.trashBoards().subscribe((b) => this.trashedBoards.set(b));
   }
 
   restoreBoard(b: TrashedBoard) {
     this.api.restoreTrashBoard(b.id).subscribe(() => {
-      this.trashedBoards.update(l => (l ?? []).filter(x => x.id !== b.id));
-      this.api.boards().subscribe(list => this.boards.set(list));
+      this.trashedBoards.update((l) => (l ?? []).filter((x) => x.id !== b.id));
+      this.api.boards().subscribe((list) => this.boards.set(list));
       this.toast.success(`« ${b.title} » restauré`);
     });
   }
 
   async purgeBoard(b: TrashedBoard) {
-    if (!(await this.dialog.confirm({
-      title: 'Supprimer définitivement ?',
-      text: `« ${b.title} », ses listes, cartes et pièces jointes seront effacés. Cette action est irréversible.`,
-      confirmText: 'Supprimer définitivement',
-    }))) return;
-    this.api.purgeTrashBoard(b.id).subscribe(() => this.trashedBoards.update(l => (l ?? []).filter(x => x.id !== b.id)));
+    if (
+      !(await this.dialog.confirm({
+        title: 'Supprimer définitivement ?',
+        text: `« ${b.title} », ses listes, cartes et pièces jointes seront effacés. Cette action est irréversible.`,
+        confirmText: 'Supprimer définitivement',
+      }))
+    )
+      return;
+    this.api
+      .purgeTrashBoard(b.id)
+      .subscribe(() => this.trashedBoards.update((l) => (l ?? []).filter((x) => x.id !== b.id)));
   }
 
   daysLeft(purgeAt: string): number {
@@ -85,31 +110,49 @@ export class DashboardComponent implements OnInit {
   }
 
   shortDate(d: string) {
-    return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(d).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
   }
 
   ngOnInit() {
     this.api.boards().subscribe({
-      next: b => { this.boards.set(b); this.loading.set(false); },
+      next: (b) => {
+        this.boards.set(b);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
   }
 
-  firstName() { return this.auth.user()?.name.split(' ')[0] ?? ''; }
+  firstName() {
+    return this.auth.user()?.name.split(' ')[0] ?? '';
+  }
 
   openCreate() {
-    this.form = { title: '', description: '', background: BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)] };
+    this.form = {
+      title: '',
+      description: '',
+      background: BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)],
+    };
     this.showCreate.set(true);
   }
 
   @HostListener('document:keydown.escape')
-  closeCreate() { if (this.dialog.isOpen()) return; this.showCreate.set(false); this.showTrash.set(false); if (!this.importing()) this.showImport.set(false); }
+  closeCreate() {
+    if (this.dialog.isOpen()) return;
+    this.showCreate.set(false);
+    this.showTrash.set(false);
+    if (!this.importing()) this.showImport.set(false);
+  }
 
   create() {
     if (!this.form.title.trim()) return;
     this.creating.set(true);
     this.api.createBoard(this.form).subscribe({
-      next: b => {
+      next: (b) => {
         this.toast.success('Tableau créé 🎉');
         this.router.navigate(['/boards', b.id]);
       },
@@ -141,9 +184,17 @@ export class DashboardComponent implements OnInit {
       next: ({ boardId, report: r }) => {
         this.importing.set(false);
         this.showImport.set(false);
-        this.toast.show(`Import terminé : ${r.lists} listes, ${r.cards} cartes (numéros conservés), ${r.comments} commentaires.`, 'success', 6000);
+        this.toast.show(
+          `Import terminé : ${r.lists} listes, ${r.cards} cartes (numéros conservés), ${r.comments} commentaires.`,
+          'success',
+          6000,
+        );
         if (r.membersUnmatched.length) {
-          this.toast.show(`${r.membersUnmatched.length} membre(s) Trello sans compte Taskora : invitez-les depuis « Partager ».`, 'info', 8000);
+          this.toast.show(
+            `${r.membersUnmatched.length} membre(s) Trello sans compte Taskora : invitez-les depuis « Partager ».`,
+            'info',
+            8000,
+          );
         }
         this.router.navigate(['/boards', boardId]);
         if (copy && r.files) this.trello.start(boardId);
@@ -155,7 +206,9 @@ export class DashboardComponent implements OnInit {
   toggleFavorite(b: BoardSummary, e: Event) {
     e.preventDefault();
     e.stopPropagation();
-    this.boards.update(list => list.map(x => (x.id === b.id ? { ...x, favorite: !x.favorite } : x)));
+    this.boards.update((list) =>
+      list.map((x) => (x.id === b.id ? { ...x, favorite: !x.favorite } : x)),
+    );
     this.api.toggleFavorite(b.id).subscribe();
   }
 }

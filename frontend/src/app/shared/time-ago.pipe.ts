@@ -9,6 +9,10 @@ export class TimeAgoPipe implements PipeTransform {
     if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
     if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
     if (diff < 604800) return `il y a ${Math.floor(diff / 86400)} j`;
-    return new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(value).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
   }
 }

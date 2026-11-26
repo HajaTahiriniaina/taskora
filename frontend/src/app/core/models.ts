@@ -166,12 +166,31 @@ export interface CardFilters {
 }
 
 export const EMPTY_FILTERS: CardFilters = {
-  q: '', noMember: false, mine: false, members: [], done: false, open: false, due: [], noLabel: false, labels: [], cf: {},
+  q: '',
+  noMember: false,
+  mine: false,
+  members: [],
+  done: false,
+  open: false,
+  due: [],
+  noLabel: false,
+  labels: [],
+  cf: {},
 };
 
 export function activeFilterCount(f: CardFilters): number {
-  return (f.q.trim() ? 1 : 0) + (f.noMember ? 1 : 0) + (f.mine ? 1 : 0) + f.members.length + (f.done ? 1 : 0) + (f.open ? 1 : 0)
-    + f.due.length + (f.noLabel ? 1 : 0) + f.labels.length + Object.values(f.cf).reduce((s, v) => s + v.length, 0);
+  return (
+    (f.q.trim() ? 1 : 0) +
+    (f.noMember ? 1 : 0) +
+    (f.mine ? 1 : 0) +
+    f.members.length +
+    (f.done ? 1 : 0) +
+    (f.open ? 1 : 0) +
+    f.due.length +
+    (f.noLabel ? 1 : 0) +
+    f.labels.length +
+    Object.values(f.cf).reduce((s, v) => s + v.length, 0)
+  );
 }
 
 export interface Invitation {
@@ -201,9 +220,31 @@ export interface AppNotification {
   createdAt: string;
 }
 
-export const BACKGROUNDS = ['aurora', 'sunset', 'ocean', 'forest', 'midnight', 'peach', 'lagoon', 'berry', 'graphite', 'sand'];
+export const BACKGROUNDS = [
+  'aurora',
+  'sunset',
+  'ocean',
+  'forest',
+  'midnight',
+  'peach',
+  'lagoon',
+  'berry',
+  'graphite',
+  'sand',
+];
 
-export const PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#0ea5e9', '#6366f1', '#8b5cf6', '#ec4899', '#64748b'];
+export const PALETTE = [
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#14b8a6',
+  '#0ea5e9',
+  '#6366f1',
+  '#8b5cf6',
+  '#ec4899',
+  '#64748b',
+];
 
 export const PRIORITIES: { value: Priority; label: string; color: string }[] = [
   { value: 'none', label: 'Aucune', color: '#94a3b8' },

@@ -22,7 +22,9 @@ export class InViewDirective implements OnDestroy {
       const margin = this.tkInViewMargin();
       this.observer?.disconnect();
       this.observer = new IntersectionObserver(
-        entries => { if (entries.some(e => e.isIntersecting)) this.tkInView.emit(); },
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) this.tkInView.emit();
+        },
         { root, rootMargin: margin },
       );
       this.observer.observe(this.el.nativeElement);

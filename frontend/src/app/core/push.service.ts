@@ -30,16 +30,28 @@ export class PushService {
   private started = false;
 
   get supported(): boolean {
-    return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext;
+    return (
+      typeof window !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      'PushManager' in window &&
+      'Notification' in window &&
+      window.isSecureContext
+    );
   }
 
   /** At login / app start: registers the worker, re-links an existing subscription to the current user. */
   async start() {
     if (this.started) return;
     this.started = true;
-    if (!this.supported) { this.state.set('unsupported'); return; }
-    if (Notification.permission === 'denied') { this.state.set('denied'); return; }
-    navigator.serviceWorker.addEventListener('message', e => this.onWorkerMessage(e));
+    if (!this.supported) {
+      this.state.set('unsupported');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      this.state.set('denied');
+      return;
+    }
+    navigator.serviceWorker.addEventListener('message', (e) => this.onWorkerMessage(e));
     try {
       this.registration = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' });
       const sub = await this.registration.pushManager.getSubscription();
@@ -61,13 +73,25 @@ export class PushService {
     this.busy.set(true);
     try {
       const config = await firstValueFrom(this.api.pushConfig());
-      if (!config.configured) { this.state.set('unconfigured'); return false; }
+      if (!config.configured) {
+        this.state.set('unconfigured');
+        return false;
+      }
       const permission = await Notification.requestPermission();
-      if (permission !== 'granted') { this.state.set(permission === 'denied' ? 'denied' : 'off'); return false; }
-      const reg = this.registration ?? (this.registration = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' }));
+      if (permission !== 'granted') {
+        this.state.set(permission === 'denied' ? 'denied' : 'off');
+        return false;
+      }
+      const reg =
+        this.registration ??
+        (this.registration = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' }));
       await navigator.serviceWorker.ready;
-      const sub = (await reg.pushManager.getSubscription())
-        ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(config.publicKey) }));
+      const sub =
+        (await reg.pushManager.getSubscription()) ??
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64UrlToBytes(config.publicKey),
+        }));
       await firstValueFrom(this.api.pushSubscribe(sub.toJSON(), deviceLabel()));
       await this.setCurrent(sub);
       this.state.set('on');
@@ -103,7 +127,9 @@ export class PushService {
         await firstValueFrom(this.api.pushUnsubscribe(sub.endpoint)).catch(() => undefined);
         await sub.unsubscribe();
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     this.state.set(this.supported ? 'off' : 'unsupported');
     this.devices.set([]);
     this.started = false;
@@ -119,32 +145,48 @@ export class PushService {
       const config = await firstValueFrom(this.api.pushConfig());
       this.devices.set(config.devices);
       if (!config.configured && this.state() === 'off') this.state.set('unconfigured');
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   async removeDevice(d: PushDevice) {
-    if (d.endpointHash === this.currentHash()) { await this.disable(); return; }
+    if (d.endpointHash === this.currentHash()) {
+      await this.disable();
+      return;
+    }
     await firstValueFrom(this.api.pushRemoveDevice(d.id));
-    this.devices.update(list => list.filter(x => x.id !== d.id));
+    this.devices.update((list) => list.filter((x) => x.id !== d.id));
   }
 
   private async setCurrent(sub: PushSubscription) {
     const bytes = new TextEncoder().encode(sub.endpoint);
     const digest = await crypto.subtle.digest('SHA-256', bytes);
-    this.currentHash.set(Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join(''));
+    this.currentHash.set(
+      Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(''),
+    );
   }
 
   private onWorkerMessage(e: MessageEvent) {
     const data = e.data as { type?: string; url?: string } | null;
     if (data?.type === 'taskora-push') this.notifs.load();
-    if (data?.type === 'taskora-open' && typeof data.url === 'string' && data.url.startsWith('/') && !data.url.startsWith('//')) {
+    if (
+      data?.type === 'taskora-open' &&
+      typeof data.url === 'string' &&
+      data.url.startsWith('/') &&
+      !data.url.startsWith('//')
+    ) {
       this.router.navigateByUrl(data.url);
     }
   }
 }
 
 function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
-  const padded = (value + '='.repeat((4 - (value.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  const padded = (value + '='.repeat((4 - (value.length % 4)) % 4))
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
   const raw = atob(padded);
   const out = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
@@ -154,9 +196,27 @@ function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
 /** "Chrome · macOS": shown in the list of devices. */
 function deviceLabel(): string {
   const ua = navigator.userAgent;
-  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
-    : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navigateur';
-  const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'macOS'
-    : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /OPR\//.test(ua)
+      ? 'Opera'
+      : /Firefox\//.test(ua)
+        ? 'Firefox'
+        : /Chrome\//.test(ua)
+          ? 'Chrome'
+          : /Safari\//.test(ua)
+            ? 'Safari'
+            : 'Navigateur';
+  const os = /iPhone|iPad/.test(ua)
+    ? 'iOS'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Mac OS X/.test(ua)
+        ? 'macOS'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : '';
   return os ? `${browser} · ${os}` : browser;
 }

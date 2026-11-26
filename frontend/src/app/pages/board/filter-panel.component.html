@@ -1,33 +1,80 @@
-<aside class="filter-panel" role="dialog" aria-label="Filtrer les cartes" (click)="$event.stopPropagation()">
+<aside
+  class="filter-panel"
+  role="dialog"
+  aria-label="Filtrer les cartes"
+  (click)="$event.stopPropagation()"
+>
   <header>
-    <h2>Filtre @if (count()) { <span class="badge">{{ count() }}</span> }</h2>
-    <button class="icon-btn" (click)="closed.emit()" aria-label="Fermer"><tk-icon name="x" /></button>
+    <h2>
+      Filtre
+      @if (count()) {
+        <span class="badge">{{ count() }}</span>
+      }
+    </h2>
+    <button class="icon-btn" (click)="closed.emit()" aria-label="Fermer">
+      <tk-icon name="x" />
+    </button>
   </header>
 
   <div class="body">
     <section>
       <h3>Mot-clé</h3>
-      <input id="board-search" class="input" placeholder="Saisissez un mot-clé…" [value]="keyword()" (input)="onKeyword($any($event.target).value)" autofocus />
-      <p class="hint">Recherchez des cartes, des membres, des étiquettes, des champs personnalisés et plus encore.</p>
+      <input
+        id="board-search"
+        class="input"
+        placeholder="Saisissez un mot-clé…"
+        [value]="keyword()"
+        (input)="onKeyword($any($event.target).value)"
+        autofocus
+      />
+      <p class="hint">
+        Recherchez des cartes, des membres, des étiquettes, des champs personnalisés et plus encore.
+      </p>
     </section>
 
     <section>
       <h3>Membres</h3>
       <label class="opt">
-        <input type="checkbox" class="checkbox" [checked]="current().noMember" (change)="toggle('noMember')" />
+        <input
+          type="checkbox"
+          class="checkbox"
+          [checked]="current().noMember"
+          (change)="toggle('noMember')"
+        />
         <span class="ico"><tk-icon name="user" [size]="16" /></span><b>Aucun membre</b>
       </label>
       <label class="opt">
-        <input type="checkbox" class="checkbox" [checked]="current().mine" (change)="toggle('mine')" />
+        <input
+          type="checkbox"
+          class="checkbox"
+          [checked]="current().mine"
+          (change)="toggle('mine')"
+        />
         <tk-avatar [user]="me()" [size]="28" /><b>Cartes qui me sont attribuées</b>
       </label>
       <div class="opt">
-        <input type="checkbox" class="checkbox" [checked]="current().members.length > 0" (change)="membersHeader()" aria-label="Filtrer par membres choisis" />
-        <button class="picker" (click)="showMemberPicker.set(!showMemberPicker())" [attr.aria-expanded]="showMemberPicker()">
+        <input
+          type="checkbox"
+          class="checkbox"
+          [checked]="current().members.length > 0"
+          (change)="membersHeader()"
+          aria-label="Filtrer par membres choisis"
+        />
+        <button
+          class="picker"
+          (click)="showMemberPicker.set(!showMemberPicker())"
+          [attr.aria-expanded]="showMemberPicker()"
+        >
           @if (selectedMembers().length) {
-            <span class="avatar-stack">@for (m of selectedMembers().slice(0, 5); track m.id) { <tk-avatar [user]="m" [size]="24" /> }</span>
+            <span class="avatar-stack">
+              @for (m of selectedMembers().slice(0, 5); track m.id) {
+                <tk-avatar [user]="m" [size]="24" />
+              }
+            </span>
             <span>{{ selectedMembers().length }} membre(s)</span>
-          } @else { <span class="placeholder">Choisir les membres</span> }
+          } @else {
+            <span class="placeholder">Choisir les membres</span>
+          }
           <tk-icon [name]="'chevronDown'" [size]="16" [class.up]="showMemberPicker()" />
         </button>
       </div>
@@ -35,8 +82,14 @@
         <div class="member-list">
           @for (m of board().members; track m.id) {
             <label class="opt sub">
-              <input type="checkbox" class="checkbox" [checked]="current().members.includes(m.id)" (change)="toggleIn('members', m.id)" />
-              <tk-avatar [user]="m" [size]="26" /><span class="grow">{{ m.name }}</span><small>{{ m.email }}</small>
+              <input
+                type="checkbox"
+                class="checkbox"
+                [checked]="current().members.includes(m.id)"
+                (change)="toggleIn('members', m.id)"
+              />
+              <tk-avatar [user]="m" [size]="26" /><span class="grow">{{ m.name }}</span
+              ><small>{{ m.email }}</small>
             </label>
           }
         </div>
@@ -45,16 +98,38 @@
 
     <section>
       <h3>Statut de la carte</h3>
-      <label class="opt"><input type="checkbox" class="checkbox" [checked]="current().done" (change)="toggle('done')" /> Marqué comme étant terminé</label>
-      <label class="opt"><input type="checkbox" class="checkbox" [checked]="current().open" (change)="toggle('open')" /> Non marqué comme terminé</label>
+      <label class="opt"
+        ><input
+          type="checkbox"
+          class="checkbox"
+          [checked]="current().done"
+          (change)="toggle('done')"
+        />
+        Marqué comme étant terminé</label
+      >
+      <label class="opt"
+        ><input
+          type="checkbox"
+          class="checkbox"
+          [checked]="current().open"
+          (change)="toggle('open')"
+        />
+        Non marqué comme terminé</label
+      >
     </section>
 
     <section>
       <h3>Date limite</h3>
       @for (d of dueOptions; track d.value) {
         <label class="opt">
-          <input type="checkbox" class="checkbox" [checked]="current().due.includes(d.value)" (change)="toggleIn('due', d.value)" />
-          <span class="ico" [class]="'ico ' + d.tone"><tk-icon [name]="d.icon" [size]="16" /></span>{{ d.label }}
+          <input
+            type="checkbox"
+            class="checkbox"
+            [checked]="current().due.includes(d.value)"
+            (change)="toggleIn('due', d.value)"
+          />
+          <span class="ico" [class]="'ico ' + d.tone"><tk-icon [name]="d.icon" [size]="16" /></span
+          >{{ d.label }}
         </label>
       }
     </section>
@@ -62,12 +137,22 @@
     <section>
       <h3>Étiquettes</h3>
       <label class="opt">
-        <input type="checkbox" class="checkbox" [checked]="current().noLabel" (change)="toggle('noLabel')" />
+        <input
+          type="checkbox"
+          class="checkbox"
+          [checked]="current().noLabel"
+          (change)="toggle('noLabel')"
+        />
         <span class="ico"><tk-icon name="tag" [size]="16" /></span><b>Aucune étiquette</b>
       </label>
       @for (l of board().labels; track l.id) {
         <label class="opt">
-          <input type="checkbox" class="checkbox" [checked]="current().labels.includes(l.id)" (change)="toggleIn('labels', l.id)" />
+          <input
+            type="checkbox"
+            class="checkbox"
+            [checked]="current().labels.includes(l.id)"
+            (change)="toggleIn('labels', l.id)"
+          />
           <span class="label-bar" [style.--c]="l.color">{{ l.name }}</span>
         </label>
       }
@@ -75,17 +160,30 @@
 
     @for (f of filterableFields(); track f.id) {
       <section>
-        <h3><tk-icon [name]="f.type === 'select' ? 'list' : 'toggle'" [size]="14" /> {{ f.name }}</h3>
+        <h3>
+          <tk-icon [name]="f.type === 'select' ? 'list' : 'toggle'" [size]="14" /> {{ f.name }}
+        </h3>
         @if (f.type === 'select') {
           @for (o of f.options; track o.id) {
             <label class="opt">
-              <input type="checkbox" class="checkbox" [checked]="hasCf(f.id, o.id)" (change)="toggleCf(f.id, o.id)" />
+              <input
+                type="checkbox"
+                class="checkbox"
+                [checked]="hasCf(f.id, o.id)"
+                (change)="toggleCf(f.id, o.id)"
+              />
               <span class="label-bar" [style.--c]="o.color">{{ o.label }}</span>
             </label>
           }
         } @else {
           <label class="opt">
-            <input type="checkbox" class="checkbox" [checked]="hasCf(f.id, 'true')" (change)="toggleCf(f.id, 'true')" /> Coché
+            <input
+              type="checkbox"
+              class="checkbox"
+              [checked]="hasCf(f.id, 'true')"
+              (change)="toggleCf(f.id, 'true')"
+            />
+            Coché
           </label>
         }
       </section>
@@ -93,6 +191,8 @@
   </div>
 
   <footer>
-    <button class="btn btn-secondary btn-block" [disabled]="!count()" (click)="clear()">Effacer les filtres</button>
+    <button class="btn btn-secondary btn-block" [disabled]="!count()" (click)="clear()">
+      Effacer les filtres
+    </button>
   </footer>
 </aside>

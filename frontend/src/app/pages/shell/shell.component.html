@@ -2,55 +2,111 @@
   <div class="left">
     <a routerLink="/boards" class="brand"><tk-logo /></a>
     <nav class="links">
-      <a routerLink="/boards" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><tk-icon name="grid" [size]="16" /> Tableaux</a>
+      <a routerLink="/boards" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
+        ><tk-icon name="grid" [size]="16" /> Tableaux</a
+      >
     </nav>
   </div>
 
   <div class="right">
-    <button class="icon-btn" (click)="toggleTheme()" [attr.aria-label]="isDark() ? 'Thème clair' : 'Thème sombre'" [title]="isDark() ? 'Thème clair' : 'Thème sombre'">
+    <button
+      class="icon-btn"
+      (click)="toggleTheme()"
+      [attr.aria-label]="isDark() ? 'Thème clair' : 'Thème sombre'"
+      [title]="isDark() ? 'Thème clair' : 'Thème sombre'"
+    >
       <tk-icon [name]="isDark() ? 'sun' : 'moon'" />
     </button>
 
     <div class="anchor">
-      <button class="icon-btn bell" [class.on]="openPanel() === 'notifs'" (click)="toggle('notifs', $event)" aria-label="Notifications">
+      <button
+        class="icon-btn bell"
+        [class.on]="openPanel() === 'notifs'"
+        (click)="toggle('notifs', $event)"
+        aria-label="Notifications"
+      >
         <tk-icon name="bell" />
-        @if (notifs.unread() > 0) { <span class="badge">{{ notifs.unread() > 99 ? '99+' : notifs.unread() }}</span> }
+        @if (notifs.unread() > 0) {
+          <span class="badge">{{ notifs.unread() > 99 ? '99+' : notifs.unread() }}</span>
+        }
       </button>
 
       @if (openPanel() === 'notifs') {
         <div class="panel notif-panel" (click)="$event.stopPropagation()">
           <div class="panel-head">
             <h3>Notifications</h3>
-            @if (notifs.unread() > 0) { <button class="btn btn-ghost btn-sm" (click)="notifs.markAllRead()"><tk-icon name="check" [size]="14" /> Tout lire</button> }
+            @if (notifs.unread() > 0) {
+              <button class="btn btn-ghost btn-sm" (click)="notifs.markAllRead()">
+                <tk-icon name="check" [size]="14" /> Tout lire
+              </button>
+            }
           </div>
           @if (push.state() === 'off' && !pushPromptHidden()) {
             <div class="push-prompt">
               <tk-icon name="bell" [size]="16" />
               <span>Recevez aussi ces notifications en bannière sur ce navigateur.</span>
-              <button class="btn btn-primary btn-sm" (click)="enablePush()" [disabled]="push.busy()">Activer</button>
-              <button class="icon-btn sm" (click)="hidePushPrompt()" aria-label="Plus tard" title="Plus tard"><tk-icon name="x" [size]="13" /></button>
+              <button
+                class="btn btn-primary btn-sm"
+                (click)="enablePush()"
+                [disabled]="push.busy()"
+              >
+                Activer
+              </button>
+              <button
+                class="icon-btn sm"
+                (click)="hidePushPrompt()"
+                aria-label="Plus tard"
+                title="Plus tard"
+              >
+                <tk-icon name="x" [size]="13" />
+              </button>
             </div>
           }
           <div class="tabs">
-            <button [class.active]="notifFilter() === 'all'" (click)="notifFilter.set('all')">Toutes</button>
-            <button [class.active]="notifFilter() === 'unread'" (click)="notifFilter.set('unread')">Non lues @if (notifs.unread()) {<i>{{ notifs.unread() }}</i>}</button>
+            <button [class.active]="notifFilter() === 'all'" (click)="notifFilter.set('all')">
+              Toutes
+            </button>
+            <button [class.active]="notifFilter() === 'unread'" (click)="notifFilter.set('unread')">
+              Non lues
+              @if (notifs.unread()) {
+                <i>{{ notifs.unread() }}</i>
+              }
+            </button>
           </div>
           <div class="notif-list">
             @for (n of visibleNotifs(); track n.id) {
               <div class="notif" [class.unread]="!n.read" (click)="open(n)">
                 <div class="n-avatar">
                   <tk-avatar [user]="n.actor" [size]="36" />
-                  <span class="n-type"><tk-icon [name]="iconFor(n)" [size]="11" [stroke]="2.5" /></span>
+                  <span class="n-type"
+                    ><tk-icon [name]="iconFor(n)" [size]="11" [stroke]="2.5"
+                  /></span>
                 </div>
                 <div class="n-body">
                   <p>{{ n.message }}</p>
-                  <small>{{ n.createdAt | timeAgo }} @if (n.boardTitle) { · {{ n.boardTitle }} }</small>
+                  <small
+                    >{{ n.createdAt | timeAgo }}
+                    @if (n.boardTitle) {
+                      · {{ n.boardTitle }}
+                    }
+                  </small>
                 </div>
-                <button class="icon-btn n-del" (click)="$event.stopPropagation(); notifs.remove(n)" aria-label="Supprimer"><tk-icon name="x" [size]="14" /></button>
-                @if (!n.read) { <span class="dot"></span> }
+                <button
+                  class="icon-btn n-del"
+                  (click)="$event.stopPropagation(); notifs.remove(n)"
+                  aria-label="Supprimer"
+                >
+                  <tk-icon name="x" [size]="14" />
+                </button>
+                @if (!n.read) {
+                  <span class="dot"></span>
+                }
               </div>
             } @empty {
-              <div class="empty"><tk-icon name="inbox" [size]="36" /><p>Vous êtes à jour ✨</p></div>
+              <div class="empty">
+                <tk-icon name="inbox" [size]="36" />
+                <p>Vous êtes à jour ✨</p>
+              </div>
             }
           </div>
         </div>
@@ -65,13 +121,21 @@
         <div class="panel user-panel" (click)="$event.stopPropagation()">
           <div class="me">
             <tk-avatar [user]="auth.user()" [size]="42" />
-            <div><strong>{{ auth.user()?.name }}</strong><small>{{ auth.user()?.email }}</small></div>
+            <div>
+              <strong>{{ auth.user()?.name }}</strong><small>{{ auth.user()?.email }}</small>
+            </div>
           </div>
           <hr class="divider" />
-          <a class="menu-item" routerLink="/profile" (click)="openPanel.set(null)"><tk-icon name="user" [size]="16" /> Mon profil</a>
-          <a class="menu-item" routerLink="/boards" (click)="openPanel.set(null)"><tk-icon name="grid" [size]="16" /> Mes tableaux</a>
+          <a class="menu-item" routerLink="/profile" (click)="openPanel.set(null)"
+            ><tk-icon name="user" [size]="16" /> Mon profil</a
+          >
+          <a class="menu-item" routerLink="/boards" (click)="openPanel.set(null)"
+            ><tk-icon name="grid" [size]="16" /> Mes tableaux</a
+          >
           <hr class="divider" />
-          <button class="menu-item danger" (click)="logout()"><tk-icon name="logout" [size]="16" /> Déconnexion</button>
+          <button class="menu-item danger" (click)="logout()">
+            <tk-icon name="logout" [size]="16" /> Déconnexion
+          </button>
         </div>
       }
     </div>

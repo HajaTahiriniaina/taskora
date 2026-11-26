@@ -4,12 +4,18 @@ import { DialogService } from './dialog.service';
 
 export type ToastKind = 'success' | 'error' | 'info';
 
-interface QueuedToast { message: string; kind: ToastKind; duration: number; }
+interface QueuedToast {
+  message: string;
+  kind: ToastKind;
+  duration: number;
+}
 
 /** Static icons (same stroke style as the app's icons); constant strings, never user data. */
 const ICONS: Record<ToastKind, string> = {
-  success: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-  error: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  success:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  error:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   info: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 16v-5M12 8h.01"/></svg>',
 };
 
@@ -33,13 +39,15 @@ export class ToastService {
     if (!this.running) this.drain();
   }
 
-  success(message: string) { this.show(message, 'success'); }
+  success(message: string) {
+    this.show(message, 'success');
+  }
 
   private async drain() {
     this.running = true;
     while (this.queue.length) {
       // never on top of (and never closing) a confirmation dialog
-      while (this.dialog.isOpen()) await new Promise(r => setTimeout(r, 250));
+      while (this.dialog.isOpen()) await new Promise((r) => setTimeout(r, 250));
       const t = this.queue.shift()!;
       const busy = this.queue.length > 1; // several waiting: shorter display
       const shownAt = Date.now();
@@ -62,16 +70,20 @@ export class ToastService {
           closeButton: 'tk-toast-close',
           timerProgressBar: 'tk-toast-progress',
         },
-        didOpen: popup => {
+        didOpen: (popup) => {
           popup.addEventListener('mouseenter', Swal.stopTimer);
           popup.addEventListener('mouseleave', Swal.resumeTimer);
         },
       });
       // Replaced by a confirmation dialog before the end (not by its timer nor the user): show it again after
       const left = t.duration - (Date.now() - shownAt);
-      if (result.dismiss !== Swal.DismissReason.timer && result.dismiss !== Swal.DismissReason.close && left > 500) {
+      if (
+        result.dismiss !== Swal.DismissReason.timer &&
+        result.dismiss !== Swal.DismissReason.close &&
+        left > 500
+      ) {
         this.queue.unshift({ ...t, duration: Math.max(2500, left) });
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise((r) => setTimeout(r, 300));
       }
     }
     this.running = false;

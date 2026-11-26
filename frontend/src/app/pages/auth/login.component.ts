@@ -15,10 +15,16 @@ import { LogoComponent } from '../../shared/logo.component';
         <tk-logo [light]="true" />
         <div>
           <h2>Bon retour parmi nous 👋</h2>
-          <p>Vos tableaux, vos cartes et votre équipe vous attendent exactement là où vous les avez laissés.</p>
+          <p>
+            Vos tableaux, vos cartes et votre équipe vous attendent exactement là où vous les avez
+            laissés.
+          </p>
         </div>
         <div class="quote">
-          <p>« Depuis que l’équipe utilise Taskora, nos sprints sont plus clairs et personne ne rate une échéance. »</p>
+          <p>
+            « Depuis que l’équipe utilise Taskora, nos sprints sont plus clairs et personne ne rate
+            une échéance. »
+          </p>
           <small>— Une équipe produit heureuse</small>
         </div>
       </aside>
@@ -27,20 +33,54 @@ import { LogoComponent } from '../../shared/logo.component';
           <div class="mobile-logo"><tk-logo /></div>
           <h1>Connexion</h1>
           <p>Ravi de vous revoir sur Taskora.</p>
-          @if (error()) { <div class="error"><tk-icon name="x" [size]="16" />{{ error() }}</div> }
+          @if (error()) {
+            <div class="error"><tk-icon name="x" [size]="16" />{{ error() }}</div>
+          }
           <div class="field">
             <label for="email">Adresse e-mail</label>
-            <input id="email" class="input" type="email" name="email" [(ngModel)]="email" required autocomplete="email" placeholder="vous@entreprise.com" />
+            <input
+              id="email"
+              class="input"
+              type="email"
+              name="email"
+              [(ngModel)]="email"
+              required
+              autocomplete="email"
+              placeholder="vous@entreprise.com"
+            />
           </div>
           <div class="field">
             <label for="password">Mot de passe</label>
             <div class="pw">
-              <input id="password" class="input" [type]="show() ? 'text' : 'password'" name="password" [(ngModel)]="password" required autocomplete="current-password" placeholder="••••••••" />
-              <button type="button" class="icon-btn" (click)="show.set(!show())" [attr.aria-label]="show() ? 'Masquer' : 'Afficher'"><tk-icon name="eye" [size]="16" /></button>
+              <input
+                id="password"
+                class="input"
+                [type]="show() ? 'text' : 'password'"
+                name="password"
+                [(ngModel)]="password"
+                required
+                autocomplete="current-password"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                class="icon-btn"
+                (click)="show.set(!show())"
+                [attr.aria-label]="show() ? 'Masquer' : 'Afficher'"
+              >
+                <tk-icon name="eye" [size]="16" />
+              </button>
             </div>
           </div>
           <button class="btn btn-primary btn-lg btn-block" [disabled]="loading() || f.invalid">
-            @if (loading()) { <span class="spinner" style="width:18px;height:18px;border-width:2px;border-color:rgba(255,255,255,.3);border-top-color:#fff"></span> } @else { Se connecter }
+            @if (loading()) {
+              <span
+                class="spinner"
+                style="width:18px;height:18px;border-width:2px;border-color:rgba(255,255,255,.3);border-top-color:#fff"
+              ></span>
+            } @else {
+              Se connecter
+            }
           </button>
           <p class="switch">Pas encore de compte ? <a routerLink="/register">Créer un compte</a></p>
         </form>
@@ -62,9 +102,13 @@ export class LoginComponent {
     this.error.set('');
     this.auth.login(this.email, this.password).subscribe({
       next: () => this.router.navigateByUrl('/boards'),
-      error: err => {
+      error: (err) => {
         this.loading.set(false);
-        this.error.set(err.status === 401 ? 'E-mail ou mot de passe incorrect.' : 'Impossible de se connecter pour le moment.');
+        this.error.set(
+          err.status === 401
+            ? 'E-mail ou mot de passe incorrect.'
+            : 'Impossible de se connecter pour le moment.',
+        );
       },
     });
   }

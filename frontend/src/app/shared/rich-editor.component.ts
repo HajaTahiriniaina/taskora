@@ -1,5 +1,15 @@
 import {
-  ChangeDetectionStrategy, Component, ElementRef, OnDestroy, afterNextRender, computed, inject, input, output, signal, viewChild,
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnDestroy,
+  afterNextRender,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
 } from '@angular/core';
 import { Editor } from '@tiptap/core';
 import { Highlight } from '@tiptap/extension-highlight';
@@ -19,8 +29,28 @@ import { ToastService } from '../core/toast.service';
 import { IconComponent } from './icon.component';
 import { toHtml } from './rich-text';
 
-const TEXT_COLORS = ['#0f172a', '#64748b', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#0d9488', '#2563eb', '#7c3aed', '#db2777'];
-const HIGHLIGHTS = ['#fef08a', '#bbf7d0', '#bae6fd', '#ddd6fe', '#fbcfe8', '#fed7aa', '#fecaca', '#e2e8f0'];
+const TEXT_COLORS = [
+  '#0f172a',
+  '#64748b',
+  '#dc2626',
+  '#ea580c',
+  '#ca8a04',
+  '#16a34a',
+  '#0d9488',
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+];
+const HIGHLIGHTS = [
+  '#fef08a',
+  '#bbf7d0',
+  '#bae6fd',
+  '#ddd6fe',
+  '#fbcfe8',
+  '#fed7aa',
+  '#fecaca',
+  '#e2e8f0',
+];
 
 /**
  * WYSIWYG editor (Tiptap / ProseMirror): headings, bold, italic, underline, strike, text color, highlight,
@@ -74,7 +104,8 @@ export class RichEditorComponent implements OnDestroy {
     this.tick();
     const e = this.editor;
     if (!e) return 'Texte';
-    for (const level of [1, 2, 3] as const) if (e.isActive('heading', { level })) return `Titre ${level}`;
+    for (const level of [1, 2, 3] as const)
+      if (e.isActive('heading', { level })) return `Titre ${level}`;
     return 'Texte';
   });
 
@@ -85,7 +116,12 @@ export class RichEditorComponent implements OnDestroy {
         extensions: [
           StarterKit.configure({
             heading: { levels: [1, 2, 3] },
-            link: { openOnClick: false, autolink: true, defaultProtocol: 'https', HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } },
+            link: {
+              openOnClick: false,
+              autolink: true,
+              defaultProtocol: 'https',
+              HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' },
+            },
           }),
           TextStyle,
           Color,
@@ -94,20 +130,34 @@ export class RichEditorComponent implements OnDestroy {
           TaskList,
           TaskItem.configure({
             nested: true,
-            a11y: { checkboxLabel: (node, checked) => `Tâche ${checked ? 'terminée' : 'à faire'} : ${node.textContent || 'vide'}` },
+            a11y: {
+              checkboxLabel: (node, checked) =>
+                `Tâche ${checked ? 'terminée' : 'à faire'} : ${node.textContent || 'vide'}`,
+            },
           }),
           Image.configure({ allowBase64: false }),
           Mention.configure({
             renderText: ({ node }) => `@${node.attrs['label'] ?? node.attrs['id']}`,
-            renderHTML: ({ node }) => ['span', { 'data-type': 'mention', 'data-id': node.attrs['id'], 'data-label': node.attrs['label'] }, `@${node.attrs['label'] ?? node.attrs['id']}`],
+            renderHTML: ({ node }) => [
+              'span',
+              {
+                'data-type': 'mention',
+                'data-id': node.attrs['id'],
+                'data-label': node.attrs['label'],
+              },
+              `@${node.attrs['label'] ?? node.attrs['id']}`,
+            ],
             suggestion: {
               char: '@',
               items: ({ query }) => this.matchMembers(query),
               render: () => ({
-                onStart: props => this.showMentions(props),
-                onUpdate: props => this.showMentions(props),
+                onStart: (props) => this.showMentions(props),
+                onUpdate: (props) => this.showMentions(props),
                 onKeyDown: ({ event }) => this.mentionKey(event),
-                onExit: () => { this.mention.set(null); this.mentionCommand = null; },
+                onExit: () => {
+                  this.mention.set(null);
+                  this.mentionCommand = null;
+                },
               }),
             },
           }),
@@ -118,9 +168,21 @@ export class RichEditorComponent implements OnDestroy {
         editorProps: {
           attributes: { class: 'rich rich-editable', role: 'textbox', 'aria-multiline': 'true' },
           handleKeyDown: (_view, event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { this.submitted.emit(); return true; }
-            if (this.mention() && ['Escape', 'Enter', 'Tab', 'ArrowUp', 'ArrowDown'].includes(event.key) && !event.metaKey && !event.ctrlKey) return false; // handled by the "@" list
-            if (event.key === 'Escape') { this.cancelled.emit(); return true; }
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              this.submitted.emit();
+              return true;
+            }
+            if (
+              this.mention() &&
+              ['Escape', 'Enter', 'Tab', 'ArrowUp', 'ArrowDown'].includes(event.key) &&
+              !event.metaKey &&
+              !event.ctrlKey
+            )
+              return false; // handled by the "@" list
+            if (event.key === 'Escape') {
+              this.cancelled.emit();
+              return true;
+            }
             return false;
           },
           handlePaste: (_view, event) => this.handleFiles(event.clipboardData?.files),
@@ -129,7 +191,7 @@ export class RichEditorComponent implements OnDestroy {
             return this.handleFiles((event as DragEvent).dataTransfer?.files, pos);
           },
         },
-        onTransaction: () => this.tick.update(t => t + 1),
+        onTransaction: () => this.tick.update((t) => t + 1),
         onUpdate: ({ editor }) => this.isEmpty.set(editor.isEmpty),
       });
       this.isEmpty.set(this.editor.isEmpty);
@@ -159,24 +221,43 @@ export class RichEditorComponent implements OnDestroy {
 
   /** Inserts a mention chip ("@Name") followed by a space. */
   insertMention(user: User) {
-    this.editor?.chain().focus().insertContent([
-      { type: 'mention', attrs: { id: String(user.id), label: user.name } },
-      { type: 'text', text: ' ' },
-    ]).run();
+    this.editor
+      ?.chain()
+      .focus()
+      .insertContent([
+        { type: 'mention', attrs: { id: String(user.id), label: user.name } },
+        { type: 'text', text: ' ' },
+      ])
+      .run();
   }
 
   // ---------- "@" mentions ----------
   private matchMembers(query: string): User[] {
     const q = norm(query);
     return this.mentionables()
-      .filter(u => !q || norm(u.name).split(/\s+/).some(w => w.startsWith(q)) || norm(u.name).startsWith(q) || norm(u.email).startsWith(q))
+      .filter(
+        (u) =>
+          !q ||
+          norm(u.name)
+            .split(/\s+/)
+            .some((w) => w.startsWith(q)) ||
+          norm(u.name).startsWith(q) ||
+          norm(u.email).startsWith(q),
+      )
       .slice(0, 8);
   }
 
-  private showMentions(props: { items: User[]; command: (a: { id: string; label: string }) => void; clientRect?: (() => DOMRect | null) | null }) {
+  private showMentions(props: {
+    items: User[];
+    command: (a: { id: string; label: string }) => void;
+    clientRect?: (() => DOMRect | null) | null;
+  }) {
     this.mentionCommand = props.command;
     const rect = props.clientRect?.();
-    if (!props.items.length || !rect) { this.mention.set(null); return; }
+    if (!props.items.length || !rect) {
+      this.mention.set(null);
+      return;
+    }
     const box = this.frame().nativeElement.getBoundingClientRect();
     const prev = this.mention();
     this.mention.set({
@@ -195,8 +276,14 @@ export class RichEditorComponent implements OnDestroy {
       this.mention.set({ ...m, index: (m.index + (event.key === 'ArrowDown' ? 1 : n - 1)) % n });
       return true;
     }
-    if (event.key === 'Enter' || event.key === 'Tab') { this.pickMention(m.items[m.index]); return true; }
-    if (event.key === 'Escape') { this.mention.set(null); return true; }
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      this.pickMention(m.items[m.index]);
+      return true;
+    }
+    if (event.key === 'Escape') {
+      this.mention.set(null);
+      return true;
+    }
     return false;
   }
 
@@ -238,15 +325,15 @@ export class RichEditorComponent implements OnDestroy {
   }
 
   setHeading(level: 0 | 1 | 2 | 3) {
-    this.run(c => (level ? c.setHeading({ level }) : c.setParagraph()));
+    this.run((c) => (level ? c.setHeading({ level }) : c.setParagraph()));
   }
 
   setColor(color: string | null) {
-    this.run(c => (color ? c.setColor(color) : c.unsetColor()));
+    this.run((c) => (color ? c.setColor(color) : c.unsetColor()));
   }
 
   setHighlight(color: string | null) {
-    this.run(c => (color ? c.setHighlight({ color }) : c.unsetHighlight()));
+    this.run((c) => (color ? c.setHighlight({ color }) : c.unsetHighlight()));
   }
 
   togglePop(p: 'color' | 'highlight' | 'link' | 'heading', e: Event) {
@@ -259,14 +346,16 @@ export class RichEditorComponent implements OnDestroy {
   applyLink() {
     const url = this.linkUrl.trim();
     if (!url) {
-      this.run(c => c.extendMarkRange('link').unsetLink());
+      this.run((c) => c.extendMarkRange('link').unsetLink());
       return;
     }
     const href = /^(https?:|mailto:)/i.test(url) ? url : `https://${url}`;
     const { empty } = this.editor!.state.selection;
-    this.run(c => (empty
-      ? c.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href } }] })
-      : c.extendMarkRange('link').setLink({ href })));
+    this.run((c) =>
+      empty
+        ? c.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href } }] })
+        : c.extendMarkRange('link').setLink({ href }),
+    );
   }
 
   pickImage() {
@@ -296,21 +385,38 @@ export class RichEditorComponent implements OnDestroy {
         continue;
       }
       const uid = ++this.uploadSeq;
-      this.fileUploads.update(u => [...u, { uid, name: file.name, progress: 0, saving: false }]);
-      const done = () => this.fileUploads.update(u => u.filter(x => x.uid !== uid));
+      this.fileUploads.update((u) => [...u, { uid, name: file.name, progress: 0, saving: false }]);
+      const done = () => this.fileUploads.update((u) => u.filter((x) => x.uid !== uid));
       this.api.uploadFileEvents(file).subscribe({
-        next: e => {
+        next: (e) => {
           if (e.type === HttpEventType.UploadProgress) {
-            const progress = Math.min(100, Math.floor((e.loaded / ((e.total ?? file.size) || 1)) * 100));
-            this.fileUploads.update(u => u.map(x => (x.uid === uid ? { ...x, progress, saving: progress >= 100 } : x)));
+            const progress = Math.min(
+              100,
+              Math.floor((e.loaded / ((e.total ?? file.size) || 1)) * 100),
+            );
+            this.fileUploads.update((u) =>
+              u.map((x) => (x.uid === uid ? { ...x, progress, saving: progress >= 100 } : x)),
+            );
           } else if (e.type === HttpEventType.Response && e.body) {
             done();
             const { url, image } = e.body;
             const node = image
               ? { type: 'image', attrs: { src: url, alt: file.name } }
-              : { type: 'paragraph', content: [{ type: 'text', text: `📎 ${file.name}`, marks: [{ type: 'link', attrs: { href: url } }] }] };
+              : {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'text',
+                      text: `📎 ${file.name}`,
+                      marks: [{ type: 'link', attrs: { href: url } }],
+                    },
+                  ],
+                };
             const chain = this.editor!.chain().focus();
-            (pos !== undefined ? chain.insertContentAt(pos, node) : chain.insertContent(node)).run();
+            (pos !== undefined
+              ? chain.insertContentAt(pos, node)
+              : chain.insertContent(node)
+            ).run();
           }
         },
         error: () => done(), // error toast already shown by the interceptor
@@ -322,5 +428,8 @@ export class RichEditorComponent implements OnDestroy {
 
 /** Lower case without accents, for "@élo" → "Éloïse". */
 function norm(s: string): string {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
