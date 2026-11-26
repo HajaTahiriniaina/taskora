@@ -69,13 +69,20 @@
          (A1, A4) ; un jeton CSRF n'apporterait rien, aucun navigateur n'envoie l'en-tête d'office.
       e2 java:S2077 (SQL dynamique) : seul le nom de schéma historique est concaténé, validé [a-z_]+ au démarrage
          (LegacySchema), plus des constantes ; toutes les valeurs passent en paramètres liés.
-      Toute nouvelle occurrence dans un AUTRE fichier reste signalée.
+      e3 java:S5998 (répétition d'expression régulière, risque de débordement de pile) : l'entrée est bornée à
+         320 octets AVANT l'expression régulière (PhpEmailValidator) ; l'expression est un portage fidèle de PHP
+         FILTER_VALIDATE_EMAIL, vérifié à 100 % par le golden php-filter-validate-email.json : la réécrire
+         (quantificateurs possessifs) risquerait la compatibilité sans gain réel.
+      Toute nouvelle occurrence dans un AUTRE fichier reste signalée. e2 et e3 couvrent tout leur fichier :
+      revue manuelle obligatoire de ces fichiers à chaque modification (A16).
     -->
-    <sonar.issue.ignore.multicriteria>e1,e2</sonar.issue.ignore.multicriteria>
+    <sonar.issue.ignore.multicriteria>e1,e2,e3</sonar.issue.ignore.multicriteria>
     <sonar.issue.ignore.multicriteria.e1.ruleKey>java:S4502</sonar.issue.ignore.multicriteria.e1.ruleKey>
     <sonar.issue.ignore.multicriteria.e1.resourceKey>**/com/taskora/identity/config/SecurityConfig.java</sonar.issue.ignore.multicriteria.e1.resourceKey>
     <sonar.issue.ignore.multicriteria.e2.ruleKey>java:S2077</sonar.issue.ignore.multicriteria.e2.ruleKey>
     <sonar.issue.ignore.multicriteria.e2.resourceKey>**/com/taskora/identity/adapter/out/legacy/JdbcLegacyUserSource.java</sonar.issue.ignore.multicriteria.e2.resourceKey>
+    <sonar.issue.ignore.multicriteria.e3.ruleKey>java:S5998</sonar.issue.ignore.multicriteria.e3.ruleKey>
+    <sonar.issue.ignore.multicriteria.e3.resourceKey>**/com/taskora/identity/domain/model/PhpEmailValidator.java</sonar.issue.ignore.multicriteria.e3.resourceKey>
 
     <!-- Sélection des tests par tag JUnit (le profil compat inverse la sélection) -->
     <test.groups></test.groups>
