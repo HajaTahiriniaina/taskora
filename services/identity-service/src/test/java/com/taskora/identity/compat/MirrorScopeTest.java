@@ -54,6 +54,9 @@ class MirrorScopeTest {
               }
             });
         if (n.has("avatarColor")) {
+          assertThat(com.taskora.identity.domain.model.AvatarColor.PALETTE)
+              .as("%s : couleur explicite hors palette (normalisation déterministe)", c.id())
+              .doesNotContain(n.get("avatarColor").asString().toLowerCase(java.util.Locale.ROOT));
           assertThat(n.get("avatarColor").asString())
               .as("%s : E18", c.id())
               .matches("#[0-9a-fA-F]{6}");

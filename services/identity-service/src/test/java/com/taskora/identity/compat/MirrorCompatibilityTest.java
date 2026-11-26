@@ -2,6 +2,7 @@ package com.taskora.identity.compat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.taskora.identity.domain.model.AvatarColor;
 import io.restassured.response.Response;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,12 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("compat")
 class MirrorCompatibilityTest {
   private static final JsonMapper JSON = JsonMapper.builder().build();
+
+  /**
+   * Couleur fixée explicitement par un cas miroir : volontairement HORS de la palette tirée au
+   * hasard à l'inscription, pour être comparée exactement et jamais confondue avec un tirage.
+   */
+  static final String EXPLICIT_COLOR = "#123ABC";
 
   /**
    * Divergences voulues : AUCUNE requête de ces catégories n'est envoyée au miroir. Toute entrée
@@ -157,7 +164,7 @@ class MirrorCompatibilityTest {
               "SC-IDENT-016 couleur valide",
               "PATCH",
               "/api/me",
-              "{\"avatarColor\":\"#0EA5E9\"}",
+              "{\"avatarColor\":\"" + EXPLICIT_COLOR + "\"}",
               true),
           new Case(
               "SC-IDENT-017 changer de mot de passe",
@@ -238,7 +245,10 @@ class MirrorCompatibilityTest {
           user.put("email", "<email>");
         }
         String color = user.get("avatarColor").asString();
-        if (color.matches("#[0-9a-f]{6}") && !"#0ea5e9".equals(color)) {
+        // Une couleur de la palette ne peut venir que du tirage aléatoire (les cas qui fixent une
+        // couleur utilisent EXPLICIT_COLOR, hors palette) : déterministe, et toute autre valeur
+        // reste comparée exactement.
+        if (AvatarColor.PALETTE.contains(color)) {
           user.put("avatarColor", "<palette>");
         }
       }
