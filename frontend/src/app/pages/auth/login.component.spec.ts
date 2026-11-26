@@ -52,6 +52,8 @@ const errorText = (root: HTMLElement) => root.querySelector('.error')?.textConte
 describe('LoginComponent', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => {
+    // Aucune requête HTTP inattendue ni restée sans réponse (revue m5).
+    TestBed.inject(HttpTestingController).verify();
     vi.restoreAllMocks();
     localStorage.clear();
   });

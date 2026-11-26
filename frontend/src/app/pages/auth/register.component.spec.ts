@@ -57,6 +57,8 @@ const VALID = { email: 'camille@example.com', name: 'Camille', password: 'motdep
 describe('RegisterComponent', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => {
+    // Aucune requête HTTP inattendue ni restée sans réponse (revue m5).
+    TestBed.inject(HttpTestingController).verify();
     vi.restoreAllMocks();
     localStorage.clear();
   });
