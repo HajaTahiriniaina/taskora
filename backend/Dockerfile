@@ -1,10 +1,12 @@
 # ---- Taskora API (Symfony 8.1 + FrankenPHP) ----
-FROM dunglas/frankenphp:1-php8.4-alpine AS base
+# Images épinglées par digest d'index multi-architecture (résolu le 26/11/2026 ;
+# mise à jour : docker buildx imagetools inspect <image:tag>).
+FROM dunglas/frankenphp:1-php8.4-alpine@sha256:f81693fa548684eb12964eeab78d86325b75c5cd91289c09ffc4dd4404a641e5 AS base
 
 RUN apk add --no-cache bash mariadb-client \
  && install-php-extensions pdo_mysql intl opcache zip apcu gd exif gmp
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2@sha256:0049ce90b432795bf413a738b073963ada1a689e1a8708104684baafe94586ec /usr/bin/composer /usr/bin/composer
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     SERVER_NAME=":80" \
     APP_ENV=prod \

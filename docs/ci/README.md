@@ -72,7 +72,7 @@ Non implémenté : publication d'images (GHCR) et déploiement (accord de l'util
 `frontend` n'a qu'une zone (union des déclencheurs de la demande) : une PR qui ne touche que `backend/**` relance aussi qualité, unitaires, build et image du front (quelques minutes).
 
 Règles appliquées : `permissions: {}` au niveau du workflow puis minimales par job ; actions épinglées par SHA (version en commentaire) ; `persist-credentials: false` ; pas de `pull_request_target` ; secrets éphémères générés à l'exécution (`openssl rand`, masqués) ; paire de clés JWT de test générée par le conteneur `api` dans le volume `jwt_keys` ; artefacts conservés 14 jours ; journaux compose publiés seulement s'ils ne contiennent ni secret ni jeton `eyJ…​.eyJ…`.
-OWASP : le rapport viendra du premier run GitHub Actions de `identity-security` (après un push approuvé par l'utilisateur) ; pas de clé NVD locale.
+OWASP : pas de clé NVD locale ; le résumé chiffré se lit dans l'artefact `identity-dependency-check` d'un run vert de `identity-security` (procédure : [requests/backend.md §6, N7](requests/backend.md#n7--résumé-owasp-condition-c1)).
 Profil `quality` : ne **jamais** exécuter de tests sur des classes compilées avec `-Pquality` (le Checker Framework y écrit `@Pure` dans le bytecode, ArchUnit échoue) ; les jobs `quality` et `security-scan` passent `-DskipTests -DskipITs` (`-DskipTests` seul ne saute pas Failsafe), et en local toujours `clean` entre un build `-Pquality` et un build de tests.
 Validation : `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667` (1.7.12, shellcheck inclus).
 SHA d'actions : vérifiés par `git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag> 'refs/tags/<tag>^{}'` (le SHA épinglé est celui du commit, donc la ligne `^{}` pour une étiquette annotée comme `dorny/test-reporter`).
@@ -124,7 +124,7 @@ Script idempotent exécuté en root : schéma `identity`, compte `identity` (dro
 - Corps plafonné à **64 Kio** sur `/api/auth/` et `/api/me` (A18, SC-IDENT-035) : au-delà, 413 `{"error":"Corps de requête trop volumineux."}` en JSON, y compris en `chunked` ; le reste de l'API garde 105 Mo (pièces jointes).
 
 ### Images épinglées par digest (m10)
-`mariadb`, `gotenberg`, `sonarqube` (compose) et `node`, `nginx` (`frontend/Dockerfile`) : `tag@sha256:…` (index multi-architecture). Mise à jour : `docker buildx imagetools inspect <image:tag>`. Restent sur étiquette : `eclipse-temurin` (`services/identity-service/Dockerfile`, BackCodeur), `dunglas/frankenphp` et `composer` (`backend/Dockerfile`), `docker pull mariadb:11.8` des workflows (pré-chargement Testcontainers, qui référence l'étiquette). `identity` : `mem_limit: 768m`, `pids_limit: 256`.
+`mariadb`, `gotenberg`, `sonarqube` (compose), `node`, `nginx` (`frontend/Dockerfile`), `eclipse-temurin:25-jdk` et `25-jre` (`services/identity-service/Dockerfile`), `dunglas/frankenphp:1-php8.4-alpine` et `composer:2` (`backend/Dockerfile`, N2, digests résolus le 26/11/2026) : `tag@sha256:…` (index multi-architecture). Mise à jour : `docker buildx imagetools inspect <image:tag>`, puis reconstruire l'image concernée. Seul reste sur étiquette : `docker pull mariadb:11.8` des workflows (pré-chargement du cache pour Testcontainers, qui référence l'étiquette). `identity` : `mem_limit: 768m`, `pids_limit: 256`.
 
 ### PHPUnit en local
 ```bash
