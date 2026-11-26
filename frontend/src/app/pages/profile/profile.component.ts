@@ -155,7 +155,10 @@ import { IconComponent } from '../../shared/icon.component';
             placeholder="8 caractères minimum"
           />
         </div>
-        <button class="btn btn-secondary" [disabled]="!currentPassword || newPassword.length < 8">
+        <button
+          class="btn btn-secondary"
+          [disabled]="!currentPassword() || newPassword().length < 8"
+        >
           Changer le mot de passe
         </button>
       </form>
@@ -298,8 +301,9 @@ export class ProfileComponent {
   palette = PALETTE;
   name = this.auth.user()?.name ?? '';
   color = this.auth.user()?.avatarColor ?? PALETTE[6];
-  currentPassword = '';
-  newPassword = '';
+  // Signals: the zoneless view must refresh when savePassword() clears them (SC-IDENT-017).
+  currentPassword = signal('');
+  newPassword = signal('');
   saving = signal(false);
   push = inject(PushService);
   testing = signal(false);
@@ -347,10 +351,10 @@ export class ProfileComponent {
 
   savePassword() {
     this.api
-      .updateMe({ currentPassword: this.currentPassword, newPassword: this.newPassword })
+      .updateMe({ currentPassword: this.currentPassword(), newPassword: this.newPassword() })
       .subscribe(() => {
-        this.currentPassword = '';
-        this.newPassword = '';
+        this.currentPassword.set('');
+        this.newPassword.set('');
         this.toast.success('Mot de passe modifié');
       });
   }
