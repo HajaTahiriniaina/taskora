@@ -1,0 +1,556 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Parent commun des microservices Taskora (docs/architecture/backend-hexagonal.md §7).
+    Propriété : BackTesteur. BackCodeur peut AJOUTER des dépendances ou plugins, mais ne modifie ni les
+    seuils JaCoCo, ni la configuration Surefire/Failsafe (inclusions, exclusions, tags), ni le profil compat.
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.2.0</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.taskora</groupId>
+  <artifactId>taskora-services</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>Taskora services</name>
+
+  <modules>
+    <module>identity-service</module>
+  </modules>
+
+  <properties>
+    <java.version>25</java.version>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Versions épinglées (§7) ; tout le reste vient du BOM Spring Boot 4.2.0 -->
+    <spring-cloud.version>2026.0.0</spring-cloud.version>
+    <archunit.version>1.5.1</archunit.version>
+    <rest-assured.version>6.3.0</rest-assured.version>
+    <swagger-request-validator.version>3.0.0</swagger-request-validator.version>
+    <wiremock.version>3.13.2</wiremock.version>
+    <bouncycastle.version>1.87</bouncycastle.version>
+    <!-- Non géré par le BOM Boot 4.2.0 : aligné sur spring-security-oauth2-jose 7.2.0 (§7) -->
+    <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
+    <spotless.version>3.12.0</spotless.version>
+    <!-- 2.0.0 : la 1.37.0 échoue sur JDK 25 (revue 2026-11-26, B1) -->
+    <google-java-format.version>2.0.0</google-java-format.version>
+    <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
+    <checkstyle.version>14.4.0</checkstyle.version>
+    <checker.version>4.4.0</checker.version>
+    <rewrite-plugin.version>6.46.1</rewrite-plugin.version>
+    <!--
+      Recettes OpenRewrite (revue B4) : les versions de rewrite-recipe-bom 3.38.0 (6.38.0 / 3.43.0 / 2.42.0)
+      sont absentes de Maven Central. Dernières versions publiées, vérifiées (HTTP 200) et exécutées.
+    -->
+    <rewrite-spring.version>6.37.1</rewrite-spring.version>
+    <rewrite-migrate-java.version>3.42.1</rewrite-migrate-java.version>
+    <rewrite-static-analysis.version>2.41.1</rewrite-static-analysis.version>
+    <jacoco.version>0.8.16</jacoco.version>
+    <sonar-plugin.version>5.9.0.7382</sonar-plugin.version>
+    <dependency-check.version>13.0.0</dependency-check.version>
+    <enforcer.version>3.7.0</enforcer.version>
+
+    <!-- argLine vide par défaut : JaCoCo le remplit ; @{argLine} reste valide quand JaCoCo est sauté (compat) -->
+    <argLine></argLine>
+
+    <!--
+      Sonar (ADR A16, revue B6) : faux positifs revus, exclus par règle ET par fichier, jamais globalement.
+      e1 java:S4502 (CSRF désactivé) : API sans état, jeton dans l'en-tête Authorization, aucun cookie ni session
+         (A1, A4) ; un jeton CSRF n'apporterait rien, aucun navigateur n'envoie l'en-tête d'office.
+      e2 java:S2077 (SQL dynamique) : seul le nom de schéma historique est concaténé, validé [a-z_]+ au démarrage
+         (LegacySchema), plus des constantes ; toutes les valeurs passent en paramètres liés.
+      e3 java:S5998 (répétition d'expression régulière, risque de débordement de pile) : l'entrée est bornée à
+         320 octets AVANT l'expression régulière (PhpEmailValidator) ; l'expression est un portage fidèle de PHP
+         FILTER_VALIDATE_EMAIL, vérifié à 100 % par le golden php-filter-validate-email.json : la réécrire
+         (quantificateurs possessifs) risquerait la compatibilité sans gain réel.
+      Toute nouvelle occurrence dans un AUTRE fichier reste signalée. e2 et e3 couvrent tout leur fichier :
+      revue manuelle obligatoire de ces fichiers à chaque modification (A16).
+    -->
+    <sonar.issue.ignore.multicriteria>e1,e2,e3</sonar.issue.ignore.multicriteria>
+    <sonar.issue.ignore.multicriteria.e1.ruleKey>java:S4502</sonar.issue.ignore.multicriteria.e1.ruleKey>
+    <sonar.issue.ignore.multicriteria.e1.resourceKey>**/com/taskora/identity/config/SecurityConfig.java</sonar.issue.ignore.multicriteria.e1.resourceKey>
+    <sonar.issue.ignore.multicriteria.e2.ruleKey>java:S2077</sonar.issue.ignore.multicriteria.e2.ruleKey>
+    <sonar.issue.ignore.multicriteria.e2.resourceKey>**/com/taskora/identity/adapter/out/legacy/JdbcLegacyUserSource.java</sonar.issue.ignore.multicriteria.e2.resourceKey>
+    <sonar.issue.ignore.multicriteria.e3.ruleKey>java:S5998</sonar.issue.ignore.multicriteria.e3.ruleKey>
+    <sonar.issue.ignore.multicriteria.e3.resourceKey>**/com/taskora/identity/domain/model/PhpEmailValidator.java</sonar.issue.ignore.multicriteria.e3.resourceKey>
+
+    <!-- Sélection des tests par tag JUnit (le profil compat inverse la sélection) -->
+    <test.groups></test.groups>
+    <test.excludedGroups>compat</test.excludedGroups>
+
+    <!-- Seuils JaCoCo (ADR A12) : ne pas baisser -->
+    <jacoco.bundle.line.minimum>0.80</jacoco.bundle.line.minimum>
+    <jacoco.core.line.minimum>0.90</jacoco.core.line.minimum>
+    <jacoco.core.branch.minimum>0.80</jacoco.core.branch.minimum>
+
+    <!-- URL des stacks pour le profil compat (surchargées en CI) -->
+    <compat.symfony.url>http://localhost:8081</compat.symfony.url>
+    <compat.identity.url>http://localhost:8082</compat.identity.url>
+    <compat.web.url>http://localhost:8080</compat.web.url>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.nimbusds</groupId>
+        <artifactId>nimbus-jose-jwt</artifactId>
+        <version>${nimbus-jose-jwt.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcpkix-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcutil-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.rest-assured</groupId>
+        <artifactId>rest-assured</artifactId>
+        <version>${rest-assured.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.rest-assured</groupId>
+        <artifactId>spring-mock-mvc</artifactId>
+        <version>${rest-assured.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.atlassian.oai</groupId>
+        <artifactId>openapi-request-validator-core</artifactId>
+        <version>${swagger-request-validator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.atlassian.oai</groupId>
+        <artifactId>openapi-request-validator-restassured</artifactId>
+        <version>${swagger-request-validator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.atlassian.oai</groupId>
+        <artifactId>openapi-request-validator-mockmvc</artifactId>
+        <version>${swagger-request-validator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.wiremock</groupId>
+        <artifactId>wiremock-standalone</artifactId>
+        <version>${wiremock.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.checkerframework</groupId>
+        <artifactId>checker-qual</artifactId>
+        <version>${checker.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!--
+    Annotations de nullité (@Nullable, @MonotonicNonNull…) : nécessaires au Nullness Checker du profil quality
+    (revue B3) et à la compilation normale du code annoté. Scope provided : absentes du jar livré.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <includes>
+              <include>**/*Test.java</include>
+            </includes>
+            <!-- Agent Mockito explicite (JDK 21+ : l'auto-attachement dynamique est déprécié ; revue B4) -->
+            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+            <groups>${test.groups}</groups>
+            <excludedGroups>${test.excludedGroups}</excludedGroups>
+            <systemPropertyVariables>
+              <compat.symfony.url>${compat.symfony.url}</compat.symfony.url>
+              <compat.identity.url>${compat.identity.url}</compat.identity.url>
+              <compat.web.url>${compat.web.url}</compat.web.url>
+            </systemPropertyVariables>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <configuration>
+            <includes>
+              <include>**/*IT.java</include>
+            </includes>
+            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+            <groups>${test.groups}</groups>
+            <excludedGroups>${test.excludedGroups}</excludedGroups>
+            <systemPropertyVariables>
+              <compat.symfony.url>${compat.symfony.url}</compat.symfony.url>
+              <compat.identity.url>${compat.identity.url}</compat.identity.url>
+              <compat.web.url>${compat.web.url}</compat.web.url>
+            </systemPropertyVariables>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>integration-test</goal>
+                <goal>verify</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>dependency-paths</id>
+              <goals><goal>properties</goal></goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+          <executions>
+            <execution>
+              <id>prepare-agent</id>
+              <goals><goal>prepare-agent</goal></goals>
+            </execution>
+            <execution>
+              <id>prepare-agent-integration</id>
+              <goals><goal>prepare-agent-integration</goal></goals>
+            </execution>
+            <execution>
+              <id>merge</id>
+              <phase>post-integration-test</phase>
+              <goals><goal>merge</goal></goals>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <directory>${project.build.directory}</directory>
+                    <includes>
+                      <include>jacoco.exec</include>
+                      <include>jacoco-it.exec</include>
+                    </includes>
+                  </fileSet>
+                </fileSets>
+                <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+              </configuration>
+            </execution>
+            <execution>
+              <id>report</id>
+              <phase>verify</phase>
+              <goals><goal>report</goal></goals>
+              <configuration>
+                <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+              </configuration>
+            </execution>
+            <execution>
+              <id>check</id>
+              <phase>verify</phase>
+              <goals><goal>check</goal></goals>
+              <configuration>
+                <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                <rules>
+                  <rule>
+                    <element>BUNDLE</element>
+                    <limits>
+                      <limit>
+                        <counter>LINE</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>${jacoco.bundle.line.minimum}</minimum>
+                      </limit>
+                    </limits>
+                  </rule>
+                  <rule>
+                    <element>PACKAGE</element>
+                    <includes>
+                      <include>com.taskora.identity.domain*</include>
+                      <include>com.taskora.identity.application*</include>
+                    </includes>
+                    <limits>
+                      <limit>
+                        <counter>LINE</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>${jacoco.core.line.minimum}</minimum>
+                      </limit>
+                      <limit>
+                        <counter>BRANCH</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>${jacoco.core.branch.minimum}</minimum>
+                      </limit>
+                    </limits>
+                  </rule>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${enforcer.version}</version>
+          <executions>
+            <execution>
+              <id>enforce</id>
+              <goals><goal>enforce</goal></goals>
+              <configuration>
+                <rules>
+                  <requireJavaVersion><version>[25,)</version></requireJavaVersion>
+                  <requireMavenVersion><version>[3.9,)</version></requireMavenVersion>
+                  <dependencyConvergence/>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>${spotless.version}</version>
+          <configuration>
+            <java>
+              <googleJavaFormat>
+                <version>${google-java-format.version}</version>
+              </googleJavaFormat>
+            </java>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <version>${checkstyle-plugin.version}</version>
+          <dependencies>
+            <dependency>
+              <groupId>com.puppycrawl.tools</groupId>
+              <artifactId>checkstyle</artifactId>
+              <version>${checkstyle.version}</version>
+            </dependency>
+          </dependencies>
+          <configuration>
+            <configLocation>google_checks.xml</configLocation>
+            <consoleOutput>true</consoleOutput>
+            <failOnViolation>true</failOnViolation>
+            <violationSeverity>warning</violationSeverity>
+            <includeTestSourceDirectory>false</includeTestSourceDirectory>
+            <!-- ADR A17 : Javadoc des méthodes exigée dans domain et application, pas dans adapter et config -->
+            <propertyExpansion>org.checkstyle.google.suppressionfilter.config=${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle-suppressions.xml</propertyExpansion>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.openrewrite.maven</groupId>
+          <artifactId>rewrite-maven-plugin</artifactId>
+          <version>${rewrite-plugin.version}</version>
+          <configuration>
+            <exportDatatables>false</exportDatatables>
+            <activeRecipes>
+              <recipe>org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0</recipe>
+              <recipe>org.openrewrite.java.migrate.UpgradeToJava25</recipe>
+              <recipe>org.openrewrite.staticanalysis.CommonStaticAnalysis</recipe>
+            </activeRecipes>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.openrewrite.recipe</groupId>
+              <artifactId>rewrite-spring</artifactId>
+              <version>${rewrite-spring.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>org.openrewrite.recipe</groupId>
+              <artifactId>rewrite-migrate-java</artifactId>
+              <version>${rewrite-migrate-java.version}</version>
+            </dependency>
+            <dependency>
+              <groupId>org.openrewrite.recipe</groupId>
+              <artifactId>rewrite-static-analysis</artifactId>
+              <version>${rewrite-static-analysis.version}</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <groupId>org.sonarsource.scanner.maven</groupId>
+          <artifactId>sonar-maven-plugin</artifactId>
+          <version>${sonar-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.owasp</groupId>
+          <artifactId>dependency-check-maven</artifactId>
+          <version>${dependency-check.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!-- Contrôles de qualité (BackReviewer) : Spotless, Checkstyle Google, Nullness Checker sur src/main -->
+    <profile>
+      <id>quality</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.diffplug.spotless</groupId>
+            <artifactId>spotless-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>spotless-check</id>
+                <phase>verify</phase>
+                <goals><goal>check</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-checkstyle-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>checkstyle-check</id>
+                <phase>verify</phase>
+                <goals><goal>check</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>default-compile</id>
+                <configuration>
+                  <fork>true</fork>
+                  <annotationProcessorPaths combine.children="append">
+                    <path>
+                      <groupId>org.checkerframework</groupId>
+                      <artifactId>checker</artifactId>
+                      <version>${checker.version}</version>
+                    </path>
+                  </annotationProcessorPaths>
+                  <annotationProcessors combine.children="append">
+                    <annotationProcessor>org.checkerframework.checker.nullness.NullnessChecker</annotationProcessor>
+                  </annotationProcessors>
+                  <compilerArgs combine.children="append">
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                    <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                  </compilerArgs>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Analyse des dépendances (OWASP), échec si CVSS >= 7 -->
+    <profile>
+      <id>security-scan</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.owasp</groupId>
+            <artifactId>dependency-check-maven</artifactId>
+            <configuration>
+              <failBuildOnCVSS>7</failBuildOnCVSS>
+              <formats>
+                <format>HTML</format>
+                <format>JSON</format>
+                <format>SARIF</format>
+              </formats>
+            </configuration>
+            <executions>
+              <execution>
+                <id>dependency-check</id>
+                <phase>verify</phase>
+                <goals><goal>check</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!--
+      Tests de compatibilité contre la stack compose (Symfony + identity) : seuls les tests @Tag("compat").
+      À lancer uniquement sur une stack jetable : ils créent des comptes compat-<uuid>@exemple.test.
+      La couverture n'a pas de sens sur ce sous-ensemble : JaCoCo est désactivé dans ce profil.
+    -->
+    <profile>
+      <id>compat</id>
+      <properties>
+        <test.groups>compat</test.groups>
+        <test.excludedGroups></test.excludedGroups>
+        <jacoco.skip>true</jacoco.skip>
+        <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
+      </properties>
+    </profile>
+
+    <!-- Sonar : rien d'autre que le chemin du rapport JaCoCo -->
+    <profile>
+      <id>sonar</id>
+      <properties>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+      </properties>
+    </profile>
+  </profiles>
+</project>

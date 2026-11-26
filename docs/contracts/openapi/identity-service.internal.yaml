@@ -1,0 +1,187 @@
+openapi: 3.1.0
+info:
+  title: Taskora identity-service — contrats internes (phase 1)
+  version: 1.0.0
+  summary: Endpoint Symfony transitoire de consommation des invitations (U2-a) et événements d'identity-service
+  description: |
+    **Non public.** Jamais routé par nginx (seuls /api/ et /uploads/ le sont). Réseau Docker interne.
+    - `POST /internal/invitations/claim` est servi par le **backend Symfony** et appelé par identity-service
+      (adapter `SymfonyInvitationClaimClient`, livraison synchrone après l'inscription puis rejeu par l'outbox).
+      Il disparaît à la migration de board-service, qui consommera `UserRegistered`.
+    - Les schémas `UserRegistered` et `UserProfileUpdated` décrivent les charges écrites dans
+      `identity.outbox_message.payload` (destination `broker`, statut `HELD` en phase 1 : pas de RabbitMQ).
+      Ils sont destinés à board-service et notification-service.
+    Architecture : docs/architecture/backend-hexagonal.md §9 (A10, A11).
+servers:
+  - url: http://api:80
+    description: Symfony sur le réseau Docker (`SYMFONY_INTERNAL_URL`)
+paths:
+  /internal/invitations/claim:
+    post:
+      operationId: claimInvitations
+      summary: Transformer les invitations en attente d'un nouvel utilisateur en adhésions
+      description: |
+        Reprend la logique de `AuthController::register` (Symfony) :
+        pour chaque `invitation` dont l'e-mail est égal (collation de la colonne) à l'e-mail de l'utilisateur :
+        - si l'utilisateur n'est pas encore membre du tableau : adhésion `member` + notification
+          `board_invite` au nouvel utilisateur, acteur = `invited_by` (peut être nul), message exact
+          `<nom de l'inviteur ou « Quelqu'un »> vous a ajouté au tableau « <titre> »`, notification push
+          comme aujourd'hui ;
+        - si l'adhésion existe déjà : rien (ni adhésion ni notification) ;
+        - dans tous les cas l'invitation est supprimée.
+        Une seule transaction. Les tableaux dans la corbeille reçoivent quand même l'adhésion (comportement actuel).
+        **Idempotent** : un second appel avec le même corps répond 200 avec `claimed: 0`.
+        Le secret est comparé en temps constant (`hash_equals`). Si `INTERNAL_API_SECRET` est vide ou absent
+        côté Symfony, l'endpoint refuse toujours (401).
+      x-scenarios: [SC-IDENT-005, SC-IDENT-006]
+      parameters:
+        - name: X-Internal-Secret
+          in: header
+          required: true
+          description: Secret partagé `INTERNAL_API_SECRET` (variable d'environnement des deux services, jamais commité)
+          schema: { type: string, minLength: 32 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvitationClaimRequest' }
+            examples:
+              claim:
+                value: { eventId: 0b7c1e9a-3f5d-4c2b-9a51-6f0e2d8c4a17, userId: 4, email: camille@exemple.fr }
+      responses:
+        '200':
+          description: Invitations consommées (éventuellement aucune)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationClaimResult' }
+              examples:
+                twoBoards: { value: { claimed: 2, boardIds: [12, 15] } }
+                replay: { value: { claimed: 0, boardIds: [] } }
+        '400':
+          description: Corps invalide — non rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidJson: { value: { error: JSON invalide. } }
+                missingField: { value: { error: 'Le champ "email" est obligatoire.' } }
+                invalidUserId: { value: { error: 'Le champ "userId" est invalide.' } }
+        '401':
+          description: Secret absent ou faux — non rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                denied: { value: { error: Accès interne refusé. } }
+        '404':
+          description: Utilisateur absent de `taskora.user` (projection pas encore visible) — rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                unknownUser: { value: { error: Utilisateur introuvable. } }
+        '409':
+          description: L'e-mail ne correspond pas à celui de l'utilisateur `userId` — non rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                mismatch: { value: { error: L'e-mail ne correspond pas à l'utilisateur. } }
+        '500':
+          description: Erreur interne — rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                internal: { value: { error: Erreur interne du serveur. } }
+components:
+  schemas:
+    InvitationClaimRequest:
+      type: object
+      additionalProperties: false
+      required: [eventId, userId, email]
+      properties:
+        eventId: { type: string, format: uuid, description: identifiant du message d'outbox (traçabilité ; l'idempotence repose sur l'état) }
+        userId: { type: integer, format: int32, minimum: 1 }
+        email: { type: string, maxLength: 180, description: e-mail normalisé (minuscules) }
+    InvitationClaimResult:
+      type: object
+      additionalProperties: false
+      required: [claimed, boardIds]
+      properties:
+        claimed: { type: integer, minimum: 0, description: nombre d'adhésions créées par cet appel }
+        boardIds: { type: array, items: { type: integer }, description: tableaux rejoints par cet appel }
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { type: string }
+    EventEnvelope:
+      type: object
+      description: Champs communs à tout événement d'identity-service
+      required: [eventId, type, version, occurredAt, userId]
+      properties:
+        eventId: { type: string, format: uuid }
+        type: { type: string }
+        version: { type: integer, const: 1 }
+        occurredAt: { type: string, format: date-time, description: 'UTC, ISO 8601 avec fuseau (ex. 2026-11-26T10:00:00+00:00)' }
+        userId: { type: integer, format: int32, minimum: 1 }
+    UserRegistered:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://taskora.local/schemas/identity/UserRegistered/v1.json
+      title: UserRegistered
+      description: Publié (outbox) dans la même transaction que la création du compte.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [type, email, name, avatarColor]
+          properties:
+            type: { const: UserRegistered }
+            email: { type: string, maxLength: 180 }
+            name: { type: string, maxLength: 120 }
+            avatarColor: { type: string, maxLength: 20 }
+      unevaluatedProperties: false
+      examples:
+        - eventId: 0b7c1e9a-3f5d-4c2b-9a51-6f0e2d8c4a17
+          type: UserRegistered
+          version: 1
+          occurredAt: '2026-11-26T10:00:00+00:00'
+          userId: 4
+          email: camille@exemple.fr
+          name: Camille Martin
+          avatarColor: '#14b8a6'
+    UserProfileUpdated:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://taskora.local/schemas/identity/UserProfileUpdated/v1.json
+      title: UserProfileUpdated
+      description: |
+        Publié (outbox) quand `name` ou `avatarColor` change réellement. Un changement de mot de passe
+        seul ne publie rien (aucune donnée sensible dans les événements). Porte l'état complet après
+        modification et la liste des champs changés.
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [type, name, avatarColor, changed]
+          properties:
+            type: { const: UserProfileUpdated }
+            name: { type: string, maxLength: 120 }
+            avatarColor: { type: string, maxLength: 20 }
+            changed:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items: { enum: [name, avatarColor] }
+      unevaluatedProperties: false
+      examples:
+        - eventId: 5d1f0c3e-8b2a-4e7d-a9c6-1f4b7e2d9a30
+          type: UserProfileUpdated
+          version: 1
+          occurredAt: '2026-11-26T11:30:00+00:00'
+          userId: 4
+          name: Camille M.
+          avatarColor: '#0EA5E9'
+          changed: [name, avatarColor]
+    InvitationClaimRequested:
+      description: Charge du message d'outbox de destination `symfony-invitations` (corps envoyé à /internal/invitations/claim).
+      $ref: '#/components/schemas/InvitationClaimRequest'

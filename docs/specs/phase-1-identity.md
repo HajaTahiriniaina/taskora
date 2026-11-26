@@ -115,7 +115,7 @@ Tous les tests doivent être **rouges** au commit (sauf ceux qui ciblent Symfony
 Aucun changement fonctionnel attendu : mêmes routes, mêmes corps, même stockage du jeton.
 1. **Tests e2e d'identité** (FrontTesteur, `frontend/e2e/identity.spec.ts`) : SC-IDENT-001, 002, 003, 007, 008, 017, 018, 025, 026, exécutables **contre les deux backends** (variable d'URL), servant de non-régression à la bascule.
 2. **Tests de composants** : intercepteur (401 → déconnexion, aucun toast sur `/auth/`), gardes, `AuthService.isExpired` avec un jeton émis par identity-service (même `exp`).
-3. **Proxy de développement** (`frontend/proxy.conf.json`) : ajouter des entrées `/api/auth` et `/api/me` vers identity-service (avant l'entrée `/api`), sur demande FrontPierre → BackAli pour le port.
+3. **Proxy de développement** (`frontend/proxy.conf.mjs`, cible lue depuis `API_BIND`/`API_PORT` du `.env`) : ajouter des entrées `/api/auth` et `/api/me` vers identity-service (`IDENTITY_BIND`/`IDENTITY_PORT`), avant l’entrée `/api`.
 4. **Robustesse** : l'écran de connexion se fonde sur le statut (401) et non sur le corps : à conserver. Si la limitation de débit (U3/E9) est décidée, ajouter le cas 429 (« Trop de tentatives, réessayez dans quelques minutes. ») au formulaire de connexion.
 5. **Accessibilité** (non bloquant) : `role="alert"` sur les messages d'erreur des formulaires d'authentification.
 6. Toute demande d'endpoint passe par `docs/contracts/requests/<NNN>-<sujet>.md`.

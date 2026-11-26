@@ -1,0 +1,233 @@
+[
+    {
+        "input": "",
+        "trim": "",
+        "mb_strlen": 0,
+        "mb_substr_120": "",
+        "mb_strtolower": ""
+    },
+    {
+        "input": " ",
+        "trim": "",
+        "mb_strlen": 1,
+        "mb_substr_120": " ",
+        "mb_strtolower": " "
+    },
+    {
+        "input": "  Camille Martin ",
+        "trim": "Camille Martin",
+        "mb_strlen": 17,
+        "mb_substr_120": "  Camille Martin ",
+        "mb_strtolower": "  camille martin "
+    },
+    {
+        "input": "\t\n\r\u0000\u000bx\u000b\u0000\r\n\t",
+        "trim": "x",
+        "mb_strlen": 11,
+        "mb_substr_120": "\t\n\r\u0000\u000bx\u000b\u0000\r\n\t",
+        "mb_strtolower": "\t\n\r\u0000\u000bx\u000b\u0000\r\n\t"
+    },
+    {
+        "input": " x ",
+        "trim": " x ",
+        "mb_strlen": 3,
+        "mb_substr_120": " x ",
+        "mb_strtolower": " x "
+    },
+    {
+        "input": " x　",
+        "trim": " x　",
+        "mb_strlen": 3,
+        "mb_substr_120": " x　",
+        "mb_strtolower": " x　"
+    },
+    {
+        "input": "\fx\f",
+        "trim": "\fx\f",
+        "mb_strlen": 3,
+        "mb_substr_120": "\fx\f",
+        "mb_strtolower": "\fx\f"
+    },
+    {
+        "input": "x",
+        "trim": "x",
+        "mb_strlen": 1,
+        "mb_substr_120": "x",
+        "mb_strtolower": "x"
+    },
+    {
+        "input": "ÉCOLE",
+        "trim": "ÉCOLE",
+        "mb_strlen": 5,
+        "mb_substr_120": "ÉCOLE",
+        "mb_strtolower": "école"
+    },
+    {
+        "input": "Ünïcödé ÀÉÎÕÛ",
+        "trim": "Ünïcödé ÀÉÎÕÛ",
+        "mb_strlen": 13,
+        "mb_substr_120": "Ünïcödé ÀÉÎÕÛ",
+        "mb_strtolower": "ünïcödé àéîõû"
+    },
+    {
+        "input": "İstanbul",
+        "trim": "İstanbul",
+        "mb_strlen": 8,
+        "mb_substr_120": "İstanbul",
+        "mb_strtolower": "i̇stanbul"
+    },
+    {
+        "input": "ΣΟΦΙΑ",
+        "trim": "ΣΟΦΙΑ",
+        "mb_strlen": 5,
+        "mb_substr_120": "ΣΟΦΙΑ",
+        "mb_strtolower": "σοφια"
+    },
+    {
+        "input": "STRASSE",
+        "trim": "STRASSE",
+        "mb_strlen": 7,
+        "mb_substr_120": "STRASSE",
+        "mb_strtolower": "strasse"
+    },
+    {
+        "input": "Straße",
+        "trim": "Straße",
+        "mb_strlen": 6,
+        "mb_substr_120": "Straße",
+        "mb_strtolower": "straße"
+    },
+    {
+        "input": "ǅ",
+        "trim": "ǅ",
+        "mb_strlen": 1,
+        "mb_substr_120": "ǅ",
+        "mb_strtolower": "ǆ"
+    },
+    {
+        "input": "Ⅻ",
+        "trim": "Ⅻ",
+        "mb_strlen": 1,
+        "mb_substr_120": "Ⅻ",
+        "mb_strtolower": "ⅻ"
+    },
+    {
+        "input": "Ａ",
+        "trim": "Ａ",
+        "mb_strlen": 1,
+        "mb_substr_120": "Ａ",
+        "mb_strtolower": "ａ"
+    },
+    {
+        "input": "🔑🔑",
+        "trim": "🔑🔑",
+        "mb_strlen": 2,
+        "mb_substr_120": "🔑🔑",
+        "mb_strtolower": "🔑🔑"
+    },
+    {
+        "input": "😀aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trim": "😀aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mb_strlen": 131,
+        "mb_substr_120": "😀aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mb_strtolower": "😀aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+        "input": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+        "trim": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+        "mb_strlen": 150,
+        "mb_substr_120": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+        "mb_strtolower": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀b",
+        "trim": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀b",
+        "mb_strlen": 121,
+        "mb_substr_120": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀",
+        "mb_strtolower": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀b"
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trim": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mb_strlen": 121,
+        "mb_substr_120": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mb_strtolower": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+        "input": "ábbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trim": "ábbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mb_strlen": 127,
+        "mb_substr_120": "ábbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mb_strtolower": "ábbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+        "input": "Camille@Exemple.FR",
+        "trim": "Camille@Exemple.FR",
+        "mb_strlen": 18,
+        "mb_substr_120": "Camille@Exemple.FR",
+        "mb_strtolower": "camille@exemple.fr"
+    },
+    {
+        "input": " Camille@Exemple.FR ",
+        "trim": "Camille@Exemple.FR",
+        "mb_strlen": 20,
+        "mb_substr_120": " Camille@Exemple.FR ",
+        "mb_strtolower": " camille@exemple.fr "
+    },
+    {
+        "input": "x\n",
+        "trim": "x",
+        "mb_strlen": 2,
+        "mb_substr_120": "x\n",
+        "mb_strtolower": "x\n"
+    },
+    {
+        "input": "\nx",
+        "trim": "x",
+        "mb_strlen": 2,
+        "mb_substr_120": "\nx",
+        "mb_strtolower": "\nx"
+    },
+    {
+        "input": "     y\t\t\t",
+        "trim": "y",
+        "mb_strlen": 9,
+        "mb_substr_120": "     y\t\t\t",
+        "mb_strtolower": "     y\t\t\t"
+    },
+    {
+        "input": "ǈǋ",
+        "trim": "ǈǋ",
+        "mb_strlen": 2,
+        "mb_substr_120": "ǈǋ",
+        "mb_strtolower": "ǉǌ"
+    },
+    {
+        "input": "ẞ",
+        "trim": "ẞ",
+        "mb_strlen": 1,
+        "mb_substr_120": "ẞ",
+        "mb_strtolower": "ß"
+    },
+    {
+        "input": "ﬀ",
+        "trim": "ﬀ",
+        "mb_strlen": 1,
+        "mb_substr_120": "ﬀ",
+        "mb_strtolower": "ﬀ"
+    },
+    {
+        "input": "K",
+        "trim": "K",
+        "mb_strlen": 1,
+        "mb_substr_120": "K",
+        "mb_strtolower": "k"
+    },
+    {
+        "input": "Ω",
+        "trim": "Ω",
+        "mb_strlen": 1,
+        "mb_substr_120": "Ω",
+        "mb_strtolower": "ω"
+    }
+]

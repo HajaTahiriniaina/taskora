@@ -44,15 +44,18 @@ Représentation publique d'un utilisateur (`Presenter::user`), reprise partout :
 
 | Méthode et route | Accès | Corps | Succès | Erreurs |
 |---|---|---|---|---|
-| `POST /api/auth/register` | public | `{"name","email","password"}` | **201** `{"token","user"}` | 400 `JSON invalide.` ; 400 `Le champ "name" est obligatoire.` ; 400 `Le champ "email" est obligatoire.` ; 400 `Adresse e-mail invalide.` ; 400 `Le mot de passe doit contenir au moins 8 caractères.` ; **409** `Un compte existe déjà avec cette adresse e-mail.` |
-| `POST /api/auth/login` | public | `{"email","password"}` (JSON) | **200** `{"token","user"}` | **401** `{"code":401,"message":"Invalid credentials."}` (HYPOTHÈSE: message par défaut Lexik) ; 400 si champ manquant ou JSON invalide (HYPOTHÈSE: message du `json_login` Symfony) |
+| `POST /api/auth/register` | public | `{"name","email","password"}` | **201** `{"token","user"}` | 400 `JSON invalide.` ; 400 `Le champ "name" est obligatoire.` ; 400 `Le champ "email" est obligatoire.` ; 400 `Adresse e-mail invalide.` ; 400 `Le mot de passe doit contenir au moins 8 caractères.` ; **409** `Un compte existe déjà avec cette adresse e-mail.` ; identity-service seulement (E15–E17 corrigés) : 400 `Le mot de passe ne doit pas dépasser 4096 octets.`, 400 `Le champ "<nom>" doit être une chaîne de caractères.`, 400 `JSON invalide.` pour un corps vide (E20) ou un JSON qui n'est pas un objet |
+| `POST /api/auth/login` | public | `{"email","password"}` (JSON) | **200** `{"token","user"}` | **401** `{"code":401,"message":"Invalid credentials."}` (HYPOTHÈSE: message par défaut Lexik) ; 400 si champ manquant ou JSON invalide (Symfony : messages anglais de `json_login`, voir architecture §8.4) ; identity-service (E19, E20 corrigés) : 400 `JSON invalide.`, `Le champ "<nom>" doit être une chaîne de caractères.`, `Le champ "<nom>" est obligatoire.` |
 | `GET /api/me` | JWT | — | **200** utilisateur | 401 |
-| `PATCH /api/me` | JWT | `{"name"?, "avatarColor"?, "currentPassword"?, "newPassword"?}` | **200** utilisateur | 400 `Le champ "name" est obligatoire.` ; 400 `Mot de passe actuel incorrect.` ; 400 `Le mot de passe doit contenir au moins 8 caractères.` ; 400 `JSON invalide.` ; 401 |
+| `PATCH /api/me` | JWT | `{"name"?, "avatarColor"?, "currentPassword"?, "newPassword"?}` | **200** utilisateur | 400 `Le champ "name" est obligatoire.` ; 400 `Mot de passe actuel incorrect.` ; 400 `Le mot de passe doit contenir au moins 8 caractères.` ; 400 `JSON invalide.` ; 401 ; identity-service seulement (E15–E18, E20, E21 corrigés) : 400 `Le mot de passe ne doit pas dépasser 4096 octets.`, 400 `Le champ "<nom>" doit être une chaîne de caractères.`, 400 `Couleur d'avatar invalide.`, 400 `JSON invalide.` pour un corps vide ou un JSON qui n'est pas un objet ; `newPassword` `"0"` contrôlé comme un vrai mot de passe |
 | `GET /api/health` | public | — | **200** `{"status":"ok","app":"Taskora"}` | — |
 | toute autre route `/api/**` sans jeton valide | — | — | — | **401** `{"code":401,"message":"JWT Token not found" \| "Expired JWT Token" \| "Invalid JWT Token"}` (HYPOTHÈSE: messages Lexik) |
 
-Ordre des contrôles de `register` : JSON → `name` → `email` (obligatoire, puis format) → longueur du mot de passe → unicité.
-Ordre des contrôles de `PATCH /me` : `name` (si la clé est présente) → `avatarColor` (ignorée si invalide) → mot de passe (si `newPassword` non vide : mot de passe actuel, puis longueur). L'enregistrement n'a lieu qu'à la fin : **une erreur n'applique aucune modification**.
+Ordre des contrôles de `register` (Symfony) : JSON → `name` → `email` (obligatoire, puis format) → longueur du mot de passe → unicité.
+Ordre dans identity-service (décisions E15–E17, E20) : corps = objet JSON (corps vide → 400 `JSON invalide.`) → type des champs présents, dans l'ordre `name`, `email`, `password` (chaîne JSON, `null` compris refusé) → `name` → `email` → longueur minimale puis maximale (4096 octets UTF-8) du mot de passe → unicité.
+Ordre des contrôles de `PATCH /me` (Symfony) : `name` (si la clé est présente) → `avatarColor` (ignorée si invalide) → mot de passe (si `newPassword` non vide : mot de passe actuel, puis longueur). L'enregistrement n'a lieu qu'à la fin : **une erreur n'applique aucune modification**.
+Ordre de `login` dans identity-service (E19, E20) : corps = objet JSON (vide → 400 `JSON invalide.`) → type de `email` puis `password` (chaîne JSON, `null` refusé) → présence de `email` puis `password` (clé absente ou `""` → `Le champ "<nom>" est obligatoire.`) → recherche de l'e-mail tel que saisi et vérification → 401 si refus.
+Ordre de `PATCH /me` dans identity-service (décisions E15–E18, E20, E21) : corps = objet JSON (vide → 400) → type des champs présents et non `null`, dans l'ordre `name`, `avatarColor`, `currentPassword`, `newPassword` → `name` → `avatarColor` (exactement `#RRGGBB`, sinon 400) → mot de passe (si `newPassword` est présent, non `null` et différent de `""`, `"0"` compris : mot de passe actuel, longueur minimale, longueur maximale). Toujours sans modification partielle.
 
 ## 3. Comportements attendus
 1. Un visiteur crée un compte et est connecté immédiatement (jeton renvoyé), puis redirigé vers `/boards`.
@@ -81,7 +84,7 @@ Validation : API, intégration (concurrence) [back] ; e2e (message affiché sous
 Étant donné un visiteur
 Quand il s'inscrit avec : `name` vide ou composé d'espaces ; `email` absent ; `email` = `pas-un-email` ; `password` de 7 caractères ; corps `"texte"` non JSON
 Alors la réponse est 400 avec respectivement `Le champ "name" est obligatoire.`, `Le champ "email" est obligatoire.`, `Adresse e-mail invalide.`, `Le mot de passe doit contenir au moins 8 caractères.`, `JSON invalide.`
-Limites : mot de passe de **8** caractères exactement → accepté ; la longueur est comptée en caractères Unicode (`mb_strlen`) : `ééééééé` (7) refusé ; aucun maximum de longueur de mot de passe (HYPOTHÈSE: bcrypt tronque à 72 octets ; à reproduire à l'identique pour la compatibilité)
+Limites : mot de passe de **8** caractères exactement → accepté ; la longueur est comptée en caractères Unicode (`mb_strlen`) : `ééééééé` (7) refusé ; maximum technique de 4096 octets (voir SC-IDENT-028) ; au-delà de 72 octets, Symfony pré-hache le mot de passe (`base64(sha512)`) : pas de troncature silencieuse, comportement reproduit (architecture A2)
 Validation : unitaire (validateurs), API (tests paramétrés) [back] ; composant (bouton désactivé si `minlength` non atteint) [front] — Acceptation : chaque cas renvoie le message exact
 
 ### SC-IDENT-004 — Longueurs maximales à l'inscription (important)
@@ -121,8 +124,9 @@ Validation : API, sécurité [back] ; e2e [front] — Acceptation : corps identi
 ### SC-IDENT-009 — Connexion avec un corps incomplet (important)
 Étant donné un visiteur
 Quand il envoie `POST /api/auth/login` sans `password`, ou avec un corps non JSON
-Alors la réponse est 400 (HYPOTHÈSE: forme et message à figer par test miroir sur Symfony)
-Validation : API, compatibilité [back] — Acceptation : même statut que Symfony
+Alors la réponse est 400
+Limites : Symfony répond avec les messages anglais de `json_login` (architecture §8.4) ; identity-service applique les règles françaises de SC-IDENT-032 et SC-IDENT-033 (décisions E19, E20) : seul le **statut** 400 est commun, les corps sont une divergence voulue, exclue des tests `compat`
+Validation : API [back] — Acceptation : 400 dans tous les cas, messages de SC-IDENT-032/033 pour identity-service
 
 ### SC-IDENT-010 — Contenu et signature du JWT (critique)
 Étant donné une connexion réussie
@@ -167,7 +171,7 @@ Validation : API [back] ; e2e page Profil [front] — Acceptation : persistance 
 Étant donné un utilisateur connecté
 Quand il envoie `PATCH /api/me` `{"avatarColor":"#0EA5E9"}`
 Alors la couleur est enregistrée telle quelle
-Limites : valeur invalide (`"red"`, `"#12345"`, `"#1234567"`) → **ignorée**, réponse 200 avec la couleur inchangée
+Limites : valeur invalide (`"red"`, `"#12345"`, `"#1234567"`) → Symfony l'**ignore** (200, couleur inchangée) ; identity-service répond **400** (décision E18, voir SC-IDENT-031)
 Validation : API [back] ; e2e page Profil [front] — Acceptation : valeur stockée ou inchangée selon le cas
 
 ### SC-IDENT-017 — Changer son mot de passe (critique)
@@ -180,7 +184,7 @@ Validation : API, intégration [back] ; e2e page Profil (toast « Mot de passe m
 Étant donné un utilisateur connecté
 Quand il envoie un `currentPassword` faux ; ou un `newPassword` de 7 caractères avec le bon mot de passe actuel
 Alors 400 `Mot de passe actuel incorrect.` ; ou 400 `Le mot de passe doit contenir au moins 8 caractères.` ; le mot de passe n'est pas modifié
-Limites : `newPassword` vide ou absent → aucune vérification, aucun changement ; `currentPassword` absent avec `newPassword` → 400 `Mot de passe actuel incorrect.`
+Limites : `newPassword` absent, `null` ou `""` → aucune vérification, aucun changement ; `"0"` → contrôlé comme tout mot de passe dans identity-service (SC-IDENT-034, E21) ; `currentPassword` absent avec `newPassword` → 400 `Mot de passe actuel incorrect.`
 Validation : unitaire, API [back] ; composant (bouton désactivé tant que `newPassword` < 8) [front] — Acceptation : hash inchangé en base
 
 ### SC-IDENT-019 — Une modification de profil en erreur n'est pas appliquée partiellement (important)
@@ -241,9 +245,73 @@ Quand il envoie un grand nombre de tentatives de connexion
 Alors aujourd'hui rien ne les limite (écart E9). Cible proposée, **sous réserve de décision** : 429 après N échecs par IP et par e-mail sur une fenêtre glissante, appliqué par la gateway
 Validation : sécurité [back], CI [Manuel] — Acceptation : à définir après décision
 
+### SC-IDENT-028 — Mot de passe trop long (important, écart E15 corrigé)
+Étant donné un visiteur, ou un utilisateur connecté dont le mot de passe actuel est correct
+Quand il s'inscrit avec un `password` de 4097 octets UTF-8, ou envoie `PATCH /api/me` avec un `newPassword` de 4097 octets
+Alors identity-service répond 400 `{"error":"Le mot de passe ne doit pas dépasser 4096 octets."}` ; aucun compte n'est créé, le mot de passe n'est pas modifié
+Limites : 4096 octets exactement → accepté ; la limite est en **octets** (2049 `é` = 4098 octets → refus) ; contrôle après la longueur minimale ; `PATCH` : après la vérification du mot de passe actuel ; à la connexion, un mot de passe de plus de 4096 octets → 401 `Invalid credentials.` (inchangé) ; Symfony répond 500 : cas exclu des tests `compat`
+Validation : unitaire (domaine), API [back] — Acceptation : 400 et message exact, rien d'écrit
+
+### SC-IDENT-029 — Le corps doit être un objet JSON (important, écart E16 corrigé)
+Étant donné un visiteur ou un utilisateur connecté
+Quand il envoie à `POST /api/auth/register` ou `PATCH /api/me` le corps `[]`, `[1,2]`, `"texte"`, `42` ou `true`
+Alors identity-service répond 400 `{"error":"JSON invalide."}` et rien n'est écrit
+Limites : corps vide → voir SC-IDENT-033 ; `{}` accepté (`register` → 400 `Le champ "name" est obligatoire.`, `PATCH` → 200 sans changement) ; s'applique aussi à `POST /api/auth/login` (E19 : 400 `JSON invalide.` au lieu de `Invalid JSON.`) ; Symfony accepte un tableau JSON : cas exclu des tests `compat`
+Validation : API [back] — Acceptation : 400 et message exact pour chaque corps
+
+### SC-IDENT-030 — Les champs texte doivent être des chaînes JSON (important, écart E17 corrigé)
+Étant donné un visiteur ou un utilisateur connecté
+Quand un champ présent parmi `name`, `email`, `password` (inscription) ou `name`, `avatarColor`, `currentPassword`, `newPassword` (`PATCH /api/me`) est un nombre, un booléen, un tableau ou un objet
+Alors identity-service répond 400 `{"error":"Le champ \"<nom>\" doit être une chaîne de caractères."}` (ex. `Le champ "name" doit être une chaîne de caractères.`) et rien n'est écrit
+Limites : inscription : `null` est aussi refusé avec ce message ; `PATCH /api/me` : `null` vaut « absent » (inchangé) ; plusieurs champs invalides → message du premier dans l'ordre indiqué ; ce contrôle précède les contrôles de contenu (`{"name":123,"email":"x"}` → message sur `name`) ; chaîne vide → règles existantes (`Le champ "name" est obligatoire.`) ; clés inconnues ignorées quel que soit leur type ; s'applique aussi à `POST /api/auth/login` pour `email` et `password`, `null` compris (E19, voir SC-IDENT-032) ; Symfony convertit à la manière de PHP : cas exclus des tests `compat`
+Validation : unitaire (lecture du corps), API (tests paramétrés : champ × type) [back] — Acceptation : message exact pour chaque couple champ × type
+
+### SC-IDENT-031 — Couleur d'avatar invalide refusée (secondaire, écart E18 corrigé)
+Étant donné un utilisateur connecté nommé « Camille »
+Quand il envoie `PATCH /api/me` avec `avatarColor` = `"red"`, `"#12345"`, `"#1234567"`, `""`, `"#0EA5E9\n"`, `" #0EA5E9"` ou `"#GGGGGG"`
+Alors identity-service répond 400 `{"error":"Couleur d'avatar invalide."}` ; ni la couleur ni aucun autre champ envoyé (ex. `name`) n'est modifié
+Limites : `#0ea5e9` et `#0EA5E9` acceptés et stockés tels quels ; `null` ou clé absente → couleur inchangée ; ordre : après `name`, avant le mot de passe (`{"name":"","avatarColor":"red"}` → message sur `name`) ; Symfony ignore la valeur : cas exclu des tests `compat`
+Validation : unitaire (`AvatarColor`), API [back] ; e2e page Profil (le sélecteur n'envoie que des couleurs valides) [front] — Acceptation : 400, message exact, profil inchangé
+
+### SC-IDENT-032 — Connexion : corps et champs validés en français (important, écart E19 corrigé)
+Étant donné un visiteur
+Quand il envoie `POST /api/auth/login` avec : `[]` ou `"texte"` ; `{"email":123,"password":"x"}` ; `{"email":"a@b.c","password":null}` ; `{"password":"motdepasse"}` ; `{"email":"camille@exemple.fr"}` ; `{"email":"","password":"x"}`
+Alors identity-service répond 400 avec respectivement `JSON invalide.` ; `Le champ "email" doit être une chaîne de caractères.` ; `Le champ "password" doit être une chaîne de caractères.` ; `Le champ "email" est obligatoire.` ; `Le champ "password" est obligatoire.` ; `Le champ "email" est obligatoire.`
+Limites : ordre = forme du corps → type de `email` → type de `password` → présence de `email` → présence de `password` (`{"email":123}` → message de type sur `email`) ; `"password":""` → `Le champ "password" est obligatoire.` ; l'e-mail n'est ni tronqué ni mis en minuscules (recherche par collation, SC-IDENT-007) : `" camille@exemple.fr"` → 401 ; identifiants faux → 401 `{"code":401,"message":"Invalid credentials."}` inchangé (SC-IDENT-008) ; le `Content-Type` n'est pas contrôlé (plus de 404) ; Symfony répond en anglais : cas exclus des tests `compat`
+Validation : unitaire (`JsonLoginRequestParser`), API (paramétré) [back] — Acceptation : message exact pour chaque cas
+
+### SC-IDENT-033 — Corps vide refusé (important, écart E20 corrigé)
+Étant donné un visiteur, ou un utilisateur connecté
+Quand il envoie un corps vide (0 octet) à `POST /api/auth/register`, `POST /api/auth/login` ou `PATCH /api/me`
+Alors identity-service répond 400 `{"error":"JSON invalide."}` et rien n'est écrit
+Limites : un corps ne contenant que des espaces est aussi du JSON invalide → même réponse ; `PATCH /api/me` sans jeton → 401 d'abord ; `{}` reste accepté (règles de SC-IDENT-029) ; Symfony traite le corps vide comme `{}` (et `Invalid JSON.` au login) : cas exclus des tests `compat`
+Validation : API [back] — Acceptation : 400 et message exact sur les trois routes
+
+### SC-IDENT-034 — `newPassword` "0" est un vrai mot de passe (secondaire, écart E21 corrigé)
+Étant donné un utilisateur connecté dont le mot de passe est `ancienmdp1`
+Quand il envoie `PATCH /api/me` `{"currentPassword":"ancienmdp1","newPassword":"0"}`, puis `{"newPassword":"0"}`
+Alors la première requête répond 400 `Le mot de passe doit contenir au moins 8 caractères.`, la seconde 400 `Mot de passe actuel incorrect.` ; le mot de passe n'est pas modifié
+Limites : seuls `newPassword` absent, `null` ou `""` signifient « pas de changement » ; `" "` (espace) est contrôlé comme les autres chaînes ; Symfony ignore `"0"` (200) : cas exclu des tests `compat` ; le front n'envoie `newPassword` que s'il fait au moins 8 caractères
+Validation : unitaire (`ProfileUpdate`), API [back] — Acceptation : messages exacts, hash inchangé
+
+### SC-IDENT-035 — Corps de requête trop volumineux (important, revue 1, ADR A18)
+Étant donné un visiteur, ou un utilisateur connecté
+Quand il envoie à `POST /api/auth/register`, `POST /api/auth/login` ou `PATCH /api/me` un corps de 65 537 octets ou plus (avec `Content-Length`, ou en `Transfer-Encoding: chunked`)
+Alors identity-service répond 413 `{"error":"Corps de requête trop volumineux."}` sans lire la suite ; rien n'est écrit
+Limites : 65 536 octets exactement → traité normalement (puis règles habituelles, ex. 400) ; `PATCH /api/me` sans jeton → 401 d'abord ; nginx applique la même limite ; Symfony n'avait pas de limite propre : cas exclu des tests `compat`
+Validation : API [back] — Acceptation : 413, message exact, aucune écriture, mémoire non saturée
+
+### SC-IDENT-036 — Démarrage refusé sans secret interne (important, revue 1, ADR A18)
+Étant donné identity-service configuré avec `INTERNAL_API_SECRET` vide, absent ou composé d'espaces
+Quand il démarre
+Alors le démarrage échoue avec un message qui nomme `INTERNAL_API_SECRET` ; avec un secret non vide, il démarre
+Limites : le message et les journaux ne contiennent jamais la valeur du secret ni d'autre secret (SC-IDENT-024)
+Validation : intégration (démarrage du contexte Spring) [back] — Acceptation : échec de démarrage constaté, message exact sans secret
+
 ## 5. Cas critiques et limites (synthèse)
-- Valeurs vides : `name` d'espaces, mot de passe vide, corps vide → 400 attendus (SC-IDENT-003).
-- Valeurs maximales : nom 120, e-mail 180, mot de passe sans maximum (attention à la limite bcrypt de 72 octets) (SC-IDENT-004).
+- Valeurs vides : `name` d'espaces, mot de passe vide → 400 attendus (SC-IDENT-003) ; corps vide → 400 `JSON invalide.` sur `register`, `login`, `PATCH /me` (SC-IDENT-033) ; `newPassword` `"0"` = vrai mot de passe (SC-IDENT-034).
+- Valeurs maximales : nom 120, e-mail 180 (SC-IDENT-004) ; mot de passe 4096 octets (SC-IDENT-028).
+- Types et formes : corps non objet (SC-IDENT-029), champ non textuel (SC-IDENT-030), couleur invalide (SC-IDENT-031) : écarts corrigés dans identity-service, exclus des tests `compat`.
 - Concurrence : double inscription simultanée (SC-IDENT-002) ; inscription concurrente avec un ajout de membre sur le même e-mail (l'invitation et l'adhésion ne doivent pas être créées deux fois).
 - IDOR : `/api/me` ne prend aucun identifiant ; il n'existe aucune route de lecture d'un autre utilisateur.
 - Coexistence : jetons croisés, hashes croisés (SC-IDENT-010, SC-IDENT-023).

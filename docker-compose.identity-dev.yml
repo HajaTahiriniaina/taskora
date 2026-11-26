@@ -1,0 +1,9 @@
+# Développement et CI (identity-compat) : publie l'API d'identity-service sur la boucle locale.
+#   docker compose -f docker-compose.yml -f docker-compose.identity-dev.yml --profile identity up -d --build
+# Le port de management (8091, /actuator/health) n'est jamais publié.
+services:
+  identity:
+    # Le réseau « backend » est interne : un réseau non interne est requis pour publier un port.
+    networks: [backend, default]
+    ports:
+      - "${IDENTITY_BIND:-127.0.0.1}:${IDENTITY_PORT:-8082}:8080"

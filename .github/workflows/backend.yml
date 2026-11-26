@@ -1,0 +1,60 @@
+# Backend Symfony : PHPUnit sur la base taskora_test (docs/ci/requests/backend.md §2, backend-phpunit).
+name: backend
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "docker-compose.yml"
+      - "docker/mariadb/**"
+      - ".github/workflows/backend.yml"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-phpunit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Secrets éphémères
+        run: |
+          for name in JWT_PASSPHRASE DB_PASSWORD DB_ROOT_PASSWORD IDENTITY_DB_PASSWORD APP_SECRET; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Image api
+        run: docker compose build api
+
+      # Volume neuf : /docker-entrypoint-initdb.d crée taskora_test et les droits de « taskora ».
+      # DATABASE_URL (compose) vise /taskora : doctrine.yaml (when@test) ajoute « _test ».
+      # INTERNAL_API_SECRET est retiré : les tests utilisent la valeur factice de backend/.env.test.
+      - name: PHPUnit
+        run: >-
+          docker compose run --rm -e APP_ENV=test -v "$PWD/backend":/app --entrypoint sh api -c
+          'unset INTERNAL_API_SECRET
+          && composer install --no-interaction --no-progress
+          && php bin/console lexik:jwt:generate-keypair --skip-if-exists --env=test
+          && php bin/console doctrine:database:create --if-not-exists --env=test
+          && php bin/console doctrine:migrations:migrate -n --allow-no-migration --env=test
+          && vendor/bin/phpunit --log-junit var/phpunit-junit.xml'
+
+      - name: Rapport JUnit
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-phpunit-junit
+          retention-days: 14
+          if-no-files-found: ignore
+          path: backend/var/phpunit-junit.xml

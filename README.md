@@ -18,8 +18,24 @@ docker compose up -d --build
 ```
 
 - Application : http://localhost:8080
-- API : http://localhost:8081/api (aussi accessible via http://localhost:8080/api)
-- MariaDB : localhost:3307 (`taskora` / `taskora`)
+- API : http://127.0.0.1:8081/api (publiée sur la boucle locale uniquement ; aussi accessible via http://localhost:8080/api)
+- MariaDB : 127.0.0.1:3307 (`taskora` / `taskora`)
+
+Ports publiés : tous se règlent dans le `.env` racine (modèle `.env.example`), puis `docker compose up -d` :
+
+| Service | Port | Adresse d'écoute | Défaut |
+|---|---|---|---|
+| Application (nginx) | `WEB_PORT` | `WEB_BIND` | `0.0.0.0:8080` (tout le réseau) |
+| API Symfony | `API_PORT` | `API_BIND` | `127.0.0.1:8081` (garder la boucle locale : `/internal/*`) |
+| MariaDB | `DB_PORT` | `DB_BIND` | `127.0.0.1:3307` |
+| identity-service (`docker-compose.identity-dev.yml`) | `IDENTITY_PORT` | `IDENTITY_BIND` | `127.0.0.1:8082` |
+| SonarQube (profil `quality`) | `SONAR_PORT` | `SONAR_BIND` | `127.0.0.1:9000` |
+
+Le proxy de `ng serve` (`frontend/proxy.conf.mjs`) lit lui aussi `API_PORT` / `API_BIND` dans le `.env` racine.
+
+Profils compose : `--profile identity` ajoute identity-service (migration en cours, `db-init` crée son schéma et son compte), `--profile quality` ajoute SonarQube (http://127.0.0.1:9000). L'amont nginx de `/api/auth/` et `/api/me` se choisit par `IDENTITY_UPSTREAM` (`api:80` par défaut, Symfony) puis `docker compose up -d web`, sans reconstruction.
+
+CI GitHub Actions (`.github/workflows/`) : identity-service (build, qualité, Sonar, image, sécurité OWASP, compatibilité), backend PHPUnit, frontend (build). Secrets à créer dans GitHub : `NVD_API_KEY`, `SONAR_TOKEN` (+ variable `SONAR_HOST_URL`). Détails : [docs/ci/README.md](docs/ci/README.md).
 
 Au démarrage, le conteneur `api` attend la base, génère les clés JWT (volume `jwt_keys`) et applique les migrations. Les images des textes et les pièces jointes sont stockées sur **Amazon S3** (ou dans le volume `uploads` tant que S3 n’est pas configuré, voir ci-dessous).
 
@@ -154,7 +170,7 @@ symfony serve --port=8081
 Frontend (Node ≥ 22.22 ou ≥ 24.15, requis par Angular 22) :
 
 ```bash
-cd frontend && npm install && npx ng serve   # proxy /api → localhost:8081
+cd frontend && npm install && npx ng serve   # proxy /api → API_PORT du .env (8081 par défaut)
 ```
 
 ## API (extrait)

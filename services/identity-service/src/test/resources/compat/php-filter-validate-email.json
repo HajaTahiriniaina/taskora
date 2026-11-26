@@ -1,0 +1,618 @@
+[
+    {
+        "input": "camille@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "camille.martin@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "c@e.fr",
+        "valid": true
+    },
+    {
+        "input": "a@b.c",
+        "valid": true
+    },
+    {
+        "input": "a@b",
+        "valid": false
+    },
+    {
+        "input": "user+tag@exemple.test",
+        "valid": true
+    },
+    {
+        "input": "user-name@exemple.test",
+        "valid": true
+    },
+    {
+        "input": "user_name@exemple.test",
+        "valid": true
+    },
+    {
+        "input": "o'brien@exemple.test",
+        "valid": true
+    },
+    {
+        "input": "x@exemple-test.fr",
+        "valid": true
+    },
+    {
+        "input": "x@-exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple-.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple..fr",
+        "valid": false
+    },
+    {
+        "input": "x..y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": ".x@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x.@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@.exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr.",
+        "valid": false
+    },
+    {
+        "input": "x@exemple",
+        "valid": false
+    },
+    {
+        "input": "x@localhost",
+        "valid": false
+    },
+    {
+        "input": "x@123",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.123",
+        "valid": false
+    },
+    {
+        "input": "x@1.2.3.4",
+        "valid": false
+    },
+    {
+        "input": "x@[1.2.3.4]",
+        "valid": true
+    },
+    {
+        "input": "x@[127.0.0.1]",
+        "valid": true
+    },
+    {
+        "input": "x@[256.1.1.1]",
+        "valid": false
+    },
+    {
+        "input": "x@[IPv6:::1]",
+        "valid": true
+    },
+    {
+        "input": "x@[IPv6:2001:db8::1]",
+        "valid": true
+    },
+    {
+        "input": "x@[IPv6:zz]",
+        "valid": false
+    },
+    {
+        "input": "\"x\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"x y\"@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "\"x@y\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"x\\\"y\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"x\\\\y\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": " x@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr ",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr\n",
+        "valid": false
+    },
+    {
+        "input": "x\n@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr\r\n",
+        "valid": false
+    },
+    {
+        "input": "\tx@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple fr",
+        "valid": false
+    },
+    {
+        "input": "@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@",
+        "valid": false
+    },
+    {
+        "input": "x",
+        "valid": false
+    },
+    {
+        "input": "",
+        "valid": false
+    },
+    {
+        "input": "@",
+        "valid": false
+    },
+    {
+        "input": "x@@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "pas-un-email",
+        "valid": false
+    },
+    {
+        "input": "é@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exémple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@xn--exmple-cva.fr",
+        "valid": true
+    },
+    {
+        "input": "ñ@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "用户@例子.广告",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr‎",
+        "valid": false
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.fr",
+        "valid": true
+    },
+    {
+        "input": "x@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.fr",
+        "valid": false
+    },
+    {
+        "input": "x!#$%&*+/=?^`{|}~@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x(comment)@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr(comment)",
+        "valid": false
+    },
+    {
+        "input": "x<y>@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x[y]@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x;y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x,y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x:y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x\\y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x\"y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "X@EXEMPLE.FR",
+        "valid": true
+    },
+    {
+        "input": "Camille@Exemple.FR",
+        "valid": true
+    },
+    {
+        "input": "1@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "123@456.789",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.f",
+        "valid": true
+    },
+    {
+        "input": "x@exemple.fr1",
+        "valid": true
+    },
+    {
+        "input": "x@exemple.co.uk",
+        "valid": true
+    },
+    {
+        "input": "x@sub.sub.sub.exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x@e_x.fr",
+        "valid": false
+    },
+    {
+        "input": "x@e--x.fr",
+        "valid": true
+    },
+    {
+        "input": "x@exemple.-fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr-",
+        "valid": false
+    },
+    {
+        "input": "x@0.fr",
+        "valid": true
+    },
+    {
+        "input": "x@a-b-c.fr",
+        "valid": true
+    },
+    {
+        "input": "x.y.z@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x--y@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "-x@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x-@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "_x@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x@exemple.FR",
+        "valid": true
+    },
+    {
+        "input": "x@[exemple.fr]",
+        "valid": false
+    },
+    {
+        "input": "x@[1.2.3]",
+        "valid": false
+    },
+    {
+        "input": "x@[1.2.3.4.5]",
+        "valid": false
+    },
+    {
+        "input": "x@[IPv6:1:2:3:4:5:6:7:8]",
+        "valid": true
+    },
+    {
+        "input": "x@[IPv6:1:2:3:4:5:6:7:8:9]",
+        "valid": false
+    },
+    {
+        "input": "x@[IPv6:::ffff:1.2.3.4]",
+        "valid": true
+    },
+    {
+        "input": "x@[01.2.3.4]",
+        "valid": false
+    },
+    {
+        "input": "x@[1.2.3.04]",
+        "valid": false
+    },
+    {
+        "input": "x@01.2.3.4",
+        "valid": false
+    },
+    {
+        "input": "x@1.2.3.256",
+        "valid": false
+    },
+    {
+        "input": "x\u0000@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr\u0000",
+        "valid": false
+    },
+    {
+        "input": "x@-",
+        "valid": false
+    },
+    {
+        "input": "x@a",
+        "valid": false
+    },
+    {
+        "input": "x@a.b",
+        "valid": true
+    },
+    {
+        "input": "x@a.b-",
+        "valid": false
+    },
+    {
+        "input": "x@a.-b",
+        "valid": false
+    },
+    {
+        "input": "x@a.1b",
+        "valid": false
+    },
+    {
+        "input": "x@a.b1",
+        "valid": true
+    },
+    {
+        "input": "x@1a.b",
+        "valid": true
+    },
+    {
+        "input": "x@a..b",
+        "valid": false
+    },
+    {
+        "input": "\"x\".y@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x.\"y\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"x\".\"y\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"x\"y@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "\"x\\ty\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"x\ny\"@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x@exemple.fr#",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr/",
+        "valid": false
+    },
+    {
+        "input": "mailto:x@exemple.fr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr?",
+        "valid": false
+    },
+    {
+        "input": "x%y@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x@exemple%2Efr",
+        "valid": false
+    },
+    {
+        "input": "x@exemple.fr.fr.fr.fr.fr.fr",
+        "valid": true
+    },
+    {
+        "input": "x@-a.b",
+        "valid": false
+    },
+    {
+        "input": "x@a.b.c.d.e.f.g.h",
+        "valid": true
+    },
+    {
+        "input": "x+@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "+@exemple.fr",
+        "valid": true
+    },
+    {
+        "input": "x@e.x.e.m.p.l.e",
+        "valid": true
+    },
+    {
+        "input": "test@exemple.test",
+        "valid": true
+    },
+    {
+        "input": "compat-1@exemple.test",
+        "valid": true
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddddddddddddddddddddddddddddddddddddddddddddddd.fr",
+        "valid": true
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddd.fr",
+        "valid": true
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddd.fr",
+        "valid": true
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddddddddddddddddddddddddddddddddddddddddddddd.fr",
+        "valid": true
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "x@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddddd.fr",
+        "valid": false
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddddddd.fr",
+        "valid": true
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddd.fr",
+        "valid": true
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.ddddddddddddddddd.fr",
+        "valid": true
+    },
+    {
+        "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.dddddddddddddddddd.fr",
+        "valid": true
+    }
+]

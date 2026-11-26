@@ -1,0 +1,80 @@
+# identity-service : OWASP Dependency-Check, échec si CVSS >= 7 (docs/ci/requests/backend.md §2).
+name: identity-security
+
+on:
+  pull_request:
+    paths:
+      - "services/**/pom.xml"
+      - ".github/workflows/identity-security.yml"
+  schedule:
+    - cron: "0 5 * * 1" # lundi 05:00 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  identity-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read # upload-sarif lit le run en cours (dépôt privé)
+      security-events: write # téléversement SARIF (onglet Security)
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: services/**/pom.xml
+      - name: Semaine ISO (clé de cache NVD)
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Cache de la base NVD
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-data-${{ steps.week.outputs.week }}
+          restore-keys: dependency-check-data-
+      # La clé reste dans l'environnement : le plugin la lit par son nom
+      # (nvdApiKeyEnvironmentVariable), jamais en argument de ligne de commande ni affichée.
+      # Secret absent (non créé, ou PR de fork) : échec explicite, dependency-check 13 refuse
+      # de tourner sans clé (« Invalid API Key, length of 0 »).
+      - name: Dependency-Check (CVSS >= 7 bloquant)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo "::error::NVD_API_KEY absent : dependency-check 13 ne peut pas s'exécuter (secret de dépôt à créer ; indisponible pour les PR de fork)."
+            exit 1
+          fi
+          ./mvnw -B -ntp -pl identity-service -am -Psecurity-scan verify -DskipTests -DskipITs -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+      - name: Rapports OWASP
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: identity-dependency-check
+          retention-days: 14
+          if-no-files-found: ignore
+          path: services/identity-service/target/dependency-check-report.*
+      - name: SARIF → onglet Security
+        if: >-
+          always() && hashFiles('services/identity-service/target/dependency-check-report.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        # Confort seulement : le seuil CVSS est appliqué par l'étape Dependency-Check. Sur un dépôt privé,
+        # l'onglet Security exige GitHub Advanced Security ; sans lui l'envoi échoue sans bloquer le job.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          sarif_file: services/identity-service/target/dependency-check-report.sarif
+          category: owasp-dependency-check
