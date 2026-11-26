@@ -1,19 +1,12 @@
 # Backend Symfony : PHPUnit sur la base taskora_test (docs/ci/requests/backend.md §2, backend-phpunit).
 name: backend
 
+# Appelé par ci.yml (concurrence gérée par l'appelant) ; plus de déclencheur pull_request/push propre.
+# Ancien filtre (job « changes » de ci.yml) : backend/**, docker-compose.yml, docker/mariadb/**, ce fichier ; PR seulement.
 on:
-  pull_request:
-    paths:
-      - "backend/**"
-      - "docker-compose.yml"
-      - "docker/mariadb/**"
-      - ".github/workflows/backend.yml"
+  workflow_call:
 
 permissions: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   backend-phpunit:

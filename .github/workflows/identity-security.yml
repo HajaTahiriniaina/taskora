@@ -1,19 +1,22 @@
 # identity-service : OWASP Dependency-Check, échec si CVSS >= 7 (docs/ci/requests/backend.md §2).
 name: identity-security
 
+# PR : appelé par ci.yml (ancien filtre : services/**/pom.xml, ce fichier). Hebdomadaire et manuel : autonome.
 on:
-  pull_request:
-    paths:
-      - "services/**/pom.xml"
-      - ".github/workflows/identity-security.yml"
+  workflow_call:
+    secrets:
+      NVD_API_KEY:
+        description: "Clé API NVD (obligatoire : le job échoue sans elle)"
+        required: false
   schedule:
     - cron: "0 5 * * 1" # lundi 05:00 UTC
   workflow_dispatch:
 
 permissions: {}
 
+# Nom fixe : appelé, github.workflow vaudrait « ci » et le groupe de l'appelant (interblocage évité).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: identity-security-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

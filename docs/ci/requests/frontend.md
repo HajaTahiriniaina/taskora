@@ -156,6 +156,8 @@ Non vérifié :
 
 Statut : **implémentée** dans `.github/workflows/frontend.yml` (26/11/2026), revue m7 et m8 de `docs/reviews/2026-11-26-frontend-identity.md`. Non poussé : le premier run GitHub Actions attend l'accord de l'utilisateur.
 
+Orchestration (26/11/2026) : `frontend.yml` est appelé par `ci.yml` (job `frontend`), avec les mêmes chemins, jobs et artefacts. Les checks s'appellent `frontend / <job>`. Le seul check requis sur `main` est `ci-gate`. Le lancement manuel avec l'entrée `upstream` reste possible sur `frontend.yml`. Détail : [../README.md](../README.md#orchestration--ciyml-et-le-check-unique-ci-gate).
+
 ### Jobs
 | Job | Bloquant | Écarts ou précisions par rapport au §2 |
 |---|---|---|

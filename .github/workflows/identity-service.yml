@@ -1,22 +1,16 @@
 # identity-service : build/tests, qualité, Sonar, image (docs/ci/requests/backend.md §2).
 name: identity-service
 
+# Appelé par ci.yml (concurrence gérée par l'appelant) ; plus de déclencheur pull_request/push propre.
+# Ancien filtre (job « changes » de ci.yml) : services/**, ce fichier ; PR et push sur main.
 on:
-  pull_request:
-    paths:
-      - "services/**"
-      - ".github/workflows/identity-service.yml"
-  push:
-    branches: [main]
-    paths:
-      - "services/**"
-      - ".github/workflows/identity-service.yml"
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        description: "Jeton Sonar (facultatif : identity-sonar est ignoré s'il manque)"
+        required: false
 
 permissions: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
