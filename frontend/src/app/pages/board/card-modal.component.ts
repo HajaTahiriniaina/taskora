@@ -1,8 +1,8 @@
 import {
   Component,
-  HostListener,
   computed,
   effect,
+  HostListener,
   inject,
   input,
   output,
@@ -11,9 +11,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+
 import { ApiService } from '../../core/api.service';
-import { DialogService } from '../../core/dialog.service';
-import { AuthService } from '../../core/auth.service';
 import {
   AttachmentUploadsService,
   draggedFiles,
@@ -21,33 +20,35 @@ import {
   fileExt,
   formatSize,
 } from '../../core/attachment-uploads.service';
+import { AuthService } from '../../core/auth.service';
+import { DialogService } from '../../core/dialog.service';
 import {
   Activity,
   Attachment,
   Board,
   CardDetail,
-  Member,
   Comment,
   CustomField,
+  Member,
   PALETTE,
   PRIORITIES,
   Priority,
 } from '../../core/models';
-import { Seg, describeActivity } from './activity-text';
 import { ToastService } from '../../core/toast.service';
 import { AvatarComponent } from '../../shared/avatar.component';
+import { FileViewerComponent } from '../../shared/file-viewer.component';
 import { IconComponent } from '../../shared/icon.component';
-import { TimeAgoPipe } from '../../shared/time-ago.pipe';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { RichViewComponent } from '../../shared/rich-view.component';
-import { FileViewerComponent } from '../../shared/file-viewer.component';
+import { TimeAgoPipe } from '../../shared/time-ago.pipe';
+import { describeActivity, Seg } from './activity-text';
 import { dueState } from './card-format';
 
 type FeedItem =
-  | { kind: 'comment'; id: string; at: string; comment: Comment }
-  | { kind: 'activity'; id: string; at: string; activity: Activity; segs: Seg[] };
+  | { kind: 'activity'; id: string; at: string; activity: Activity; segs: Seg[] }
+  | { kind: 'comment'; id: string; at: string; comment: Comment };
 
-type PopKind = 'members' | 'labels' | 'cover' | 'priority' | 'more' | 'add';
+type PopKind = 'add' | 'cover' | 'labels' | 'members' | 'more' | 'priority';
 
 function readPref(key: string, fallback: boolean): boolean {
   try {
@@ -99,7 +100,7 @@ export class CardModalComponent {
   manageFields = output<void>();
 
   card = signal<CardDetail | null>(null);
-  pop = signal<PopKind | null>(null);
+  pop = signal<null | PopKind>(null);
   /** Comment composer: collapsed placeholder until clicked (Trello-like). */
   composing = signal(false);
   composerSeed = signal('');
@@ -109,7 +110,7 @@ export class CardModalComponent {
   activities = signal<Activity[]>([]);
   activityHasMore = signal(false);
   activityLoading = signal(false);
-  private activityTimer: ReturnType<typeof setTimeout> | null = null;
+  private activityTimer: null | ReturnType<typeof setTimeout> = null;
 
   /** Comments + activity merged, newest first (Trello-like feed). */
   feed = computed<FeedItem[]>(() => {
@@ -139,7 +140,7 @@ export class CardModalComponent {
   pendingUploads = computed(() => this.uploads.pending().filter((p) => p.cardId === this.cardId()));
   /** A file is dragged over the modal (outside an editor): show the drop overlay. */
   fileOver = signal(false);
-  renaming = signal<number | null>(null);
+  renaming = signal<null | number>(null);
   showAllAttachments = signal(false);
   visibleAttachments = computed(() => {
     const all = this.card()?.attachments ?? [];
@@ -276,13 +277,13 @@ export class CardModalComponent {
   toggleCompleted() {
     this.patch({ completed: !this.card()!.completed });
   }
-  setCover(color: string | null) {
+  setCover(color: null | string) {
     this.pop.set(null);
     this.patch(
       color || !this.card()?.coverAttachmentId ? { cover: color } : { coverAttachmentId: null },
     );
   }
-  setCoverImage(attachmentId: number | null) {
+  setCoverImage(attachmentId: null | number) {
     this.pop.set(null);
     this.patch({ coverAttachmentId: attachmentId });
   }
@@ -602,7 +603,7 @@ export class CardModalComponent {
   }
 
   /** "+ Ajouter" menu: jumps to the matching control of the details column. */
-  addAction(kind: 'members' | 'labels' | 'due' | 'checklist' | 'fields' | 'attachment', e: Event) {
+  addAction(kind: 'attachment' | 'checklist' | 'due' | 'fields' | 'labels' | 'members', e: Event) {
     e.stopPropagation();
     this.pop.set(null);
     if (kind === 'members' || kind === 'labels') {
@@ -631,7 +632,7 @@ export class CardModalComponent {
     return new Date(d).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' });
   }
 
-  dueLabel(): string | null {
+  dueLabel(): null | string {
     return (
       ({ overdue: 'En retard', soon: 'Bientôt', done: 'Terminée' } as Record<string, string>)[
         this.due() ?? ''

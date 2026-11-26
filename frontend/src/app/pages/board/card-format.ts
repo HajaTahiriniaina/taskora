@@ -4,7 +4,7 @@ import { Card, CustomField } from '../../core/models';
 export function formatFieldValue(
   field: CustomField,
   value: unknown,
-): { text: string; color?: string } | null {
+): null | { text: string; color?: string } {
   if (value === null || value === undefined || value === '') return null;
   switch (field.type) {
     case 'checkbox':
@@ -33,9 +33,9 @@ export function formatFieldValue(
   }
 }
 
-export type DueState = 'done' | 'overdue' | 'soon' | 'later';
+export type DueState = 'done' | 'later' | 'overdue' | 'soon';
 
-export function dueState(card: Pick<Card, 'dueDate' | 'completed'>): DueState | null {
+export function dueState(card: Pick<Card, 'completed' | 'dueDate'>): DueState | null {
   if (!card.dueDate) return null;
   if (card.completed) return 'done';
   const diff = new Date(card.dueDate).getTime() - Date.now();

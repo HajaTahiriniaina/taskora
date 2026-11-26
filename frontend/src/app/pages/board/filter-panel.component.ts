@@ -1,24 +1,25 @@
-import { DialogService } from '../../core/dialog.service';
 import {
   ChangeDetectionStrategy,
   Component,
-  HostListener,
-  OnDestroy,
-  OnInit,
   computed,
+  HostListener,
   inject,
   input,
   linkedSignal,
+  OnDestroy,
+  OnInit,
   output,
   signal,
 } from '@angular/core';
+
+import { DialogService } from '../../core/dialog.service';
 import {
+  activeFilterCount,
   Board,
   CardFilters,
   DueFilter,
   EMPTY_FILTERS,
   User,
-  activeFilterCount,
 } from '../../core/models';
 import { AvatarComponent } from '../../shared/avatar.component';
 import { IconComponent } from '../../shared/icon.component';
@@ -34,7 +35,7 @@ export class FilterPanelComponent implements OnInit, OnDestroy {
   private dialog = inject(DialogService);
   board = input.required<Board>();
   filters = input.required<CardFilters>();
-  me = input<User | null>(null);
+  me = input<null | User>(null);
   filtersChange = output<CardFilters>();
   /** Local copy, always up to date even if several toggles happen before the parent re-renders. */
   current = linkedSignal(() => this.filters());
@@ -42,7 +43,7 @@ export class FilterPanelComponent implements OnInit, OnDestroy {
 
   showMemberPicker = signal(false);
   keyword = signal('');
-  private keywordTimer: ReturnType<typeof setTimeout> | null = null;
+  private keywordTimer: null | ReturnType<typeof setTimeout> = null;
 
   dueOptions: { value: DueFilter; label: string; icon: string; tone: string }[] = [
     { value: 'none', label: 'Aucune date', icon: 'calendar', tone: 'neutral' },
@@ -82,11 +83,11 @@ export class FilterPanelComponent implements OnInit, OnDestroy {
     this.keywordTimer = setTimeout(() => this.patch({ q: value }), 300);
   }
 
-  toggle(key: 'noMember' | 'mine' | 'done' | 'open' | 'noLabel') {
+  toggle(key: 'done' | 'mine' | 'noLabel' | 'noMember' | 'open') {
     this.patch({ [key]: !this.current()[key] });
   }
 
-  toggleIn<K extends 'members' | 'labels' | 'due'>(key: K, value: CardFilters[K][number]) {
+  toggleIn<K extends 'due' | 'labels' | 'members'>(key: K, value: CardFilters[K][number]) {
     const arr = this.current()[key] as unknown[];
     this.patch({
       [key]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value],

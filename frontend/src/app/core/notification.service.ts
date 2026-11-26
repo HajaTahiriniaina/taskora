@@ -1,4 +1,5 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
+
 import { ApiService } from './api.service';
 import { AppNotification } from './models';
 import { ToastService } from './toast.service';
@@ -15,7 +16,7 @@ export class NotificationService {
   /** Incremented when new notifications arrive: pages may refresh their data. */
   readonly tick = signal(0);
 
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: null | ReturnType<typeof setInterval> = null;
   private lastUnread = -1;
 
   start() {

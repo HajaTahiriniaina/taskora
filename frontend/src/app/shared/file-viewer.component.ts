@@ -1,12 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  HostListener,
-  OnDestroy,
   computed,
   effect,
+  HostListener,
   inject,
   input,
+  OnDestroy,
   output,
   signal,
   untracked,
@@ -14,6 +14,7 @@ import {
 import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-browser';
 import DOMPurify from 'dompurify';
 import { firstValueFrom } from 'rxjs';
+
 import { ApiService } from '../core/api.service';
 import { extColor, fileExt, formatSize } from '../core/attachment-uploads.service';
 import { Attachment } from '../core/models';
@@ -21,7 +22,7 @@ import { IconComponent } from './icon.component';
 import { JsonNodeComponent } from './json-node.component';
 
 export type ViewerKind =
-  'image' | 'video' | 'audio' | 'pdf' | 'office' | 'sheet' | 'text' | 'json' | 'eml' | 'none';
+  'audio' | 'eml' | 'image' | 'json' | 'none' | 'office' | 'pdf' | 'sheet' | 'text' | 'video';
 
 /** Formats HTML5 players read natively (the API streams them inline, with seeking). */
 const VIDEO = ['mp4', 'm4v', 'mov', 'webm', 'ogv'];
@@ -140,8 +141,8 @@ interface Mail {
   to: string;
   cc: string;
   date: string;
-  html: SafeHtml | null;
-  text: string | null;
+  html: null | SafeHtml;
+  text: null | string;
   files: MailFile[];
   remoteImages: boolean;
 }
@@ -178,16 +179,16 @@ export class FileViewerComponent implements OnDestroy {
 
   loading = signal(false);
   loadingText = signal('Chargement…');
-  error = signal<string | null>(null);
-  frameUrl = signal<SafeResourceUrl | null>(null);
-  text = signal<string | null>(null);
+  error = signal<null | string>(null);
+  frameUrl = signal<null | SafeResourceUrl>(null);
+  text = signal<null | string>(null);
   truncated = signal(false);
-  json = signal<{ value: unknown } | null>(null);
+  json = signal<null | { value: unknown }>(null);
   sheets = signal<Sheet[]>([]);
   sheetIndex = signal(0);
-  sheetMode = signal<'table' | 'pdf'>('table');
+  sheetMode = signal<'pdf' | 'table'>('table');
   mail = signal<Mail | null>(null);
-  private mailSource: { html: string; files: Map<string, string> } | null = null;
+  private mailSource: null | { html: string; files: Map<string, string> } = null;
   private objectUrls: string[] = [];
   private token = 0;
 
@@ -305,7 +306,7 @@ export class FileViewerComponent implements OnDestroy {
     }
   }
 
-  setSheetMode(mode: 'table' | 'pdf') {
+  setSheetMode(mode: 'pdf' | 'table') {
     if (mode === this.sheetMode()) return;
     this.sheetMode.set(mode);
     if (mode === 'pdf' && !this.frameUrl()) {
@@ -315,7 +316,7 @@ export class FileViewerComponent implements OnDestroy {
   }
 
   /** Only our own "/uploads/…" URLs are put in a frame. */
-  private trusted(url: string): SafeResourceUrl | null {
+  private trusted(url: string): null | SafeResourceUrl {
     return /^\/uploads\/[A-Za-z0-9/._-]+$/.test(url)
       ? this.sanitizer.bypassSecurityTrustResourceUrl(url)
       : null;
@@ -399,7 +400,7 @@ export class FileViewerComponent implements OnDestroy {
     const { default: PostalMime } = await import('postal-mime');
     const email = await PostalMime.parse(buffer);
     if (stale()) return;
-    const who = (list?: MailAddress[] | MailAddress | null) =>
+    const who = (list?: MailAddress | MailAddress[] | null) =>
       (Array.isArray(list) ? list : list ? [list] : [])
         .map((x) => (x.name ? `${x.name} <${x.address ?? ''}>` : (x.address ?? '')))
         .join(', ');

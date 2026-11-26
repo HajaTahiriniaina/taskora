@@ -7,7 +7,7 @@ export function isHtml(value: string): boolean {
 }
 
 /** Legacy plain text and Markdown (e.g. Trello imports) → HTML. */
-export function toHtml(value: string | null | undefined): string {
+export function toHtml(value: null | string | undefined): string {
   const v = (value ?? '').trim();
   if (!v) return '';
   return isHtml(v) ? v : (marked.parse(v, { async: false, gfm: true, breaks: true }) as string);
@@ -54,6 +54,6 @@ export function sanitizeHtml(html: string): string {
   });
 }
 
-export function renderRich(value: string | null | undefined): string {
+export function renderRich(value: null | string | undefined): string {
   return sanitizeHtml(toHtml(value));
 }

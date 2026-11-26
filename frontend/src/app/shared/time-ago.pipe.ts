@@ -2,7 +2,7 @@ import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({ name: 'timeAgo' })
 export class TimeAgoPipe implements PipeTransform {
-  transform(value: string | null | undefined): string {
+  transform(value: null | string | undefined): string {
     if (!value) return '';
     const diff = (Date.now() - new Date(value).getTime()) / 1000;
     if (diff < 60) return "à l'instant";

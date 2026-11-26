@@ -1,8 +1,9 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import Swal from 'sweetalert2';
+
 import { DialogService } from './dialog.service';
 
-export type ToastKind = 'success' | 'error' | 'info';
+export type ToastKind = 'error' | 'info' | 'success';
 
 interface QueuedToast {
   message: string;

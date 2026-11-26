@@ -1,6 +1,7 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+
 import { ApiService, PushDevice } from './api.service';
 import { NotificationService } from './notification.service';
 
@@ -8,7 +9,7 @@ import { NotificationService } from './notification.service';
  * unsupported: no Web Push in this browser (or iPhone outside the Home Screen app)
  * denied: blocked in the browser settings · off: not enabled yet · on: banners active
  */
-export type PushState = 'unsupported' | 'denied' | 'off' | 'on' | 'unconfigured';
+export type PushState = 'denied' | 'off' | 'on' | 'unconfigured' | 'unsupported';
 
 /**
  * Browser notifications (Web Push). The service worker (/push-sw.js) shows the banners sent by the
@@ -25,8 +26,8 @@ export class PushService {
   readonly busy = signal(false);
   readonly devices = signal<PushDevice[]>([]);
   /** Hash of this browser's endpoint, to mark "this device" in the list */
-  readonly currentHash = signal<string | null>(null);
-  private registration: ServiceWorkerRegistration | null = null;
+  readonly currentHash = signal<null | string>(null);
+  private registration: null | ServiceWorkerRegistration = null;
   private started = false;
 
   get supported(): boolean {
@@ -170,7 +171,7 @@ export class PushService {
   }
 
   private onWorkerMessage(e: MessageEvent) {
-    const data = e.data as { type?: string; url?: string } | null;
+    const data = e.data as null | { type?: string; url?: string };
     if (data?.type === 'taskora-push') this.notifs.load();
     if (
       data?.type === 'taskora-open' &&

@@ -1,20 +1,21 @@
 import {
   Component,
-  HostListener,
-  OnInit,
   computed,
   effect,
+  HostListener,
   inject,
   input,
+  OnInit,
   output,
   signal,
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+
 import { ApiService, BoardTrash } from '../../core/api.service';
-import { DialogService } from '../../core/dialog.service';
 import { AuthService } from '../../core/auth.service';
+import { DialogService } from '../../core/dialog.service';
 import {
   BACKGROUNDS,
   Board,
@@ -33,7 +34,7 @@ import { AvatarComponent } from '../../shared/avatar.component';
 import { IconComponent } from '../../shared/icon.component';
 import { TimeAgoPipe } from '../../shared/time-ago.pipe';
 
-type Tab = 'members' | 'labels' | 'fields' | 'background' | 'archived' | 'trash';
+type Tab = 'archived' | 'background' | 'fields' | 'labels' | 'members' | 'trash';
 
 @Component({
   selector: 'tk-board-settings',
@@ -64,7 +65,7 @@ export class BoardSettingsComponent implements OnInit {
   archivedHasMore = signal(false);
   archivedLoading = signal(false);
   archivedQuery = '';
-  private archivedTimer: ReturnType<typeof setTimeout> | null = null;
+  private archivedTimer: null | ReturnType<typeof setTimeout> = null;
   /** Keeps the active tab visible when the tab bar scrolls (narrow drawer). */
   private tabVisible = effect(() => {
     this.tab();
@@ -211,7 +212,7 @@ export class BoardSettingsComponent implements OnInit {
     });
   }
 
-  archivedDate(d: string | null) {
+  archivedDate(d: null | string) {
     return d
       ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
       : '';
@@ -245,13 +246,13 @@ export class BoardSettingsComponent implements OnInit {
 
   // labels
   newLabel = { name: '', color: PALETTE[5] };
-  editingLabel = signal<number | null>(null);
+  editingLabel = signal<null | number>(null);
 
   // custom fields
   newField: { name: string; type: CustomFieldType; options: SelectOption[]; showOnCard: boolean } =
     this.blankField();
   newOption = { label: '', color: PALETTE[5] };
-  editingField = signal<number | null>(null);
+  editingField = signal<null | number>(null);
   fieldOption = { label: '', color: PALETTE[6] };
 
   // general

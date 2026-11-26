@@ -1,12 +1,13 @@
+import { HttpEventType } from '@angular/common/http';
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
-  OnDestroy,
-  afterNextRender,
   computed,
+  ElementRef,
   inject,
   input,
+  OnDestroy,
   output,
   signal,
   viewChild,
@@ -14,18 +15,18 @@ import {
 import { Editor } from '@tiptap/core';
 import { Highlight } from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
-import { Mention } from '@tiptap/extension-mention';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
+import { Mention } from '@tiptap/extension-mention';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Color, TextStyle } from '@tiptap/extension-text-style';
 import { Placeholder } from '@tiptap/extensions';
 import { StarterKit } from '@tiptap/starter-kit';
-import { HttpEventType } from '@angular/common/http';
+
 import { ApiService } from '../core/api.service';
 import { MAX_ATTACHMENT } from '../core/attachment-uploads.service';
 import { User } from '../core/models';
-import { AvatarComponent } from './avatar.component';
 import { ToastService } from '../core/toast.service';
+import { AvatarComponent } from './avatar.component';
 import { IconComponent } from './icon.component';
 import { toHtml } from './rich-text';
 
@@ -68,7 +69,7 @@ export class RichEditorComponent implements OnDestroy {
   private api = inject(ApiService);
   private toast = inject(ToastService);
 
-  value = input<string | null>('');
+  value = input<null | string>('');
   placeholder = input('Écrivez ici…');
   /** Smaller toolbar (comments). */
   compact = input(false);
@@ -81,7 +82,7 @@ export class RichEditorComponent implements OnDestroy {
   private host = viewChild.required<ElementRef<HTMLElement>>('host');
   private frame = viewChild.required<ElementRef<HTMLElement>>('frame');
   /** "@" suggestion list: members matching what is typed after "@", position under the caret. */
-  mention = signal<{ items: User[]; index: number; top: number; left: number } | null>(null);
+  mention = signal<null | { items: User[]; index: number; top: number; left: number }>(null);
   private mentionCommand: ((attrs: { id: string; label: string }) => void) | null = null;
   private fileInput = viewChild.required<ElementRef<HTMLInputElement>>('file');
   private anyFileInput = viewChild.required<ElementRef<HTMLInputElement>>('anyFile');
@@ -94,7 +95,7 @@ export class RichEditorComponent implements OnDestroy {
   fileUploads = signal<{ uid: number; name: string; progress: number; saving: boolean }[]>([]);
   uploading = computed(() => this.fileUploads().length);
   private uploadSeq = 0;
-  pop = signal<'color' | 'highlight' | 'link' | 'heading' | null>(null);
+  pop = signal<'color' | 'heading' | 'highlight' | 'link' | null>(null);
   linkUrl = '';
 
   textColors = TEXT_COLORS;
@@ -308,12 +309,12 @@ export class RichEditorComponent implements OnDestroy {
     return !!this.editor?.isActive({ textAlign: align });
   }
 
-  can(action: 'undo' | 'redo'): boolean {
+  can(action: 'redo' | 'undo'): boolean {
     this.tick();
     return !!this.editor?.can()[action]();
   }
 
-  currentColor(): string | null {
+  currentColor(): null | string {
     this.tick();
     return (this.editor?.getAttributes('textStyle')['color'] as string) ?? null;
   }
@@ -328,15 +329,15 @@ export class RichEditorComponent implements OnDestroy {
     this.run((c) => (level ? c.setHeading({ level }) : c.setParagraph()));
   }
 
-  setColor(color: string | null) {
+  setColor(color: null | string) {
     this.run((c) => (color ? c.setColor(color) : c.unsetColor()));
   }
 
-  setHighlight(color: string | null) {
+  setHighlight(color: null | string) {
     this.run((c) => (color ? c.setHighlight({ color }) : c.unsetHighlight()));
   }
 
-  togglePop(p: 'color' | 'highlight' | 'link' | 'heading', e: Event) {
+  togglePop(p: 'color' | 'heading' | 'highlight' | 'link', e: Event) {
     e.preventDefault();
     e.stopPropagation();
     if (p === 'link') this.linkUrl = (this.editor?.getAttributes('link')['href'] as string) ?? '';

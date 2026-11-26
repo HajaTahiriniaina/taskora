@@ -1,4 +1,4 @@
-import { Directive, ElementRef, OnDestroy, effect, inject, input, output } from '@angular/core';
+import { Directive, effect, ElementRef, inject, input, OnDestroy, output } from '@angular/core';
 
 /**
  * Emits when the host enters its scroll container (IntersectionObserver, no scroll listeners).

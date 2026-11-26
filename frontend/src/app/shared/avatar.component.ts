@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+
 import { User } from '../core/models';
 
 @Component({
@@ -31,7 +32,7 @@ import { User } from '../core/models';
   ],
 })
 export class AvatarComponent {
-  user = input<Pick<User, 'name' | 'avatarColor'> | null>(null);
+  user = input<null | Pick<User, 'avatarColor' | 'name'>>(null);
   size = input(32);
   initials = computed(() => {
     const parts = (this.user()?.name ?? '?').trim().split(/\s+/);

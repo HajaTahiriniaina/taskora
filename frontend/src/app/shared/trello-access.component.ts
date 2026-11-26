@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
+
 import { ApiService } from '../core/api.service';
 import { TrelloTransferService } from '../core/trello-transfer.service';
 import { IconComponent } from './icon.component';
@@ -148,8 +149,8 @@ export class TrelloAccessComponent {
 
   key = this.transfer.credentials()?.key ?? '';
   token = this.transfer.credentials()?.token ?? '';
-  error = signal<string | null>(null);
-  account = signal<string | null>(this.transfer.credentials()?.account ?? null);
+  error = signal<null | string>(null);
+  account = signal<null | string>(this.transfer.credentials()?.account ?? null);
   checking = signal(false);
 
   validKey() {

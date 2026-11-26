@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+
 import { draggedFiles } from '../../core/attachment-uploads.service';
 import { Card, CustomField, Label, PRIORITIES } from '../../core/models';
 import { AvatarComponent } from '../../shared/avatar.component';
@@ -139,7 +140,7 @@ export class CardItemComponent {
   opened = output<void>();
   toggled = output<void>();
   /** Progress (0-100) of attachments being uploaded to this card, null when idle. */
-  uploading = input<number | null>(null);
+  uploading = input<null | number>(null);
   filesDropped = output<File[]>();
 
   fileOver = signal(false);

@@ -1,6 +1,7 @@
 import { HttpClient, HttpEvent, HttpParams } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+
 import {
   Activity,
   AppNotification,
@@ -13,9 +14,9 @@ import {
   CardFilters,
   CardPage,
   ChecklistItem,
-  EMPTY_FILTERS,
   Comment,
   CustomField,
+  EMPTY_FILTERS,
   Label,
   Member,
   User,
@@ -44,15 +45,15 @@ export interface TrelloImportReport {
 export interface PushDevice {
   id: number;
   kind: string;
-  device: string | null;
+  device: null | string;
   endpointHash: string;
   createdAt: string;
-  lastSuccessAt: string | null;
+  lastSuccessAt: null | string;
 }
 
 export interface TrashInfo {
   deletedAt: string;
-  deletedBy: string | null;
+  deletedBy: null | string;
   purgeAt: string;
 }
 export interface TrashedBoard extends TrashInfo {
@@ -63,7 +64,7 @@ export interface TrashedBoard extends TrashInfo {
 export interface BoardTrash {
   retentionDays: number;
   lists: (BoardList & TrashInfo)[];
-  cards: ({
+  cards: (TrashInfo & {
     id: number;
     number: number;
     title: string;
@@ -71,7 +72,7 @@ export interface BoardTrash {
     listTitle: string;
     listDeleted: boolean;
     archived: boolean;
-  } & TrashInfo)[];
+  })[];
 }
 
 export interface TrelloCredentials {
@@ -129,7 +130,7 @@ export class ApiService {
       TrelloFilesState & {
         transferred: { name: string; cardId: number }[];
         errors: { name: string; error: string }[];
-        retryAfter: number | null;
+        retryAfter: null | number;
       }
     >(`${this.base}/boards/${boardId}/trello-files/transfer`, c);
   }

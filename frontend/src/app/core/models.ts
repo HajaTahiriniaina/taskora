@@ -5,7 +5,7 @@ export interface User {
   avatarColor: string;
 }
 
-export type Role = 'owner' | 'admin' | 'member';
+export type Role = 'admin' | 'member' | 'owner';
 
 export interface Member extends User {
   role: Role;
@@ -15,7 +15,7 @@ export interface Member extends User {
 export interface BoardSummary {
   id: number;
   title: string;
-  description: string | null;
+  description: null | string;
   background: string;
   showCardNumbers: boolean;
   favorite: boolean;
@@ -32,7 +32,7 @@ export interface Label {
   color: string;
 }
 
-export type CustomFieldType = 'text' | 'number' | 'date' | 'checkbox' | 'select' | 'url';
+export type CustomFieldType = 'checkbox' | 'date' | 'number' | 'select' | 'text' | 'url';
 
 export interface SelectOption {
   id: string;
@@ -49,7 +49,7 @@ export interface CustomField {
   position: number;
 }
 
-export type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
+export type Priority = 'high' | 'low' | 'medium' | 'none' | 'urgent';
 
 export interface Card {
   id: number;
@@ -57,16 +57,16 @@ export interface Card {
   /** Per-board card number (#12), kept when importing from Trello. */
   number: number;
   title: string;
-  description: string | null;
+  description: null | string;
   position: number;
-  dueDate: string | null;
+  dueDate: null | string;
   completed: boolean;
   /** Set when the card is archived (it then only appears in the board's archives) */
-  archivedAt: string | null;
-  cover: string | null;
+  archivedAt: null | string;
+  cover: null | string;
   /** Image attachment used as cover (thumbnail URL), takes precedence over the color */
-  coverImage: string | null;
-  coverAttachmentId: number | null;
+  coverImage: null | string;
+  coverAttachmentId: null | number;
   priority: Priority;
   labelIds: number[];
   assignees: User[];
@@ -95,12 +95,12 @@ export interface Attachment {
   size: number;
   image: boolean;
   /** Small WebP version for images (null: use url) */
-  thumbUrl: string | null;
+  thumbUrl: null | string;
   /** lower-case extension of the name */
   ext: string;
   /** Set when the file was posted in a comment */
-  commentId: number | null;
-  uploader: User | null;
+  commentId: null | number;
+  uploader: null | User;
   createdAt: string;
 }
 
@@ -123,7 +123,7 @@ export interface CardDetail extends Card {
   listTitle: string;
   /** Its list is archived (the card is not on the board) */
   listArchived: boolean;
-  createdBy: User | null;
+  createdBy: null | User;
   comments: Comment[];
   checklist: ChecklistItem[];
   attachments: Attachment[];
@@ -133,8 +133,8 @@ export interface BoardList {
   id: number;
   title: string;
   position: number;
-  color: string | null;
-  archivedAt?: string | null;
+  color: null | string;
+  archivedAt?: null | string;
   /** Total cards in the list (server side, unfiltered). */
   cardCount: number;
   /** Cards loaded so far (lazy, page by page). */
@@ -148,7 +148,7 @@ export interface CardPage {
   hasMore: boolean;
 }
 
-export type DueFilter = 'none' | 'overdue' | 'day' | 'week' | 'month';
+export type DueFilter = 'day' | 'month' | 'none' | 'overdue' | 'week';
 
 /** Trello-like filters: OR inside a section, AND between sections (applied server side). */
 export interface CardFilters {
@@ -213,10 +213,10 @@ export interface AppNotification {
   type: string;
   message: string;
   read: boolean;
-  actor: User | null;
-  boardId: number | null;
-  boardTitle: string | null;
-  cardId: number | null;
+  actor: null | User;
+  boardId: null | number;
+  boardTitle: null | string;
+  cardId: null | number;
   createdAt: string;
 }
 

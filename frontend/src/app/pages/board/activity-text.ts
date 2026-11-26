@@ -18,7 +18,7 @@ const fmtDate = (iso: string) =>
 
 /** French sentence (after the actor's name) describing an activity. */
 export function describeActivity(a: Activity): Seg[] {
-  const d = a.data as Record<string, string | null | undefined>;
+  const d = a.data as Record<string, null | string | undefined>;
   const v = (x: unknown) => String(x ?? '');
   const self = (name: unknown) => v(name) === a.actor.name;
   switch (a.type) {

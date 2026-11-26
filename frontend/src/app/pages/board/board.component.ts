@@ -8,14 +8,14 @@ import {
 } from '@angular/cdk/drag-drop';
 import {
   Component,
-  ElementRef,
-  HostListener,
-  OnDestroy,
-  OnInit,
   computed,
   effect,
+  ElementRef,
+  HostListener,
   inject,
   input,
+  OnDestroy,
+  OnInit,
   signal,
   untracked,
   viewChild,
@@ -23,17 +23,17 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin, map, of } from 'rxjs';
+
 import { ApiService } from '../../core/api.service';
-import { DialogService } from '../../core/dialog.service';
 import {
   AttachmentUploadsService,
   draggedFiles,
   formatSize,
 } from '../../core/attachment-uploads.service';
-import { TrelloTransferService } from '../../core/trello-transfer.service';
-import { TrelloAccessComponent } from '../../shared/trello-access.component';
 import { AuthService } from '../../core/auth.service';
+import { DialogService } from '../../core/dialog.service';
 import {
+  activeFilterCount,
   Board,
   BoardList,
   Card,
@@ -42,13 +42,14 @@ import {
   CardPage,
   EMPTY_FILTERS,
   PALETTE,
-  activeFilterCount,
 } from '../../core/models';
 import { NotificationService } from '../../core/notification.service';
 import { ToastService } from '../../core/toast.service';
+import { TrelloTransferService } from '../../core/trello-transfer.service';
 import { AvatarComponent } from '../../shared/avatar.component';
 import { IconComponent } from '../../shared/icon.component';
 import { InViewDirective } from '../../shared/in-view.directive';
+import { TrelloAccessComponent } from '../../shared/trello-access.component';
 import { BoardSettingsComponent } from './board-settings.component';
 import { CardItemComponent } from './card-item.component';
 import { CardModalComponent } from './card-modal.component';
@@ -133,9 +134,9 @@ export class BoardComponent implements OnInit, OnDestroy {
   /** Bumped to re-arm the viewport observers (board reload, filter change). */
   epoch = signal(0);
 
-  openCardId = signal<number | null>(null);
+  openCardId = signal<null | number>(null);
   settingsTab = signal<
-    'members' | 'labels' | 'fields' | 'background' | 'archived' | 'trash' | null
+    'archived' | 'background' | 'fields' | 'labels' | 'members' | 'trash' | null
   >(null);
 
   // filters (applied server side, see FilterPanelComponent)
@@ -144,12 +145,12 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   // inline editors
   editingTitle = signal(false);
-  addingCardTo = signal<number | null>(null);
+  addingCardTo = signal<null | number>(null);
   newCardTitle = '';
   addingList = signal(false);
   newListTitle = '';
-  editingListId = signal<number | null>(null);
-  listMenu = signal<number | null>(null);
+  editingListId = signal<null | number>(null);
+  listMenu = signal<null | number>(null);
 
   palette = PALETTE;
   skeletons = [0, 1, 2];
@@ -170,15 +171,15 @@ export class BoardComponent implements OnInit, OnDestroy {
   );
   showJump = signal(false);
   jumpQuery = signal('');
-  movingListId = signal<number | null>(null);
+  movingListId = signal<null | number>(null);
   private canvasRef = viewChild<ElementRef<HTMLElement>>('canvas');
-  private resizeObs: ResizeObserver | null = null;
+  private resizeObs: null | ResizeObserver = null;
   private scrollRaf = 0;
 
   private dragging = false;
-  private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private refreshTimer: null | ReturnType<typeof setInterval> = null;
   private queue = new Set<number>();
-  private queueTimer: ReturnType<typeof setTimeout> | null = null;
+  private queueTimer: null | ReturnType<typeof setTimeout> = null;
 
   lists = computed(() => this.board()?.lists ?? []);
   listCount = computed(() => this.lists().length);
@@ -610,7 +611,7 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.api.updateList(list.id, { title }).subscribe();
   }
 
-  setListColor(list: BoardList, color: string | null) {
+  setListColor(list: BoardList, color: null | string) {
     this.listMenu.set(null);
     this.patchList(list.id, (l) => ({ ...l, color }));
     this.api.updateList(list.id, { color }).subscribe();

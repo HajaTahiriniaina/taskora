@@ -122,7 +122,7 @@ const MAX_CHILDREN = 300;
   `,
 })
 export class JsonNodeComponent {
-  name = input<string | null>(null);
+  name = input<null | string>(null);
   value = input<unknown>(null);
   depth = input(0);
 

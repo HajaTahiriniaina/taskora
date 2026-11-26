@@ -1,6 +1,7 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
+
 import { ApiService } from './api.service';
 import { User } from './models';
 
@@ -12,8 +13,8 @@ export class AuthService {
   private api = inject(ApiService);
   private router = inject(Router);
 
-  readonly token = signal<string | null>(this.read(TOKEN_KEY));
-  readonly user = signal<User | null>(JSON.parse(this.read(USER_KEY) ?? 'null'));
+  readonly token = signal<null | string>(this.read(TOKEN_KEY));
+  readonly user = signal<null | User>(JSON.parse(this.read(USER_KEY) ?? 'null'));
   readonly isLoggedIn = computed(() => !!this.token() && !this.isExpired(this.token()!));
 
   login(email: string, password: string) {
@@ -60,7 +61,7 @@ export class AuthService {
     }
   }
 
-  private read(key: string): string | null {
+  private read(key: string): null | string {
     try {
       return localStorage.getItem(key);
     } catch {

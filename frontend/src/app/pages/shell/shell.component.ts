@@ -1,10 +1,11 @@
-import { DialogService } from '../../core/dialog.service';
-import { PushService } from '../../core/push.service';
-import { Component, HostListener, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, HostListener, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+
 import { AuthService } from '../../core/auth.service';
+import { DialogService } from '../../core/dialog.service';
 import { AppNotification } from '../../core/models';
 import { NotificationService } from '../../core/notification.service';
+import { PushService } from '../../core/push.service';
 import { AvatarComponent } from '../../shared/avatar.component';
 import { IconComponent } from '../../shared/icon.component';
 import { LogoComponent } from '../../shared/logo.component';
@@ -52,7 +53,7 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   openPanel = signal<'notifs' | 'user' | null>(null);
   notifFilter = signal<'all' | 'unread'>('all');
-  theme = signal<'light' | 'dark' | null>(this.readTheme());
+  theme = signal<'dark' | 'light' | null>(this.readTheme());
 
   ngOnInit() {
     this.notifs.start();
@@ -128,9 +129,9 @@ export class ShellComponent implements OnInit, OnDestroy {
     if (t) document.documentElement.dataset['theme'] = t;
   }
 
-  private readTheme(): 'light' | 'dark' | null {
+  private readTheme(): 'dark' | 'light' | null {
     try {
-      return (localStorage.getItem('taskora.theme') as 'light' | 'dark') ?? null;
+      return (localStorage.getItem('taskora.theme') as 'dark' | 'light') ?? null;
     } catch {
       return null;
     }

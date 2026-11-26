@@ -1,5 +1,6 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { Subject, firstValueFrom } from 'rxjs';
+import { inject, Injectable, signal } from '@angular/core';
+import { firstValueFrom, Subject } from 'rxjs';
+
 import { ApiService, TrelloCredentials, TrelloFilesState } from './api.service';
 import { ToastService } from './toast.service';
 
@@ -9,7 +10,7 @@ export interface TrelloTransferState extends TrelloFilesState {
   /** Last files copied (most recent first) */
   recent: string[];
   waitingSeconds: number;
-  error: string | null;
+  error: null | string;
 }
 
 /**
@@ -24,13 +25,13 @@ export class TrelloTransferService {
   private toast = inject(ToastService);
 
   /** Key / token given in this tab (memory only). */
-  readonly credentials = signal<(TrelloCredentials & { account: string }) | null>(null);
-  readonly state = signal<TrelloTransferState | null>(null);
+  readonly credentials = signal<null | (TrelloCredentials & { account: string })>(null);
+  readonly state = signal<null | TrelloTransferState>(null);
   /** Emitted when files were copied on a board (the board view refreshes its cards). */
   readonly progressed = new Subject<number>();
   private stopRequested = false;
 
-  setCredentials(c: (TrelloCredentials & { account: string }) | null) {
+  setCredentials(c: null | (TrelloCredentials & { account: string })) {
     this.credentials.set(c);
   }
 

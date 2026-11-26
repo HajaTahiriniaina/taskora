@@ -1,24 +1,25 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   Component,
-  HostListener,
-  OnInit,
   computed,
+  HostListener,
   inject,
+  OnInit,
   signal,
   viewChild,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+
 import { ApiService, TrashedBoard } from '../../core/api.service';
-import { DialogService } from '../../core/dialog.service';
 import { AuthService } from '../../core/auth.service';
+import { DialogService } from '../../core/dialog.service';
 import { BACKGROUNDS, BoardSummary } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { TrelloTransferService } from '../../core/trello-transfer.service';
-import { TrelloAccessComponent } from '../../shared/trello-access.component';
 import { AvatarComponent } from '../../shared/avatar.component';
 import { IconComponent } from '../../shared/icon.component';
+import { TrelloAccessComponent } from '../../shared/trello-access.component';
 
 @Component({
   selector: 'tk-dashboard',
@@ -75,7 +76,7 @@ export class DashboardComponent implements OnInit {
 
   // ---------- trash (boards deleted by their owner, 30 days) ----------
   showTrash = signal(false);
-  trashedBoards = signal<TrashedBoard[] | null>(null);
+  trashedBoards = signal<null | TrashedBoard[]>(null);
 
   openTrash() {
     this.trashedBoards.set(null);
