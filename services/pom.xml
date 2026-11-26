@@ -42,20 +42,40 @@
     <!-- Non géré par le BOM Boot 4.2.0 : aligné sur spring-security-oauth2-jose 7.2.0 (§7) -->
     <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
     <spotless.version>3.12.0</spotless.version>
-    <google-java-format.version>1.37.0</google-java-format.version>
+    <!-- 2.0.0 : la 1.37.0 échoue sur JDK 25 (revue 2026-11-26, B1) -->
+    <google-java-format.version>2.0.0</google-java-format.version>
     <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
     <checkstyle.version>14.4.0</checkstyle.version>
     <checker.version>4.4.0</checker.version>
     <rewrite-plugin.version>6.46.1</rewrite-plugin.version>
-    <rewrite-recipe-bom.version>3.38.0</rewrite-recipe-bom.version>
-    <!-- Versions lues dans rewrite-recipe-bom 3.38.0 (un plugin ne peut pas importer de BOM) -->
-    <rewrite-spring.version>6.38.0</rewrite-spring.version>
-    <rewrite-migrate-java.version>3.43.0</rewrite-migrate-java.version>
-    <rewrite-static-analysis.version>2.42.0</rewrite-static-analysis.version>
+    <!--
+      Recettes OpenRewrite (revue B4) : les versions de rewrite-recipe-bom 3.38.0 (6.38.0 / 3.43.0 / 2.42.0)
+      sont absentes de Maven Central. Dernières versions publiées, vérifiées (HTTP 200) et exécutées.
+    -->
+    <rewrite-spring.version>6.37.1</rewrite-spring.version>
+    <rewrite-migrate-java.version>3.42.1</rewrite-migrate-java.version>
+    <rewrite-static-analysis.version>2.41.1</rewrite-static-analysis.version>
     <jacoco.version>0.8.16</jacoco.version>
     <sonar-plugin.version>5.9.0.7382</sonar-plugin.version>
     <dependency-check.version>13.0.0</dependency-check.version>
     <enforcer.version>3.7.0</enforcer.version>
+
+    <!-- argLine vide par défaut : JaCoCo le remplit ; @{argLine} reste valide quand JaCoCo est sauté (compat) -->
+    <argLine></argLine>
+
+    <!--
+      Sonar (ADR A16, revue B6) : faux positifs revus, exclus par règle ET par fichier, jamais globalement.
+      e1 java:S4502 (CSRF désactivé) : API sans état, jeton dans l'en-tête Authorization, aucun cookie ni session
+         (A1, A4) ; un jeton CSRF n'apporterait rien, aucun navigateur n'envoie l'en-tête d'office.
+      e2 java:S2077 (SQL dynamique) : seul le nom de schéma historique est concaténé, validé [a-z_]+ au démarrage
+         (LegacySchema), plus des constantes ; toutes les valeurs passent en paramètres liés.
+      Toute nouvelle occurrence dans un AUTRE fichier reste signalée.
+    -->
+    <sonar.issue.ignore.multicriteria>e1,e2</sonar.issue.ignore.multicriteria>
+    <sonar.issue.ignore.multicriteria.e1.ruleKey>java:S4502</sonar.issue.ignore.multicriteria.e1.ruleKey>
+    <sonar.issue.ignore.multicriteria.e1.resourceKey>**/com/taskora/identity/config/SecurityConfig.java</sonar.issue.ignore.multicriteria.e1.resourceKey>
+    <sonar.issue.ignore.multicriteria.e2.ruleKey>java:S2077</sonar.issue.ignore.multicriteria.e2.ruleKey>
+    <sonar.issue.ignore.multicriteria.e2.resourceKey>**/com/taskora/identity/adapter/out/legacy/JdbcLegacyUserSource.java</sonar.issue.ignore.multicriteria.e2.resourceKey>
 
     <!-- Sélection des tests par tag JUnit (le profil compat inverse la sélection) -->
     <test.groups></test.groups>
@@ -136,8 +156,25 @@
         <artifactId>wiremock-standalone</artifactId>
         <version>${wiremock.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.checkerframework</groupId>
+        <artifactId>checker-qual</artifactId>
+        <version>${checker.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
+
+  <!--
+    Annotations de nullité (@Nullable, @MonotonicNonNull…) : nécessaires au Nullness Checker du profil quality
+    (revue B3) et à la compilation normale du code annoté. Scope provided : absentes du jar livré.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
 
   <build>
     <pluginManagement>
@@ -149,6 +186,8 @@
             <includes>
               <include>**/*Test.java</include>
             </includes>
+            <!-- Agent Mockito explicite (JDK 21+ : l'auto-attachement dynamique est déprécié ; revue B4) -->
+            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
             <groups>${test.groups}</groups>
             <excludedGroups>${test.excludedGroups}</excludedGroups>
             <systemPropertyVariables>
@@ -165,6 +204,7 @@
             <includes>
               <include>**/*IT.java</include>
             </includes>
+            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
             <groups>${test.groups}</groups>
             <excludedGroups>${test.excludedGroups}</excludedGroups>
             <systemPropertyVariables>
@@ -179,6 +219,16 @@
                 <goal>integration-test</goal>
                 <goal>verify</goal>
               </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>dependency-paths</id>
+              <goals><goal>properties</goal></goals>
             </execution>
           </executions>
         </plugin>
@@ -308,6 +358,8 @@
             <failOnViolation>true</failOnViolation>
             <violationSeverity>warning</violationSeverity>
             <includeTestSourceDirectory>false</includeTestSourceDirectory>
+            <!-- ADR A17 : Javadoc des méthodes exigée dans domain et application, pas dans adapter et config -->
+            <propertyExpansion>org.checkstyle.google.suppressionfilter.config=${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle-suppressions.xml</propertyExpansion>
           </configuration>
         </plugin>
         <plugin>
@@ -317,7 +369,7 @@
           <configuration>
             <exportDatatables>false</exportDatatables>
             <activeRecipes>
-              <recipe>org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_2</recipe>
+              <recipe>org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0</recipe>
               <recipe>org.openrewrite.java.migrate.UpgradeToJava25</recipe>
               <recipe>org.openrewrite.staticanalysis.CommonStaticAnalysis</recipe>
             </activeRecipes>
@@ -357,6 +409,10 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>org.jacoco</groupId>
@@ -425,6 +481,7 @@
                     <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                     <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
                     <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
                     <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
                     <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
                     <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>

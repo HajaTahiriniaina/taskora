@@ -50,7 +50,7 @@ paths:
         + notification `board_invite`), synchrone au mieux, rejouée par l'outbox sinon
         (voir identity-service.internal.yaml). La réponse est 201 même si cette consommation est différée.
         Les inscriptions concurrentes avec le même e-mail donnent un seul compte ; les autres reçoivent 409.
-      x-scenarios: [SC-IDENT-001, SC-IDENT-002, SC-IDENT-003, SC-IDENT-004, SC-IDENT-005, SC-IDENT-006, SC-IDENT-010, SC-IDENT-023, SC-IDENT-024, SC-IDENT-028, SC-IDENT-029, SC-IDENT-030]
+      x-scenarios: [SC-IDENT-001, SC-IDENT-002, SC-IDENT-003, SC-IDENT-004, SC-IDENT-005, SC-IDENT-006, SC-IDENT-010, SC-IDENT-023, SC-IDENT-024, SC-IDENT-028, SC-IDENT-029, SC-IDENT-030, SC-IDENT-035]
       requestBody:
         required: true
         content:
@@ -104,6 +104,7 @@ paths:
                 passwordTooLong:
                   summary: plus de 4096 octets UTF-8 — E15 (SC-IDENT-028)
                   value: { error: Le mot de passe ne doit pas dépasser 4096 octets. }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '409':
           description: E-mail déjà utilisé (SC-IDENT-002)
           content:
@@ -136,7 +137,7 @@ paths:
           significatifs (→ 401) ;
         - e-mail > 4096 octets, mot de passe > 4096 octets, e-mail inconnu, mauvais mot de passe → 401 au format
           actuel, même corps, temps comparable.
-      x-scenarios: [SC-IDENT-007, SC-IDENT-008, SC-IDENT-009, SC-IDENT-010, SC-IDENT-017, SC-IDENT-023, SC-IDENT-024, SC-IDENT-032, SC-IDENT-033]
+      x-scenarios: [SC-IDENT-007, SC-IDENT-008, SC-IDENT-009, SC-IDENT-010, SC-IDENT-017, SC-IDENT-023, SC-IDENT-024, SC-IDENT-032, SC-IDENT-033, SC-IDENT-035]
       requestBody:
         required: true
         content:
@@ -179,6 +180,7 @@ paths:
                 passwordMissing:
                   summary: clé password absente ou "" — E19
                   value: { error: 'Le champ "password" est obligatoire.' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '401':
           description: Identifiants refusés (SC-IDENT-008)
           headers:
@@ -219,7 +221,7 @@ paths:
         → mot de passe (si `newPassword` est présent, non `null` et différent de `""` — `"0"` compris, E21 :
         d'abord `currentPassword`, puis longueur ≥ 8, puis ≤ 4096 octets, E15). Toute erreur → **aucune** modification.
         `email` et toute autre clé sont ignorés.
-      x-scenarios: [SC-IDENT-015, SC-IDENT-016, SC-IDENT-017, SC-IDENT-018, SC-IDENT-019, SC-IDENT-020, SC-IDENT-021, SC-IDENT-011, SC-IDENT-012, SC-IDENT-028, SC-IDENT-029, SC-IDENT-030, SC-IDENT-031, SC-IDENT-033, SC-IDENT-034]
+      x-scenarios: [SC-IDENT-015, SC-IDENT-016, SC-IDENT-017, SC-IDENT-018, SC-IDENT-019, SC-IDENT-020, SC-IDENT-021, SC-IDENT-011, SC-IDENT-012, SC-IDENT-028, SC-IDENT-029, SC-IDENT-030, SC-IDENT-031, SC-IDENT-033, SC-IDENT-034, SC-IDENT-035]
       security:
         - bearerAuth: []
       requestBody:
@@ -273,6 +275,7 @@ paths:
                 avatarColorInvalid:
                   summary: avatarColor différente de \A#[0-9a-fA-F]{6}\z (ex. "red", "#12345", "#0EA5E9\n") — E18 (SC-IDENT-031)
                   value: { error: Couleur d'avatar invalide. }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 components:
   securitySchemes:
@@ -289,6 +292,17 @@ components:
         Pas de rafraîchissement ni de révocation (E10 conservé). Le compte est rechargé par `username`
         à chaque requête.
   responses:
+    PayloadTooLarge:
+      description: |
+        Corps de plus de 65 536 octets (64 Kio), refusé sans être lu entièrement (ADR A18). Sur `PATCH /me`,
+        l'authentification est contrôlée avant (sans jeton → 401). nginx applique la même limite et le même corps.
+        Symfony n'avait pas de limite propre (nginx 105 Mo) : cas exclu des tests `compat`.
+      x-scenarios: [SC-IDENT-035]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            tooLarge: { value: { error: Corps de requête trop volumineux. } }
     Unauthorized:
       description: |
         Jeton absent, invalide, expiré, ou compte disparu (SC-IDENT-011, 012, 013). Précédence :

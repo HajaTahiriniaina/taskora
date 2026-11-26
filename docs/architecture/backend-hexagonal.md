@@ -114,10 +114,11 @@ Règle : une version gérée par le BOM Spring Boot n'est **jamais** surchargée
 | RestAssured | `io.rest-assured:rest-assured` **6.3.0** (épinglée) | 7.0.0-RC1 écartée (pré-version) |
 | Validation OpenAPI | `com.atlassian.oai:swagger-request-validator-restassured` **3.0.0** (épinglée) | valide chaque réponse de test contre `docs/contracts/openapi/identity-service.yaml` |
 | WireMock | `org.wiremock:wiremock-standalone` **3.13.2** (épinglée) | 4.0.0 n'existe qu'en bêta |
-| Spotless | `spotless-maven-plugin` **3.12.0** + google-java-format **1.37.0** | gjf 2.0.0 (30/10/2026) est une version majeure récente : on garde 1.37.0 tant que Spotless 3.12 n'est pas validé avec 2.0.0 par BackReviewer |
+| Spotless | `spotless-maven-plugin` **3.12.0** + google-java-format **2.0.0** | **Révisé (revue 1, B1)** : 1.37.0 lève `InvocationTargetException` sur JDK 25 ; 2.0.0 vérifiée sur `eclipse-temurin:25-jdk` (`spotless:check` s'exécute et signale 63 fichiers à reformater) |
 | Checkstyle | `maven-checkstyle-plugin` **3.6.0** + `com.puppycrawl.tools:checkstyle` **14.4.0**, `google_checks.xml` | |
-| Checker Framework | `org.checkerframework:checker` **4.4.0** (Nullness Checker, profil `quality`) | si 4.4.0 ne supporte pas JDK 25, BackReviewer le signale (pas de contournement silencieux) |
-| OpenRewrite | `rewrite-maven-plugin` **6.46.1** + `rewrite-recipe-bom` **3.38.0** | `rewrite:dryRun` seulement |
+| Checker Framework | `org.checkerframework:checker` **4.4.0** (Nullness Checker, profil `quality`) + `checker-qual` **4.4.0** (`provided`, hérité du parent) | **Révisé (revue 1, B3)** : vérifié sur JDK 25 ; il fallait `checker-qual` et l'export `-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED` en plus de ceux déjà présents |
+| OpenRewrite | `rewrite-maven-plugin` **6.46.1** + `rewrite-spring` **6.37.1**, `rewrite-migrate-java` **3.42.1**, `rewrite-static-analysis` **2.41.1** ; recettes `UpgradeSpringBoot_4_0`, `UpgradeToJava25`, `CommonStaticAnalysis` | **Révisé (revue 1, B4)** : les versions de `rewrite-recipe-bom` 3.38.0 sont absentes de Maven Central (404) et `UpgradeSpringBoot_4_2` n'existe pas ; `rewrite:dryRun` résolu et exécuté. `rewrite:dryRun` seulement en CI |
+| Agent Mockito | `-javaagent:${org.mockito:mockito-core:jar}` dans l'`argLine` de Surefire et Failsafe (`maven-dependency-plugin:properties`) | revue 1, B4 (`AddMockitoJavaAgentToMavenSurefirePlugin`) : l'auto-attachement dynamique est déprécié depuis JDK 21 ; configuré dans le parent, ce qui satisfait la recette |
 | JaCoCo | `jacoco-maven-plugin` **0.8.16** | seuils au §9 A12 |
 | Sonar | `sonar-maven-plugin` **5.9.0.7382** | |
 | OWASP | `dependency-check-maven` **13.0.0** | clé NVD par secret CI `NVD_API_KEY` |
@@ -216,7 +217,7 @@ Format : contexte → décision → conséquences. Statut : **acceptée** (étap
   - Erreurs d'authentification JWT et échec de login : `{"code":401,"message":"<message Lexik exact>"}` + `WWW-Authenticate: Bearer`.
   - Erreurs de forme du login : **corrigé (décision utilisateur E19, E20)** : mêmes règles et messages français que l'inscription (`JSON invalide.`, `Le champ "<nom>" doit être une chaîne de caractères.`, `Le champ "<nom>" est obligatoire.`), `Content-Type` non contrôlé ; plus de messages anglais `json_login` ni de 404.
   - 404/405 Spring : `{"error":"…"}` avec le bon statut ; le texte n'est pas contractuel (il contient l'hôte côté Symfony).
-  - 5xx : `{"error":"Erreur interne du serveur."}`, jamais de trace, d'exception ni de SQL ; `server.error.include-*` à `never`.
+  - 5xx : `{"error":"Erreur interne du serveur."}`, jamais de trace, d'exception ni de SQL ; `spring.web.error.include-*` à `never` et `spring.web.error.whitelabel.enabled=false` (**Boot 4 a renommé `server.error.*` en `spring.web.error.*`** : l'ancienne clé est ignorée sans erreur, revue 1 B4).
   - Jackson sérialise en UTF-8 sans échappement `\uXXXX` : équivalence sémantique avec Symfony (§8.5), les tests de compatibilité comparent le JSON analysé.
 - **Conséquences** : les messages sont des constantes d'une classe `ErrorMessages` (adapter web) testées une par une.
 
@@ -258,7 +259,7 @@ Paquet racine `com.taskora.identity`.
 - `UserProfileUpdated` est ajouté à l'outbox seulement si `name` ou `avatarColor` change réellement (pas pour un changement de mot de passe seul).
 
 ### A9 — Projection historique `taskora.user` (U1-B)
-- **Décision** : `LegacyUserProjectionPort.upsert(User)` implémenté par `JdbcLegacyUserProjection` (`JdbcClient`) : `INSERT INTO <legacy>.\`user\` (id, email, name, password, avatar_color, roles, created_at) VALUES (…) ON DUPLICATE KEY UPDATE email=VALUES(email), name=…, password=…, avatar_color=…, roles=…` (jamais `created_at` en mise à jour, **jamais de DELETE**). Schéma historique configurable `identity.legacy.schema` (défaut `taskora`).
+- **Décision** (révisée après la revue 1) : `LegacyUserProjectionPort.upsert(User)` implémenté par `JdbcLegacyUserProjection` (`JdbcClient`) : `UPDATE <legacy>.\`user\` SET email=?, name=?, password=?, avatar_color=?, roles=? WHERE id=?` ; si **0 ligne trouvée** (`useAffectedRows=false`, défaut du pilote), `INSERT … (id, email, name, password, avatar_color, roles, created_at)` avec l'id explicite. **Pas de `ON DUPLICATE KEY UPDATE`** : un ODKU se déclencherait aussi sur l'index unique `email` et écraserait la ligne d'un **autre** compte ; ici une collision (e-mail ou id) lève `DuplicateKeyException` → 409 et annulation de la transaction. Jamais `created_at` en mise à jour, **jamais de DELETE**. Schéma historique configurable `identity.legacy.schema` (défaut `taskora`).
 - **Même transaction** que l'écriture dans `identity` : même serveur MariaDB, même `DataSource`, même gestionnaire de transactions (XA inutile). L'utilisateur MariaDB `identity` a `SELECT, INSERT, UPDATE` sur `taskora.user` seulement.
 - `created_at` est stocké dans `identity` et dans `taskora` en heure locale **`Europe/Paris`** (`identity.legacy.zone`), comme PHP ; `roles` = `[]` (JSON) comme Symfony.
 - La projection est supprimée à la migration de board-service (fin de la coexistence).
@@ -280,7 +281,8 @@ Paquet racine `com.taskora.identity`.
 
 ### A12 — Seuils de qualité
 - JaCoCo : **lignes ≥ 90 %** et **branches ≥ 80 %** sur `domain` et `application` ; lignes ≥ 80 % sur le module ; la build échoue en dessous.
-- Checkstyle (Google), Spotless et Checker Framework : **0** violation (échec de build en profil `quality`).
+- Checkstyle (Google, avec la seule exception de portée de l'A17), Spotless et Checker Framework : **0** violation (échec de build en profil `quality`).
+- Sonar : les seules exceptions sont celles, revues et justifiées, de l'A16.
 - OWASP : échec si CVSS ≥ 7.
 - Sonar : quality gate « Sonar way », 0 bug/vulnérabilité bloquants ou critiques, 0 security hotspot non revu.
 
@@ -306,3 +308,27 @@ Paquet racine `com.taskora.identity`.
   | E20 | corps vide sur `register`, `login`, `PATCH /me` → 400 `JSON invalide.` (la règle transverse « vide = `{}` » ne s'applique plus à ces routes) | adapter web (`PhpJsonBody`) | SC-IDENT-033 |
   | E21 | `PATCH /me` : seuls `newPassword` absent, `null` ou `""` = pas de changement ; `"0"` et toute autre chaîne passent les contrôles (mot de passe actuel, longueurs) | adapter web + domaine | SC-IDENT-034 |
 - **Conséquences** : ces cas sont des **divergences voulues** : les tests `compat` (miroir Symfony) les excluent explicitement (liste dans l'ordre de travail) ; les autres comportements (trim PHP à l'inscription, points de code, collation, recherche de l'e-mail brut au login, 401 Lexik) restent reproduits. Le contrat public documente tous les nouveaux 400.
+
+### A16 — Faux positifs Sonar revus (revue 1, B6)
+- **Contexte** : A12 exige 0 vulnérabilité critique non revue. Sonar signale S4502 (CRITICAL, CSRF désactivé, `config/SecurityConfig.java`) et 6 × S2077 (MAJOR, SQL formaté, `adapter/out/legacy/JdbcLegacyUserSource.java`).
+- **Analyse** :
+  - S4502 : l'API est sans état (`SessionCreationPolicy.STATELESS`), l'authentification passe **uniquement** par l'en-tête `Authorization: Bearer` (A1), il n'existe ni cookie ni session ; un navigateur n'ajoute jamais cet en-tête de lui-même, donc une requête intersite forgée n'est pas authentifiée. La protection CSRF n'apporte rien et casserait les clients non navigateur. **Sûr.** À réexaminer si un jour un cookie d'authentification est introduit (alors : CSRF obligatoire).
+  - S2077 : seul le nom du schéma historique est concaténé, validé `[a-z_]+` au démarrage (`LegacySchema`, refus de démarrer sinon), avec des fragments constants ; toutes les valeurs passent en paramètres liés. **Sûr.**
+- **Décision** : exclusion **déclarative et versionnée** dans `services/pom.xml` (`sonar.issue.ignore.multicriteria`, entrées `e1` = `java:S4502` sur `**/com/taskora/identity/config/SecurityConfig.java`, `e2` = `java:S2077` sur `**/com/taskora/identity/adapter/out/legacy/JdbcLegacyUserSource.java`), avec la justification en commentaire. Préférée à « Safe » dans l'interface (perdu sur un serveur neuf ou une nouvelle clé de projet) et à `// NOSONAR` (qui masque **toutes** les règles de la ligne). Portée minimale : une règle × un fichier ; toute occurrence ailleurs reste signalée.
+- **Conséquences** : BackReviewer vérifie à chaque revue que la liste ne contient que ces deux entrées ; toute nouvelle exclusion exige une ADR.
+
+### A17 — Portée de la règle Javadoc de Checkstyle (revue 1, B2)
+- **Contexte** : 164 violations Google, dont 131 `MissingJavadocMethod` (méthodes publiques et constructeurs) et 22 `LineLength`. L'intention d'A12 est un code **lisible et dont le contrat est documenté là où il est consommé**, pas une Javadoc systématique.
+- **Décision** :
+  1. `google_checks.xml` reste la configuration (aucune règle désactivée, aucun seuil changé, `violationSeverity=warning`, échec de build).
+  2. **Une seule exception de portée** : `MissingJavadocMethod` ne s'applique pas aux paquets `adapter` et `config` (`services/config/checkstyle/checkstyle-suppressions.xml`, branché par `propertyExpansion` sur le crochet `org.checkstyle.google.suppressionfilter.config` de google_checks).
+  3. Elle reste **obligatoire** dans `domain` et `application` (modèle, événements, exceptions, ports in/out, services, records) et pour `IdentityServiceApplication` : c'est le contrat de l'hexagone, lu par les autres agents et services.
+  4. `MissingJavadocType` (chaque type public documenté), `LineLength` 100, `SummaryJavadoc` et toutes les autres règles s'appliquent **partout**, adapters et config compris.
+- **Justification** : le contrat des adapters est déjà documenté à un niveau plus fiable que la Javadoc (OpenAPI avec `x-scenarios` pour les contrôleurs, schémas internes et ADR A1–A16 pour les clients, la sécurité et la persistance, `IdentityProperties` pour la configuration) ; une Javadoc sur chaque méthode `@Bean`, constructeur d'injection ou accesseur d'entité JPA répéterait le code sans rien apprendre au lecteur. Ce n'est pas un assouplissement pour « passer » : les longueurs de ligne, les noms et le `default` de `switch` restent à corriger, et la règle Javadoc garde toute sa force là où vit le contrat.
+- **Mesure** : avec cette portée, `checkstyle:check` passe de 164 à **97** violations (64 `MissingJavadocMethod` dans `domain`/`application`, 22 `LineLength`, 5 `SummaryJavadoc`, 2 `VariableDeclarationUsageDistance`, 1 `GoogleMethodName`, 1 `AbbreviationAsWordInName`, 1 `JavadocParagraph`, 1 `MissingSwitchDefault`) : toutes à corriger par BackCodeur.
+
+### A18 — Robustesse après la revue 1 (m1, m2, m3, m4)
+- **Secret interne obligatoire** : `identity.symfony.internal-secret` (`INTERNAL_API_SECRET`) vide ou composé d'espaces → **le service refuse de démarrer** (validation de `IdentityProperties`, message citant la variable `INTERNAL_API_SECRET`, jamais la valeur). Évite des claims tous en `FAILED` et des invitations perdues.
+- **Taille du corps** : `POST /api/auth/register`, `POST /api/auth/login` et `PATCH /api/me` lisent au plus **65 536 octets** (64 Kio, largement au-dessus du plus grand corps légitime : mot de passe ≤ 4096 octets, nom 120, e-mail 180). Au-delà → **413** `{"error":"Corps de requête trop volumineux."}`, sans lire la suite. Mécanisme : `Content-Length` > limite → refus immédiat ; sinon lecture bornée du flux (`InputStream.readNBytes(limite + 1)`), ce qui couvre aussi `Transfer-Encoding: chunked`. L'authentification passe avant (`PATCH /api/me` sans jeton → 401). Défense en profondeur côté nginx (`client_max_body_size 64k` sur `/api/auth/` et `/api/me`, page d'erreur 413 en JSON identique).
+- **Reprise (ODKU)** : l'import garde `INSERT … SELECT … ON DUPLICATE KEY UPDATE` (rapide, atomique, idempotent), **précédé** d'un contrôle bloquant : nombre de lignes source dont l'e-mail normalisé existe déjà dans la cible **sous un autre id** (`JOIN … ON t.email = LOWER(TRIM(s.email)) AND t.id <> s.id`). S'il est > 0, l'import échoue **avant toute écriture** (code de sortie ≠ 0, nombre seulement). L'ODKU ne peut alors se déclencher que sur la clé primaire.
+- **Journaux SQL** : `org.hibernate.orm.jdbc.error` et `org.hibernate.engine.jdbc.spi.SqlExceptionHelper` à **`OFF`** (et non `ERROR`) : les messages du pilote citent les valeurs en conflit.

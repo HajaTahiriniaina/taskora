@@ -57,7 +57,16 @@ GRANT SELECT, INSERT, UPDATE ON taskora.`user` TO 'identity'@'%';   -- projectio
 
 ## 3. Copie idempotente (`ImportLegacyUsersUseCase`)
 
-Lancement : `docker compose run --rm identity --identity.legacy-import=run` (ou `verify` pour les contrôles seuls). Une seule transaction :
+Lancement : `docker compose run --rm identity --identity.legacy-import=run` (ou `verify` pour les contrôles seuls).
+
+Contrôles **bloquants** avant toute écriture (ADR A18) : 0 doublon d'e-mail normalisé dans la source, et 0 ligne source dont l'e-mail normalisé existe déjà dans la cible sous un **autre id** :
+```sql
+SELECT COUNT(*) FROM taskora.`user` s
+JOIN identity.user_account t ON t.email = LOWER(TRIM(s.email)) AND t.id <> s.id;
+```
+Si l'un des deux est > 0 : échec (code ≠ 0), rien n'est écrit, seuls des nombres sont affichés. L'`ON DUPLICATE KEY UPDATE` ci-dessous ne peut alors se déclencher que sur la clé primaire.
+
+Puis une seule transaction :
 ```sql
 INSERT INTO identity.user_account (id, email, name, password_hash, avatar_color, roles, created_at)
 SELECT u.id, LOWER(TRIM(u.email)), u.name, u.password, u.avatar_color, u.roles, u.created_at
@@ -65,8 +74,8 @@ FROM taskora.`user` u
 ON DUPLICATE KEY UPDATE
   email = VALUES(email), name = VALUES(name), password_hash = VALUES(password_hash),
   avatar_color = VALUES(avatar_color), roles = VALUES(roles);
--- puis, AUTO_INCREMENT = MAX(id) + 1 (calculé, ALTER TABLE)
 ```
+- **Pas d'`ALTER TABLE … AUTO_INCREMENT`** (révisé après la revue 1) : InnoDB/MariaDB avance le compteur au-delà de tout id inséré explicitement, et un `ALTER` validerait implicitement la transaction en cours. `verify` contrôle `AUTO_INCREMENT ≥ MAX(id)+1` (`autoIncrementAboveMaxId`).
 - **Hashes copiés tels quels** (aucun retraitement) ; `created_at` copié sans conversion de fuseau.
 - `LOWER(TRIM())` est un no-op sur les données actuelles (0 e-mail non normalisé) ; si une normalisation produit un doublon, la commande échoue **avant** toute écriture (contrôle préalable), sans afficher d'e-mail.
 - Ré-exécutable : la deuxième exécution ne change rien (`rows affected = 0`), test d'intégration obligatoire.

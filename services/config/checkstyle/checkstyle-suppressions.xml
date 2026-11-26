@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<!--
+  ADR A17 (docs/architecture/backend-hexagonal.md) : seule exception aux règles Google.
+  MissingJavadocMethod n'est pas exigé dans les couches adapter et config, dont le contrat est documenté ailleurs
+  (OpenAPI, ADR, propriétés typées). domain et application (ports et services) restent soumis à la règle complète ;
+  MissingJavadocType, LineLength et toutes les autres règles s'appliquent partout.
+  Toute nouvelle suppression passe par une ADR.
+-->
+<suppressions>
+  <suppress checks="MissingJavadocMethod" files="[\\/]com[\\/]taskora[\\/][a-z]+[\\/](adapter|config)[\\/]"/>
+</suppressions>

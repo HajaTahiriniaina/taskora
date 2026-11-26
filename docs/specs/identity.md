@@ -294,6 +294,20 @@ Alors la première requête répond 400 `Le mot de passe doit contenir au moins 
 Limites : seuls `newPassword` absent, `null` ou `""` signifient « pas de changement » ; `" "` (espace) est contrôlé comme les autres chaînes ; Symfony ignore `"0"` (200) : cas exclu des tests `compat` ; le front n'envoie `newPassword` que s'il fait au moins 8 caractères
 Validation : unitaire (`ProfileUpdate`), API [back] — Acceptation : messages exacts, hash inchangé
 
+### SC-IDENT-035 — Corps de requête trop volumineux (important, revue 1, ADR A18)
+Étant donné un visiteur, ou un utilisateur connecté
+Quand il envoie à `POST /api/auth/register`, `POST /api/auth/login` ou `PATCH /api/me` un corps de 65 537 octets ou plus (avec `Content-Length`, ou en `Transfer-Encoding: chunked`)
+Alors identity-service répond 413 `{"error":"Corps de requête trop volumineux."}` sans lire la suite ; rien n'est écrit
+Limites : 65 536 octets exactement → traité normalement (puis règles habituelles, ex. 400) ; `PATCH /api/me` sans jeton → 401 d'abord ; nginx applique la même limite ; Symfony n'avait pas de limite propre : cas exclu des tests `compat`
+Validation : API [back] — Acceptation : 413, message exact, aucune écriture, mémoire non saturée
+
+### SC-IDENT-036 — Démarrage refusé sans secret interne (important, revue 1, ADR A18)
+Étant donné identity-service configuré avec `INTERNAL_API_SECRET` vide, absent ou composé d'espaces
+Quand il démarre
+Alors le démarrage échoue avec un message qui nomme `INTERNAL_API_SECRET` ; avec un secret non vide, il démarre
+Limites : le message et les journaux ne contiennent jamais la valeur du secret ni d'autre secret (SC-IDENT-024)
+Validation : intégration (démarrage du contexte Spring) [back] — Acceptation : échec de démarrage constaté, message exact sans secret
+
 ## 5. Cas critiques et limites (synthèse)
 - Valeurs vides : `name` d'espaces, mot de passe vide → 400 attendus (SC-IDENT-003) ; corps vide → 400 `JSON invalide.` sur `register`, `login`, `PATCH /me` (SC-IDENT-033) ; `newPassword` `"0"` = vrai mot de passe (SC-IDENT-034).
 - Valeurs maximales : nom 120, e-mail 180 (SC-IDENT-004) ; mot de passe 4096 octets (SC-IDENT-028).
