@@ -2,6 +2,7 @@ package com.taskora.identity.adapter.in.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.taskora.identity.application.port.in.DeliverPendingMessagesUseCase;
 import com.taskora.identity.application.port.in.ImportLegacyUsersUseCase;
 import com.taskora.identity.application.port.in.ImportReport;
 import com.taskora.identity.application.port.in.VerificationReport;
@@ -17,12 +18,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 
 /** SC-IDENT-023 (A14) : reprise idempotente du jeu d'essai fixtures/legacy-users.sql. */
 class LegacyImportIT extends ApiTestBase {
   @Autowired ImportLegacyUsersUseCase importer;
+  @Autowired DeliverPendingMessagesUseCase relay;
 
   private static List<JsonNode> accounts;
 
@@ -134,6 +137,42 @@ class LegacyImportIT extends ApiTestBase {
     ImportReport report = importer.importAll();
     assertThat(report.targetOnly()).isEqualTo(1);
     assertThat(count("SELECT COUNT(*) FROM identity.user_account WHERE id = 99")).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName(
+      "SC-IDENT-023 A18 — e-mail normalisé déjà dans la cible sous un autre id : refus avant toute écriture, message sans e-mail")
+  void targetEmailConflictAborts() {
+    MariaDbContainerSupport.rootExecute(
+        List.of(
+            "INSERT INTO identity.user_account (id, email, name, password_hash, avatar_color, roles, created_at) "
+                + "VALUES (99, 'reprise-2y-13@exemple.test', 'Autre id', '$2y$04$x', '#6366f1', '[]', '2026-01-01 00:00:00')"));
+    RuntimeException refused = null;
+    try {
+      importer.importAll();
+    } catch (RuntimeException e) {
+      refused = e;
+    }
+    assertThat(refused).as("la reprise doit être refusée").isNotNull();
+    assertThat(String.valueOf(refused.getMessage())).doesNotContain("@");
+    assertThat(count("SELECT COUNT(*) FROM identity.user_account")).isEqualTo(1);
+    VerificationReport v = importer.verify();
+    assertThat(v.consistent()).isFalse();
+    assertThat(v.failedChecks()).contains("targetEmailConflicts");
+    assertThat(v.metrics().get("target.targetEmailConflicts")).isEqualTo("1");
+  }
+
+  @Test
+  @DisplayName(
+      "SC-IDENT-023 — commande --identity.legacy-import : run → 0, verify après divergence → 1")
+  void runnerExitCodes() throws Exception {
+    LegacyImportRunner runner = new LegacyImportRunner(importer, relay);
+    runner.run(new DefaultApplicationArguments("--identity.legacy-import=run"));
+    assertThat(runner.getExitCode()).isZero();
+    MariaDbContainerSupport.rootExecute(
+        List.of("UPDATE identity.user_account SET name = 'Modifié' WHERE id = 1"));
+    runner.run(new DefaultApplicationArguments("--identity.legacy-import=verify"));
+    assertThat(runner.getExitCode()).isEqualTo(1);
   }
 
   @Test
