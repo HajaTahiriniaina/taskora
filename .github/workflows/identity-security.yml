@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      actions: read # upload-sarif lit le run en cours (dépôt privé)
       security-events: write # téléversement SARIF (onglet Security)
     defaults:
       run:
@@ -70,6 +71,9 @@ jobs:
         if: >-
           always() && hashFiles('services/identity-service/target/dependency-check-report.sarif') != '' &&
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        # Confort seulement : le seuil CVSS est appliqué par l'étape Dependency-Check. Sur un dépôt privé,
+        # l'onglet Security exige GitHub Advanced Security ; sans lui l'envoi échoue sans bloquer le job.
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           sarif_file: services/identity-service/target/dependency-check-report.sarif
