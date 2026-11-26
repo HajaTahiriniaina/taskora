@@ -173,8 +173,9 @@ Méthode : lecture de la configuration, du code vendor (`lexik/jwt-authenticatio
 Les 400 passent par `ApiExceptionListener` (forme `{"error"}`), les 401 par le gestionnaire d'échec Lexik (forme `{"code","message"}`).
 
 ### 8.5 Autres constats utiles
-- `POST /api/auth/register` : `[]` est accepté comme `{}` ; conversions PHP `(string)` : nombre → texte, `true` → `"1"`, `false`/`null` → `""`, tableau → `"Array"` (un `name` tableau est accepté et vaut `"Array"`) ; `trim` PHP = espaces, `\t \n \r \0 \x0B` uniquement ; longueurs en points de code (`mb_*`).
-- `PATCH /api/me` : `isset` (une valeur `null` vaut « absente ») ; `!empty($newPassword)` (`""`, `"0"` → aucun changement de mot de passe) ; l'expression `/^#[0-9a-fA-F]{6}$/` accepte aussi un `\n` final (comportement PCRE de `$`).
+- `POST /api/auth/register` (Symfony) : `[]` est accepté comme `{}` — **corrigé (décision utilisateur E16)** dans identity-service ; conversions PHP `(string)` : nombre → texte, `true` → `"1"`, `false`/`null` → `""`, tableau → `"Array"` (un `name` tableau est accepté et vaut `"Array"`) — **corrigé (décision utilisateur E17)** ; reproduits tels quels : `trim` PHP = espaces, `\t \n \r \0 \x0B` uniquement ; longueurs en points de code (`mb_*`).
+- `PATCH /api/me` (Symfony) : `isset` (une valeur `null` vaut « absente », **conservé** par E17) ; `!empty($newPassword)` (`""`, `"0"` → aucun changement de mot de passe, conservé : hors E15–E18) ; une couleur invalide est ignorée et l'expression `/^#[0-9a-fA-F]{6}$/` accepte un `\n` final — **corrigé (décision utilisateur E18)** : 400 `Couleur d'avatar invalide.`
+- Mot de passe > 4096 octets à l'inscription ou dans `newPassword` → 500 chez Symfony — **corrigé (décision utilisateur E15)** : 400 `Le mot de passe ne doit pas dépasser 4096 octets.`
 - Inscription concurrente avec le même e-mail : Symfony ne capture pas la violation d'unicité (→ 500) ; la cible renvoie 409 (SC-IDENT-002, déjà spécifié par Paul).
 - `JsonResponse` échappe `"`, `/` et les caractères non ASCII (`"`, `\/`, `è`) : l'équivalence est **sémantique** (même JSON après analyse), pas octet par octet.
 - Le port `8081` du conteneur `api` est publié sur l'hôte : tout endpoint interne de Symfony est joignable depuis l'hôte, d'où le secret partagé obligatoire (ADR A10).
@@ -199,7 +200,7 @@ Format : contexte → décision → conséquences. Statut : **acceptée** (étap
   - **Hachage** : bcrypt **`$2y$` coût 13** (configurable `identity.password.bcrypt-cost`, 4 en test). Spring `BCryptPasswordEncoder(BCryptVersion.$2Y, 13)`.
   - **Pré-hachage** : si la longueur **en octets UTF-8** > 72 ou si le mot de passe contient `\0` → `Base64(SHA-512(octets))` (base64 standard avec remplissage, 88 caractères ASCII), au hachage et à la vérification des hashes `$2…`. PHP passe ensuite ces 88 caractères à bcrypt, qui n'en lit que les **72 premiers octets** ; or `BCryptPasswordEncoder` (Spring Security ≥ 6.3) **refuse** une entrée de plus de 72 octets : l'adapter tronque donc explicitement l'entrée effective à 72 octets avant l'appel bcrypt (troncature sûre : ASCII). Test obligatoire : un hash produit par PHP pour un mot de passe de 100 octets est vérifié par Java, et inversement.
   - **Vérification** par préfixe : `$2y$`, `$2a$`, `$2b$` → bcrypt (tous coûts 4–31) ; `$argon2id$`, `$argon2i$` → `Argon2PasswordEncoder` (BouncyCastle), **sans pré-hachage** ; tout autre préfixe, hash tronqué ou corrompu → `false` (jamais d'exception → jamais 500).
-  - Mot de passe vide ou > 4096 octets → `false` à la vérification ; > 4096 octets au **hachage** → exception de domaine `PasswordTooLongException` traduite en **500** `Erreur interne du serveur.` (compatibilité stricte, écart proposé E15 : voir questions ouvertes).
+  - Mot de passe vide ou > 4096 octets → `false` à la vérification ; > 4096 octets à l'inscription ou dans `newPassword` → **400** `Le mot de passe ne doit pas dépasser 4096 octets.` — **corrigé (décision utilisateur E15)**, contrôlé dans le domaine (`PlainPassword.requireMaximumLength`, `PasswordTooLongException`) **avant** tout hachage ; le hasher garde une garde défensive (exception) qui ne doit jamais être atteinte. Au login, > 4096 octets → 401 (inchangé).
   - Comparaison à temps constant (assurée par les encodeurs Spring) ; e-mail inconnu au login → vérification d'un hash factice `$2y$13$…` pré-calculé au démarrage, pour un temps comparable (SC-IDENT-008).
   - Pas de re-hachage à la connexion en phase 1.
 - **Conséquences** : argon2 n'est pas présent en base mais reste vérifiable (jeu d'essai SC-IDENT-023) ; les hashes produits par identity-service sont lisibles par PHP `password_verify` → retour arrière sans perte.
@@ -234,7 +235,7 @@ Paquet racine `com.taskora.identity`.
 | `application.port.in` | `RegisterUserUseCase`, `AuthenticateUseCase`, `GetProfileUseCase`, `UpdateProfileUseCase`, `ResolveAuthenticatedUserUseCase`, `DeliverPendingMessagesUseCase`, `ImportLegacyUsersUseCase` |
 | `application.port.out` | `UserRepositoryPort`, `PasswordHasherPort`, `TokenIssuerPort`, `TokenVerifierPort`, `LegacyUserProjectionPort`, `OutboxPort`, `InvitationClaimPort`, `LegacyUserSourcePort`, `UnitOfWorkPort` |
 | `application.service` | implémentations des cas d'utilisation, Java pur (pas d'annotation Spring ; transactions via `UnitOfWorkPort`) |
-| `adapter.in.web` | `AuthController`, `MeController`, `PhpJsonBody` (lecture tolérante façon PHP), `JsonLoginRequestParser`, `ApiErrorHandler`, `ErrorMessages`, DTO |
+| `adapter.in.web` | `AuthController`, `MeController`, `PhpJsonBody` (nom conservé ; lecture stricte : objet JSON exigé, champs chaîne, `null` = absent sur `PATCH` ; E16, E17), `JsonLoginRequestParser`, `ApiErrorHandler`, `ErrorMessages`, DTO |
 | `adapter.in.web.security` | `LexikCompatibleJwtFilter`, `LexikAuthenticationEntryPoint`, `LexikTokenExtractor` |
 | `adapter.in.scheduling` | `OutboxRelayScheduler` (appelle `DeliverPendingMessagesUseCase`) |
 | `adapter.in.cli` | `LegacyImportRunner` (`--identity.legacy-import=run|verify`) |
@@ -252,7 +253,7 @@ Paquet racine `com.taskora.identity`.
 - **Conséquences** : test d'intégration avec N inscriptions parallèles (même e-mail, casses différentes) → 1 ligne, N−1 × 409, 0 × 500.
 
 ### A8 — Mise à jour atomique du profil
-- **Décision** : `User.applyProfileUpdate(ProfileUpdate, PasswordHasherPort)` valide tout dans l'ordre de Symfony (`name` si présent et non `null` → `avatarColor` ignorée si invalide → si `newPassword` « non vide » au sens PHP : mot de passe actuel puis longueur ≥ 8), produit un **nouvel** état, et n'est persisté qu'à la fin dans une seule transaction (`UnitOfWorkPort`) avec la projection et l'événement. Toute exception → rien n'est écrit (SC-IDENT-019).
+- **Décision** : `User.applyProfileUpdate(ProfileUpdate, PasswordHasherPort)` valide tout dans l'ordre (`name` si présent → `avatarColor` exactement `#RRGGBB` sinon 400 `Couleur d'avatar invalide.` — **corrigé (décision utilisateur E18)** → si `newPassword` non vide : mot de passe actuel, longueur ≥ 8, puis ≤ 4096 octets — E15) ; la forme du corps et le type des champs (E16, E17) sont vérifiés avant, par l'adapter web, produit un **nouvel** état, et n'est persisté qu'à la fin dans une seule transaction (`UnitOfWorkPort`) avec la projection et l'événement. Toute exception → rien n'est écrit (SC-IDENT-019).
 - `UserProfileUpdated` est ajouté à l'outbox seulement si `name` ou `avatarColor` change réellement (pas pour un changement de mot de passe seul).
 
 ### A9 — Projection historique `taskora.user` (U1-B)
@@ -290,3 +291,14 @@ Paquet racine `com.taskora.identity`.
 ### A14 — Reprise des données : commande ré-exécutable plutôt que migration Flyway
 - **Contexte** : Paul proposait `V2__import_legacy_users.sql`. Une migration Flyway ne s'exécute qu'une fois, alors qu'il faut copier à la bascule (après gel des écritures) et resynchroniser après un retour arrière.
 - **Décision** : Flyway ne crée que le schéma (`V1`, `V2`) ; la copie est le cas d'utilisation `ImportLegacyUsersUseCase`, lancé par `LegacyImportRunner` (`java -jar identity-service.jar --identity.legacy-import=run`), idempotent (`INSERT … ON DUPLICATE KEY UPDATE` par id), avec rapport de contrôle. Détails : [identity-migration.md](identity-migration.md).
+
+### A15 — Écarts E15–E18 corrigés dans identity-service (décision utilisateur du 26/11/2026)
+- **Contexte** : l'utilisateur a choisi de **corriger** ces écarts plutôt que de les reproduire (docs/specs/decisions.md). Symfony n'est pas modifié.
+- **Décision** — statut : **corrigé (décision utilisateur)** :
+  | Réf. | identity-service | Où | Scénario |
+  |---|---|---|---|
+  | E15 | mot de passe > 4096 octets UTF-8 (inscription, `newPassword`) → 400 `Le mot de passe ne doit pas dépasser 4096 octets.` ; login → 401 inchangé | domaine (`PlainPassword`) | SC-IDENT-028 |
+  | E16 | `register` et `PATCH /me` : corps JSON non objet → 400 `JSON invalide.` (corps vide = `{}`, règle transverse conservée) | adapter web (`PhpJsonBody`) | SC-IDENT-029 |
+  | E17 | champ présent non chaîne → 400 `Le champ "<nom>" doit être une chaîne de caractères.` ; `null` refusé à l'inscription, « absent » sur `PATCH` ; contrôle de type de tous les champs connus avant les contrôles de contenu, dans l'ordre du contrat ; login inchangé (messages `json_login`) | adapter web | SC-IDENT-030 |
+  | E18 | `avatarColor` doit correspondre à `\A#[0-9a-fA-F]{6}\z`, sinon 400 `Couleur d'avatar invalide.` (sans modification partielle) | domaine (`AvatarColor`) | SC-IDENT-031 |
+- **Conséquences** : ces cas sont des **divergences voulues** : les tests `compat` (miroir Symfony) les excluent explicitement (liste dans l'ordre de travail) ; les autres comportements PHP (trim, points de code, collation, `"0"` vide pour `newPassword`) restent reproduits. Le contrat public documente les quatre nouveaux 400.

@@ -37,12 +37,21 @@ Auteur : BackAli, 26/11/2026. Ce fichier suffit à chaque agent : lisez-le en en
 Détail et preuves : architecture §8.
 1. JWT **RS256** confirmé ; `iat`/`exp` entiers ; en-tête `{"typ":"JWT","alg":"RS256"}` sans `kid` ; tolérance 0 s ; précédence des messages 401 du §8.1 (l'expiration l'emporte sur une signature fausse).
 2. Hashes en base : **100 % `$2y$` coût 13** (3/3). Argon2 absent mais supporté en vérification.
-3. **Bcrypt ne tronque pas** chez Symfony : au-delà de 72 octets (ou avec `\0`), pré-hachage `base64(sha512)` ; Java tronque ensuite l'entrée effective à 72 octets (A2). Limite **4096 octets** : 500 au hachage (compatibilité, E15 proposé), `false` à la vérification.
+3. **Bcrypt ne tronque pas** chez Symfony : au-delà de 72 octets (ou avec `\0`), pré-hachage `base64(sha512)` ; Java tronque ensuite l'entrée effective à 72 octets (A2). Limite **4096 octets** : chez Symfony 500 au hachage ; dans identity-service **400** (E15 corrigé, voir point 9), `false` à la vérification (login → 401).
 4. Erreurs 400 du login : `{"error": "<message anglais>"}` (pas la forme Lexik) ; `Content-Type` sans `json` → 404 (§8.4).
 5. Compte disparu → 401 `Invalid credentials.` ; revendication `username` absente → `Unable to find key "username" in the token payload.`
 6. Connexion : la recherche de l'e-mail suit la collation `utf8mb4_unicode_ci` (casse, **accents**, **espaces finaux** ignorés ; espace initial → 401). On **ne normalise pas** l'e-mail au login (contrairement à l'hypothèse SC-IDENT-007) : la colonne d'identity a la même collation (A7).
 7. `created_at` est en heure locale **Europe/Paris** (fuseau PHP).
 8. La reprise est une commande ré-exécutable, pas une migration Flyway (A14).
+9. **Écarts corrigés (décision utilisateur, decisions.md, ADR A15)** — identity-service **ne reproduit pas** ces comportements de Symfony :
+   | Réf. | Règle identity-service | Message 400 exact | Scénario |
+   |---|---|---|---|
+   | E15 | mot de passe > 4096 octets UTF-8 à l'inscription ou dans `newPassword` (login : 401 inchangé) | `Le mot de passe ne doit pas dépasser 4096 octets.` | SC-IDENT-028 |
+   | E16 | `register` et `PATCH /me` : JSON valide mais non objet (`[]`, `"x"`, `42`, `true`) ; corps vide = `{}` | `JSON invalide.` | SC-IDENT-029 |
+   | E17 | champ connu présent non chaîne (`register` : `name`, `email`, `password`, `null` refusé ; `PATCH` : `name`, `avatarColor`, `currentPassword`, `newPassword`, `null` = absent) ; contrôle de type de tous les champs dans cet ordre **avant** les contrôles de contenu ; login inchangé | `Le champ "<nom>" doit être une chaîne de caractères.` | SC-IDENT-030 |
+   | E18 | `avatarColor` ≠ `\A#[0-9a-fA-F]{6}\z` (dont `""`, `\n` final) ; après `name`, avant le mot de passe ; rien n'est appliqué | `Couleur d'avatar invalide.` | SC-IDENT-031 |
+   Restent reproduits : `trim` PHP, longueurs en points de code, collation, `newPassword` `""`/`"0"` = aucun changement ; plus aucune conversion de type PHP.
+   **Exclusions `compat`** : `MirrorCompatibilityTest` n'envoie **aucune** requête relevant de E15–E18 (mot de passe > 4096 octets, corps JSON non objet, champ non chaîne, `avatarColor` invalide) ; ces cas sont testés seulement contre identity-service (API IT). La liste exclue est une constante nommée `INTENTIONAL_DIVERGENCES` avec la référence E15–E18 en commentaire.
 
 ## 2. Étape 1 — BackTesteur (tests rouges, commit `test(identity): …`)
 
@@ -50,8 +59,8 @@ Détail et preuves : architecture §8.
 | Priorité | Scénarios | Remarque |
 |---|---|---|
 | critique | SC-IDENT-001, 002, 003, 005, 007, 008, 010, 011, 012, 014, 017, 018, 023, 024 | obligatoires |
-| important | SC-IDENT-004, 009, 013, 015, 019, 020 | 025 et 026 sont des scénarios front (FrontTesteur) |
-| secondaire | SC-IDENT-006, 016, 021 | 022 : identity n'expose que `/actuator/health` (test de démarrage) ; 027 hors phase (U3) |
+| important | SC-IDENT-004, 009, 013, 015, 019, 020, **028, 029, 030** | 025 et 026 sont des scénarios front (FrontTesteur) ; 028–030 = écarts E15–E17 corrigés |
+| secondaire | SC-IDENT-006, 016, 021, **031** | 022 : identity n'expose que `/actuator/health` (test de démarrage) ; 027 hors phase (U3) |
 Chaque test : `@DisplayName("SC-IDENT-0NN — …")` ; un test peut couvrir plusieurs identifiants (`SC-IDENT-003/004 — …`). Les cas listés « Limites » de identity.md sont tous testés, corrigés par §1.3.
 
 ### 2.2 Squelette Maven à créer
@@ -78,8 +87,8 @@ Paquet racine `com.taskora.identity`. Corps : `throw new UnsupportedOperationExc
   - `final class PhpEmailValidator` : `static boolean isValid(String)` (équivalent `filter_var($e, FILTER_VALIDATE_EMAIL)` sans drapeau).
   - `record Email(String value)` : `static Email fromRegistration(String raw)` (trim → obligatoire → tronqué à 180 → minuscules → format), `static Email ofStored(String value)`.
   - `record PersonName(String value)` : `static PersonName of(String raw)` (trim → obligatoire → tronqué à 120).
-  - `record AvatarColor(String value)` : `static final List<String> PALETTE`, `static AvatarColor random(RandomGenerator)`, `static Optional<AvatarColor> parse(String raw)`.
-  - `final class PlainPassword` : `static PlainPassword of(String raw)`, `String value()`, `int codePointLength()`, `int utf8Length()`, `boolean isEmpty()`, `void requireMinimumLength()` (8, sinon `ValidationException`), `toString()` masqué.
+  - `record AvatarColor(String value)` : `static final List<String> PALETTE`, `static AvatarColor random(RandomGenerator)`, `static AvatarColor parse(String raw)` (E18 : `\A#[0-9a-fA-F]{6}\z`, sinon `ValidationException("Couleur d'avatar invalide.")`).
+  - `final class PlainPassword` : `static PlainPassword of(String raw)`, `String value()`, `int codePointLength()`, `int utf8Length()`, `boolean isEmpty()`, `void requireMinimumLength()` (8, sinon `ValidationException`), `void requireMaximumLength()` (4096 octets UTF-8, sinon `PasswordTooLongException`, E15), `toString()` masqué.
   - `record NewUser(Email email, PersonName name, HashedPassword password, AvatarColor avatarColor, Roles roles, LocalDateTime createdAt)`.
   - `final class User` : accesseurs `id()`, `email()`, `name()`, `password()`, `avatarColor()`, `roles()`, `createdAt()` ; `static User rehydrate(UserId, Email, PersonName, HashedPassword, AvatarColor, Roles, LocalDateTime)` ; `ProfileUpdateResult updateProfile(ProfileUpdate update, PasswordHashing hashing)`.
   - `record ProfileUpdate(Optional<String> name, Optional<String> avatarColor, Optional<String> currentPassword, Optional<String> newPassword)` — `name` présent = clé présente et non `null` ; `newPassword` présent = non vide au sens PHP `empty` (calculé par l'adapter web).
@@ -112,7 +121,7 @@ Rien d'autre dans `src/main` (pas d'adapter, pas de configuration Spring) : les 
   - `adapter.out.security.SymfonyCompatiblePasswordHasher(int bcryptCost)` ;
   - `adapter.out.security.NimbusTokenIssuer(LexikKeyLoader keys, Clock clock, Duration ttl)` ;
   - `adapter.out.security.NimbusTokenVerifier(RSAPublicKey key, Clock clock)` ;
-  - `adapter.in.web.PhpJsonBody` : `static PhpJsonBody parse(byte[] body)` (lève `ValidationException("JSON invalide.")`), `boolean has(String key)`, `boolean isSetLikePhp(String key)`, `String stringLikePhp(String key)` (`null` si absent), `boolean nonEmptyLikePhp(String key)` ;
+  - `adapter.in.web.PhpJsonBody` (nom conservé, **sans conversion PHP** depuis E16/E17) : `static PhpJsonBody parse(byte[] body)` (vide → `{}` ; non JSON **ou JSON non objet** → `ValidationException("JSON invalide.")`), `boolean has(String key)`, `boolean isSetLikePhp(String key)` (présent et non `null`), `String requiredString(String key)` (inscription : `null` si absent ; présent non chaîne, `null` compris → `ValidationException("Le champ \"<key>\" doit être une chaîne de caractères.")`), `String optionalString(String key)` (`PATCH` : `null` si absent ou `null` ; autre non-chaîne → même exception), `boolean nonEmptyLikePhp(String key)` (chaîne ni `""` ni `"0"`). `stringLikePhp` est **supprimée** ;
   - `adapter.in.web.JsonLoginRequestParser` : `static LoginCommand parse(String contentType, byte[] body)` (lève `JsonLoginException(int status, String message)`, à créer aussi).
 
 ### 2.4 Tests à écrire (`services/identity-service/src/test/java/com/taskora/identity/...`)
@@ -131,11 +140,11 @@ Fixtures (`src/test/resources/`) générées **une fois** dans le conteneur `api
 | ↳ | `domain/model/PhpEmailValidatorTest` | unitaire paramétré | golden `compat/php-filter-validate-email.json` : 100 % des cas identiques |
 | ↳ | `domain/model/PhpStringTest` | unitaire paramétré | golden `compat/php-string-functions.json` |
 | ↳ | `domain/model/PersonNameTest` | unitaire | 001, 003 (espaces seuls), 004/015 (150 → 120 points de code, emoji compté 1) |
-| ↳ | `domain/model/AvatarColorTest` | unitaire | 001 (palette, `RandomGenerator` déterministe), 016 (`#0EA5E9` conservé tel quel ; `red`, `#12345`, `#1234567` → vide ; `#0EA5E9\n` accepté) |
-| ↳ | `domain/model/PlainPasswordTest` | unitaire | 003/018 (7 → refus, 8 → ok, `ééééééé` 7 → refus), `toString` masqué (024) |
+| ↳ | `domain/model/AvatarColorTest` | unitaire | 001 (palette, `RandomGenerator` déterministe), 016 (`#0EA5E9` conservé tel quel), 031 (`red`, `#12345`, `#1234567`, `""`, `#0EA5E9\n`, ` #0EA5E9` → `ValidationException("Couleur d'avatar invalide.")`) |
+| ↳ | `domain/model/PlainPasswordTest` | unitaire | 003/018 (7 → refus, 8 → ok, `ééééééé` 7 → refus), 028 (4096 octets ok, 4097 → `PasswordTooLongException`, 2049 × `é` → refus), `toString` masqué (024) |
 | ↳ | `domain/model/UserProfileUpdateTest` | unitaire | 015, 016, 018 (actuel faux, actuel absent, nouveau trop court), 019 (erreur → état d'origine intact, `ProfileUpdateResult` non produit), 020 (pas de champ e-mail), ordre des contrôles, `changedFields`, `passwordChanged` |
 | ↳ | `domain/model/RolesTest` | unitaire | 010 (`ROLE_USER` ajouté, sans doublon) |
-| Application | `application/service/RegisterUserServiceTest` | unitaire (ports mockés) | 001, 002 (existe → 409, aucune écriture), 003 (ordre name → email → password → unicité), 005 (dans **une** unité de travail : insert + projection + 3 messages d'outbox : claim immédiat, claim de rattrapage à +60 s, `UserRegistered` ; **après** l'unité de travail : `deliverNow` du premier claim ; échec de livraison → résultat 201 quand même) ; `PasswordTooLongException` propagée (> 4096 octets) |
+| Application | `application/service/RegisterUserServiceTest` | unitaire (ports mockés) | 001, 002 (existe → 409, aucune écriture), 003 (ordre name → email → password → unicité), 005 (dans **une** unité de travail : insert + projection + 3 messages d'outbox : claim immédiat, claim de rattrapage à +60 s, `UserRegistered` ; **après** l'unité de travail : `deliverNow` du premier claim ; échec de livraison → résultat 201 quand même) ; 028 : `PasswordTooLongException` (> 4096 octets) levée après la longueur minimale et avant l'unicité, sans écriture ni hachage |
 | ↳ | `application/service/AuthenticateServiceTest` | unitaire | 007, 008 (inconnu → `verifyAgainstDummy` appelé puis `InvalidCredentialsException` ; mauvais mot de passe → même exception), e-mail passé **brut** à `findByLoginEmail`, e-mail ou mot de passe > 4096 octets → refus sans appel au dépôt |
 | ↳ | `application/service/ProfileServiceTest` | unitaire | 014, 015–020 ; une seule unité de travail (update + projection + événement) ; `UserProfileUpdated` seulement si `name`/`avatarColor` changent ; erreur → aucun appel d'écriture |
 | ↳ | `application/service/AuthenticatedUserResolverTest` | unitaire | 013 (`ACCOUNT_NOT_FOUND`), `MISSING_USERNAME` |
@@ -145,11 +154,11 @@ Fixtures (`src/test/resources/`) générées **une fois** dans le conteneur `api
 | ↳ | `adapter/out/security/LexikKeyLoaderTest` | unitaire | PKCS#8 chiffré PBES2 (3DES comme Lexik, et AES-256) ; mauvaise passphrase → exception dont le message ne contient ni la passphrase ni du PEM (024) |
 | ↳ | `adapter/out/security/NimbusTokenIssuerTest` | unitaire | 010 : en-tête exact, `exp − iat = 604800`, entiers, `username`, `roles`, `uid`, aucune autre revendication |
 | ↳ | `adapter/out/security/NimbusTokenVerifierTest` | unitaire paramétré | 012 : tableau de précédence du §8.1 (chaque variante de `TokenFactory` → `TokenRejection` attendu) ; jeton au format Lexik valide → accepté ; `uid` absent accepté (jetons Symfony) |
-| API | `adapter/in/web/RegisterApiIT` | MockMvc `@SpringBootTest` + Testcontainers MariaDB + validation OpenAPI | 001–004, 024 : statuts, corps exacts, validation OpenAPI de chaque réponse, `[]` ≡ `{}`, conversions PHP (`name` nombre, `name` tableau → `"Array"`), mot de passe > 4096 octets → 500 `Erreur interne du serveur.` sans trace |
+| API | `adapter/in/web/RegisterApiIT` | MockMvc `@SpringBootTest` + Testcontainers MariaDB + validation OpenAPI | 001–004, 024 : statuts, corps exacts, validation OpenAPI de chaque réponse ; 028 (4096 octets → 201, 4097 → 400) ; 029 (`[]`, `"x"`, `42`, `true` → 400 `JSON invalide.` ; corps vide → 400 `name` obligatoire) ; 030 (paramétré champ × type : nombre, booléen, `null`, tableau, objet ; priorité du premier champ ; type vérifié avant contenu) |
 | ↳ | `adapter/in/web/LoginApiIT` | idem | 007 (casse différente, accent `é`↔`e`, espace final → 200 ; espace initial → 401), 008 (corps identiques), 009 (tous les cas du tableau §8.4 avec messages exacts, `Content-Type` absent → 404), 017 (ancien → 401, nouveau → 200) |
-| ↳ | `adapter/in/web/MeApiIT` | idem | 014, 015 (`null` ignoré, `""` → 400), 016, 017, 018 (`newPassword` `""`/`"0"` → aucun changement), 019, 020, 021 (ancien jeton toujours accepté après changement de mot de passe) |
+| ↳ | `adapter/in/web/MeApiIT` | idem | 014, 015 (`null` ignoré, `""` → 400), 016, 017, 018 (`newPassword` `""`/`"0"` → aucun changement), 019, 020, 021 (ancien jeton toujours accepté après changement de mot de passe) ; 028 (`newPassword` 4097 octets → 400, hash inchangé) ; 029 ; 030 (`null` = absent, autres types → 400) ; 031 (chaque valeur invalide → 400, `name` envoyé en même temps non appliqué ; `{"name":"","avatarColor":"red"}` → message `name`) |
 | ↳ | `adapter/in/web/JwtSecurityApiIT` | idem | 011 (sans en-tête, `Basic …`, `Bearer` seul, `Bearer a b` → `JWT Token not found`), 012 (chaque variante → message exact + `WWW-Authenticate: Bearer`), 013 (compte supprimé → `Invalid credentials.`), `/api/auth/*` accessibles sans jeton, `/actuator/health` sur le port de management uniquement (022) |
-| ↳ | `adapter/in/web/PhpJsonBodyTest`, `adapter/in/web/JsonLoginRequestParserTest` | unitaire | coercitions PHP, `empty`/`isset`, messages du parseur de login |
+| ↳ | `adapter/in/web/PhpJsonBodyTest`, `adapter/in/web/JsonLoginRequestParserTest` | unitaire | 029 (non-objet → `JSON invalide.`, vide → `{}`), 030 (aucune conversion : non-chaîne → message exact, `null` selon le mode), `nonEmptyLikePhp`, messages du parseur de login (inchangés) |
 | Intégration | `adapter/out/persistence/UserPersistenceIT` | Testcontainers | Flyway V1/V2 sur schéma vide ; collation : recherche accent/casse/espace final ; index unique (`É@x` vs `e@x`) |
 | ↳ | `adapter/out/persistence/ConcurrentRegistrationIT` | Testcontainers + HTTP | 002 : 8 inscriptions parallèles même e-mail (casses différentes) → 1 × 201, 7 × 409, 0 × 500, 1 ligne dans `identity` et dans `taskora.user` |
 | ↳ | `adapter/out/legacy/LegacyProjectionIT` | Testcontainers | U1-B : inscription et profil → ligne `taskora.user` identique (id explicite, hash, `roles=[]`, `created_at` en heure de Paris) ; échec forcé de la projection → rien dans `identity` ; aucune requête `DELETE` sur `taskora.user` (journal SQL) |
@@ -158,7 +167,7 @@ Fixtures (`src/test/resources/`) générées **une fois** dans le conteneur `api
 | ↳ | `adapter/in/cli/LegacyImportIT` | Testcontainers | 023 : `fixtures/legacy-users.sql` dans `taskora.user` → `run` → login de **chaque** compte du jeu d'essai via l'API (100 %) ; 2e `run` → aucune modification ; `verify` vert ; `AUTO_INCREMENT` = max+1 ; compte présent seulement dans la cible → signalé, conservé |
 | ↳ | `security/SecretsDoNotLeakIT` | Testcontainers + capture des journaux | 024 : sur un parcours inscription → login → PATCH mot de passe → erreurs, aucune occurrence du mot de passe, du hash, du jeton, de la passphrase ni du PEM dans les réponses et journaux |
 | ↳ | `security/LoginTimingIT` | Testcontainers | 008 : 30 essais e-mail inconnu vs mauvais mot de passe, coût 13 : écart des médianes < 50 % |
-| Compatibilité | `compat/MirrorCompatibilityTest` (`@Tag("compat")`) | RestAssured sur la stack compose | mêmes requêtes vers Symfony (`compat.symfony.url`) et identity (`compat.identity.url`) : 001–003, 007–009, 014–018 ; comparaison statut + JSON analysé ; e-mails uniques `compat-<uuid>@exemple.test` (à lancer seulement sur une stack jetable) |
+| Compatibilité | `compat/MirrorCompatibilityTest` (`@Tag("compat")`) | RestAssured sur la stack compose | mêmes requêtes vers Symfony (`compat.symfony.url`) et identity (`compat.identity.url`) : 001–003, 007–009, 014–018, **hors** divergences E15–E18 (§1.3 point 9, constante `INTENTIONAL_DIVERGENCES`) ; comparaison statut + JSON analysé ; e-mails uniques `compat-<uuid>@exemple.test` (à lancer seulement sur une stack jetable) |
 | ↳ | `compat/CrossTokenCompatibilityTest` (`@Tag("compat")`) | idem | 010 : jeton de login Symfony → `GET /api/me` identity 200 ; jeton identity → `GET /api/boards` Symfony 200 |
 | ↳ | `compat/CrossPasswordCompatibilityTest` (`@Tag("compat")`) | idem | 023 : compte inscrit via identity → login Symfony 200 (projection + hash `$2y$`) ; changement de mot de passe via identity → login Symfony avec le nouveau |
 
@@ -185,15 +194,16 @@ Fixtures (`src/test/resources/`) générées **une fois** dans le conteneur `api
 Entrée : le hash du commit de BackTesteur. Interdit : toute écriture dans `services/**/src/test/**`, `backend/tests/**`, `backend/phpunit.dist.xml`, `backend/.env.test`, le `require-dev` de `composer.json`, les seuils et la configuration de tests des POM.
 
 ### 3.1 Domaine et application
-- Implémenter le squelette §2.3 en respectant **exactement** l'ordre des contrôles et les messages de identity.md §2 corrigés par §1.3.
+- Implémenter le squelette §2.3 en respectant **exactement** l'ordre des contrôles et les messages de identity.md §2 (« Ordre dans identity-service ») corrigés par §1.3, y compris les écarts corrigés E15–E18 (§1.3 point 9) : ne pas les reproduire « à la Symfony ».
 - `PhpString.trim` : uniquement ` `, `\t`, `\n`, `\r`, `\0`, `\x0B` ; longueurs et troncatures en **points de code** ; `toLower` = `toLowerCase(Locale.ROOT)`.
+- `AvatarColor.parse` : `\A#[0-9a-fA-F]{6}\z` (pas `$`), valeur stockée telle quelle ; `PlainPassword.requireMaximumLength` appelé après `requireMinimumLength` (inscription) et après la vérification du mot de passe actuel puis la longueur minimale (`PATCH`).
 - `PhpEmailValidator` : port fidèle de l'expression de `php_filter_validate_email` (ext/filter, sans `FILTER_FLAG_EMAIL_UNICODE`) + limites de longueur PHP ; doit passer 100 % du golden.
 - Services applicatifs en Java pur, transactions via `UnitOfWorkPort` ; `RegisterUserService` : unité de travail (insert, projection, 3 messages d'outbox) **puis** `deliverNow` hors transaction (exceptions de livraison capturées et journalisées sans e-mail) ; `AuthenticateService` : `verifyAgainstDummy` pour un e-mail inconnu.
 
 ### 3.2 Adapters attendus
 | Adapter | Classe(s) | Points imposés |
 |---|---|---|
-| `adapter.in.web` | `AuthController` (`POST /api/auth/register` 201, `POST /api/auth/login` 200), `MeController` (`GET`, `PATCH /api/me`), `PhpJsonBody`, `JsonLoginRequestParser`, `JsonLoginException`, `ApiErrorHandler`, `ErrorMessages`, `UserResponse`, `AuthResponse` | Lire le corps brut (`byte[]`) : pas de liaison Jackson automatique sur des DTO typés (elle ne reproduit pas les conversions PHP) ; réponses conformes au contrat ; 404/405 en `{"error"}` ; `server.error.include-stacktrace=never` |
+| `adapter.in.web` | `AuthController` (`POST /api/auth/register` 201, `POST /api/auth/login` 200), `MeController` (`GET`, `PATCH /api/me`), `PhpJsonBody`, `JsonLoginRequestParser`, `JsonLoginException`, `ApiErrorHandler`, `ErrorMessages`, `UserResponse`, `AuthResponse` | Lire le corps brut (`byte[]`) via `PhpJsonBody` : pas de liaison Jackson automatique sur des DTO typés (elle convertirait les types en silence) ; **aucune conversion PHP** (E17) ; contrôle de forme (E16) puis de type de tous les champs connus, dans l'ordre du contrat, avant tout appel de cas d'utilisation ; `PasswordTooLongException` → 400 (E15), plus jamais 500 ; réponses conformes au contrat ; 404/405 en `{"error"}` ; `server.error.include-stacktrace=never` |
 | `adapter.in.web.security` | `SecurityConfig` (dans `config`), `LexikCompatibleJwtFilter`, `LexikTokenExtractor`, `LexikAuthenticationEntryPoint` | sans état, CSRF désactivé, `/api/auth/**` public, tout le reste de `/api/**` authentifié ; messages et précédence §8.1 ; `WWW-Authenticate: Bearer` ; pas de `BearerTokenAuthenticationFilter` |
 | `adapter.in.scheduling` | `OutboxRelayScheduler` | `@Scheduled(fixedDelay = 5 s)`, lot de 20, désactivable (`identity.outbox.relay.enabled`) |
 | `adapter.in.cli` | `LegacyImportRunner` | `--identity.legacy-import=run|verify`, `--identity.outbox-drain` ; code de sortie ≠ 0 si incohérent ; sortie : nombres et empreintes seulement |
@@ -221,8 +231,8 @@ Référence d'intégrité : hash du commit `test(identity)` de BackTesteur.
 2. **Contrôles outillés** (depuis `services/`) : `./mvnw -B -ntp -pl identity-service -am verify` ; `-Pquality verify -DskipTests` (Spotless, Checkstyle Google, Nullness) ; `rewrite:dryRun` (patch vide attendu) ; `-Psecurity-scan verify -DskipTests` (OWASP, CVSS < 7 ; sans `NVD_API_KEY` en local, le noter) ; Sonar si un serveur est disponible, sinon le noter ; PHPUnit (`vendor/bin/phpunit` dans le conteneur `api`). Signaler toute incompatibilité d'outil avec Java 25 (Checker Framework 4.4.0, google-java-format) comme point **bloquant à arbitrer**, sans désactiver l'outil.
 3. **Architecture** : ArchUnit vert ; pas d'annotation Spring dans `domain`/`application` ; pas de Spring Data REST (A5) ; aucun adapter n'appelle un autre adapter.
 4. **Revue de sécurité ciblée** : chargement de la clé privée (jamais journalisée, montée en lecture seule, passphrase effacée) ; validation JWT (`alg` vérifié avant la signature, tolérance 0, pas d'acceptation HS*/none) ; comparaison à temps constant des hashes **et** du secret interne (`hash_equals`) ; aucune donnée sensible dans journaux, exceptions, `last_error` d'outbox, rapports de reprise ; schéma historique non injectable ; aucune requête `DELETE` sur `taskora.user` ; endpoint `/internal` refusé si secret vide ; en-têtes de sécurité par défaut de Spring Security conservés ; CORS non ouvert (même origine via nginx).
-5. **Conformité au contrat** : chaque statut/message des deux YAML a au moins un test ; exemples OpenAPI cohérents avec les réponses réelles.
-6. **Couverture des scénarios** : tableau SC-IDENT → test(s) → résultat ; tout scénario critique sans test vert est bloquant.
+5. **Conformité au contrat** : chaque statut/message des deux YAML a au moins un test ; exemples OpenAPI cohérents avec les réponses réelles. **Écarts E15–E18** : vérifier qu'ils sont corrigés et non reproduits (aucune conversion PHP dans `PhpJsonBody` ni ailleurs, aucun `[]` accepté comme objet, aucun 500 pour un mot de passe long, aucune couleur invalide ignorée) ; vérifier que les tests `compat` les excluent via `INTENTIONAL_DIVERGENCES` et qu'aucun autre cas n'y a été ajouté pour masquer une divergence non décidée (toute entrée hors E15–E18 est bloquante).
+6. **Couverture des scénarios** : tableau SC-IDENT → test(s) → résultat, y compris SC-IDENT-028 à 031 ; tout scénario critique sans test vert est bloquant ; 028–030 (importants) sans test vert : bloquant pour la bascule.
 7. Rapport : points bloquants / non bloquants, mesures (couverture, violations), sans aucun secret. Tout point bloquant renvoie à l'étape 2 (3 boucles maximum, puis remontée à BackAli et Paul).
 
 ## 5. Recette BackAli (après l'étape 3)
