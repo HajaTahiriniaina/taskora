@@ -4,7 +4,10 @@
 exec python3 -I -c '
 import json, re, sys
 
-TEST_PATH = re.compile(r"(^|/)(services/[^ ]*/src/test/|frontend/e2e/|backend/tests/)|\.spec\.ts\b|(^|/)e2e/")
+# Test files, plus the frontend test configuration (Playwright, Vitest, tsconfig.spec).
+# angular.json and package.json are shared with the Codeur: the Reviewer checks their test parts by git diff.
+TEST_PATH = re.compile(r"(^|/)(services/[^ ]*/src/test/|frontend/e2e/|backend/tests/)|\.spec\.ts\b|(^|/)e2e/"
+                       r"|(^|/)(playwright\.config|vitest\.config|vitest\.workspace)\.[cm]?[jt]s\b|(^|/)tsconfig\.spec\.json\b")
 WRITE_CMD = re.compile(r"(>|\btee\b|\bsed\s+-i|\bperl\s+-[a-z]*i|\brm\b|\bmv\b|\bcp\b|\btruncate\b|"
                        r"\bgit\s+(checkout|restore|rm|mv|stash|reset|apply)\b|\bpatch\b|\bspotless:apply\b|"
                        r"\beslint\b.*--fix|\bprettier\b.*--write)")
