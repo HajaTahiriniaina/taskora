@@ -42,6 +42,8 @@ class ManagementPortIT {
     r.add("identity.jwt.passphrase", KEYS::passphrase);
     r.add("identity.password.bcrypt-cost", () -> "4");
     r.add("identity.outbox.relay.enabled", () -> "false");
+    // A18 / SC-IDENT-036 : un secret interne vide empêche le démarrage.
+    r.add("identity.symfony.internal-secret", () -> "test-internal-secret-0123456789abcdef");
   }
 
   private HttpResponse<String> get(int p, String path) throws Exception {
@@ -60,7 +62,7 @@ class ManagementPortIT {
     java.util.Properties p = yaml.getObject();
     assertThat(p.getProperty("management.server.port")).isEqualTo("8091");
     assertThat(p.getProperty("management.endpoints.web.exposure.include")).isEqualTo("health");
-    assertThat(p.getProperty("server.error.include-stacktrace")).isEqualTo("never");
+    assertThat(p.getProperty("spring.web.error.include-stacktrace")).isEqualTo("never");
     assertThat(p.getProperty("spring.jpa.open-in-view")).isEqualTo("false");
     assertThat(p.getProperty("spring.flyway.schemas")).isEqualTo("identity");
   }
