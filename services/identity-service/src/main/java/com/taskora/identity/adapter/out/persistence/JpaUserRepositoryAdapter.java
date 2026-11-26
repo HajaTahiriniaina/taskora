@@ -69,7 +69,8 @@ public class JpaUserRepositoryAdapter implements UserRepositoryPort {
     UserAccountEntity entity =
         repository
             .findById(user.id().value())
-            .orElseThrow(() -> new IllegalStateException("Compte " + user.id().value() + " absent"));
+            .orElseThrow(
+                () -> new IllegalStateException("Compte " + user.id().value() + " absent"));
     entity.applyProfile(
         user.name().value(),
         user.password().value(),

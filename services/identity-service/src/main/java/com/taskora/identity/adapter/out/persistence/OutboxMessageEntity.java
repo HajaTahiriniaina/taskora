@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -16,7 +17,7 @@ import org.hibernate.type.SqlTypes;
 public class OutboxMessageEntity {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private @Nullable Long id;
 
   @JdbcTypeCode(SqlTypes.CHAR)
   @Column(name = "event_id", nullable = false, length = 36)
@@ -48,11 +49,13 @@ public class OutboxMessageEntity {
   private int attempts;
 
   @Column(name = "last_error", length = 255)
-  private String lastError;
+  private @Nullable String lastError;
 
   @Column(name = "delivered_at")
-  private LocalDateTime deliveredAt;
+  private @Nullable LocalDateTime deliveredAt;
 
+  /** Constructeur réservé à JPA (les champs sont renseignés par Hibernate). */
+  @SuppressWarnings("initialization.fields.uninitialized")
   protected OutboxMessageEntity() {}
 
   OutboxMessageEntity(

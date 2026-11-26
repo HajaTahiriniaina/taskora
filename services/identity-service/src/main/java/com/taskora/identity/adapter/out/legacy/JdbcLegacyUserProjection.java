@@ -11,8 +11,9 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * DataSource). Id explicite, roles « [] », created_at jamais modifié, jamais de DELETE.
  *
  * <p>UPDATE par id puis, si la ligne n'existe pas, INSERT avec l'id explicite : un « INSERT … ON
- * DUPLICATE KEY UPDATE » écraserait une autre ligne qui aurait le même e-mail (index unique) au lieu
- * d'échouer. Une violation d'unicité sur l'e-mail → EmailAlreadyUsedException (409, rollback, A7).
+ * DUPLICATE KEY UPDATE » écraserait une autre ligne qui aurait le même e-mail (index unique) au
+ * lieu d'échouer. Une violation d'unicité sur l'e-mail → EmailAlreadyUsedException (409, rollback,
+ * A7).
  */
 public class JdbcLegacyUserProjection implements LegacyUserProjectionPort {
   private final JdbcClient jdbc;

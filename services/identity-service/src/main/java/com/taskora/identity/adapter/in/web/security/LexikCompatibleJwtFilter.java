@@ -49,7 +49,8 @@ public final class LexikCompatibleJwtFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     String token = extractor.extract(request);
     if (token == null) {
-      // Pas de jeton : la règle d'autorisation déclenche le point d'entrée (« JWT Token not found »).
+      // Pas de jeton : la règle d'autorisation déclenche le point d'entrée (« JWT Token not found
+      // »).
       chain.doFilter(request, response);
       return;
     }

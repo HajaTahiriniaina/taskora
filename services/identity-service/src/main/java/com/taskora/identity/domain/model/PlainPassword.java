@@ -16,18 +16,39 @@ public final class PlainPassword {
     this.value = value;
   }
 
+  /**
+   * Enveloppe un mot de passe saisi.
+   *
+   * @param raw mot de passe ({@code null} = absent, traité comme vide)
+   * @return mot de passe
+   */
   public static PlainPassword of(String raw) {
     return new PlainPassword(raw == null ? "" : raw);
   }
 
+  /**
+   * Valeur en clair, pour le hachage seulement (jamais journalisée).
+   *
+   * @return mot de passe
+   */
   public String value() {
     return value;
   }
 
+  /**
+   * Longueur en points de code (mb_strlen), pour le minimum de 8.
+   *
+   * @return nombre de points de code
+   */
   public int codePointLength() {
     return PhpString.length(value);
   }
 
+  /**
+   * Longueur en octets UTF-8, pour la limite de 4096 (E15).
+   *
+   * @return nombre d'octets
+   */
   public int utf8Length() {
     return value.getBytes(StandardCharsets.UTF_8).length;
   }

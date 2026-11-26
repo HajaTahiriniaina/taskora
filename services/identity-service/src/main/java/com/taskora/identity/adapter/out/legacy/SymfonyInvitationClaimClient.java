@@ -73,6 +73,8 @@ public class SymfonyInvitationClaimClient implements InvitationClaimPort {
     if (code == 404 || code == 408 || code == 429 || status.is5xxServerError()) {
       return ClaimOutcome.RETRYABLE_FAILURE;
     }
-    return status.is4xxClientError() ? ClaimOutcome.PERMANENT_FAILURE : ClaimOutcome.RETRYABLE_FAILURE;
+    return status.is4xxClientError()
+        ? ClaimOutcome.PERMANENT_FAILURE
+        : ClaimOutcome.RETRYABLE_FAILURE;
   }
 }

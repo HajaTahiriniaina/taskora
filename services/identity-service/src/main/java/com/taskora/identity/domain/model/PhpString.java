@@ -8,7 +8,9 @@ public final class PhpString {
 
   private PhpString() {}
 
-  /** trim() de PHP : retire uniquement espace, \t, \n, \r, \0 et \x0B aux deux extrémités. */
+  /**
+   * Reproduit trim() de PHP : retire uniquement espace, \t, \n, \r, \0 et \x0B aux deux extrémités.
+   */
   public static String trim(String s) {
     int start = 0;
     int end = s.length();
@@ -26,7 +28,7 @@ public final class PhpString {
     return s.codePointCount(0, s.length());
   }
 
-  /** mb_substr(s, 0, maxCodePoints). */
+  /** Tronque comme mb_substr(s, 0, maxCodePoints), en points de code. */
   public static String truncate(String s, int maxCodePoints) {
     if (length(s) <= maxCodePoints) {
       return s;
@@ -34,7 +36,7 @@ public final class PhpString {
     return s.substring(0, s.offsetByCodePoints(0, maxCodePoints));
   }
 
-  /** mb_strtolower. */
+  /** Met en minuscules comme mb_strtolower (règles Unicode, sans locale). */
   public static String toLower(String s) {
     return s.toLowerCase(Locale.ROOT);
   }

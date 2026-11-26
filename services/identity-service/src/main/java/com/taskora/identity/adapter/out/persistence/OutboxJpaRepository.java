@@ -5,27 +5,24 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.NativeQuery;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /** Accès à l'outbox ; verrouillage SELECT … FOR UPDATE SKIP LOCKED (A10, A11). */
 public interface OutboxJpaRepository extends JpaRepository<OutboxMessageEntity, Long> {
 
-  @Query(
-      value =
-          "SELECT * FROM outbox_message WHERE destination = :destination AND status = 'PENDING'"
-              + " AND available_at <= :now ORDER BY id LIMIT :limit FOR UPDATE SKIP LOCKED",
-      nativeQuery = true)
+  @NativeQuery(
+      "SELECT * FROM outbox_message WHERE destination = :destination AND status = 'PENDING'"
+          + " AND available_at <= :now ORDER BY id LIMIT :limit FOR UPDATE SKIP LOCKED")
   List<OutboxMessageEntity> lockDue(
       @Param("destination") String destination,
       @Param("now") LocalDateTime now,
       @Param("limit") int limit);
 
-  @Query(
-      value =
-          "SELECT * FROM outbox_message WHERE event_id = :eventId AND status = 'PENDING'"
-              + " FOR UPDATE SKIP LOCKED",
-      nativeQuery = true)
+  @NativeQuery(
+      "SELECT * FROM outbox_message WHERE event_id = :eventId AND status = 'PENDING'"
+          + " FOR UPDATE SKIP LOCKED")
   Optional<OutboxMessageEntity> lockPending(@Param("eventId") String eventId);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -51,6 +48,7 @@ public interface OutboxJpaRepository extends JpaRepository<OutboxMessageEntity, 
   int markFailed(@Param("eventId") String eventId, @Param("error") String error);
 
   @Modifying
-  @Query("DELETE FROM OutboxMessageEntity m WHERE m.status = 'DELIVERED' AND m.deliveredAt < :before")
+  @Query(
+      "DELETE FROM OutboxMessageEntity m WHERE m.status = 'DELIVERED' AND m.deliveredAt < :before")
   int purgeDelivered(@Param("before") LocalDateTime before);
 }

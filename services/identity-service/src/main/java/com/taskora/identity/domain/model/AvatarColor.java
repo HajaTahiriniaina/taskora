@@ -14,6 +14,12 @@ public record AvatarColor(String value) {
   private static final Pattern HEX = Pattern.compile("\\A#[0-9a-fA-F]{6}\\z");
   static final String INVALID = "Couleur d'avatar invalide.";
 
+  /**
+   * Tire une couleur de la palette, comme Symfony à l'inscription.
+   *
+   * @param random générateur (déterministe en test)
+   * @return couleur de la palette
+   */
   public static AvatarColor random(RandomGenerator random) {
     return new AvatarColor(PALETTE.get(random.nextInt(PALETTE.size())));
   }

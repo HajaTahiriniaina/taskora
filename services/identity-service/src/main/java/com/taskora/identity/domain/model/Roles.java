@@ -8,6 +8,11 @@ import java.util.List;
 public record Roles(List<String> stored) {
   public static final String ROLE_USER = "ROLE_USER";
 
+  /**
+   * Copie immuable des rôles stockés.
+   *
+   * @param stored rôles en base ({@code []} aujourd'hui)
+   */
   public Roles {
     stored = List.copyOf(stored);
   }

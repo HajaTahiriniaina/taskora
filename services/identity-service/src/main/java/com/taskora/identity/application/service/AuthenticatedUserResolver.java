@@ -14,6 +14,12 @@ public class AuthenticatedUserResolver implements ResolveAuthenticatedUserUseCas
   private final TokenVerifierPort verifier;
   private final UserRepositoryPort users;
 
+  /**
+   * Assemble le cas d'utilisation.
+   *
+   * @param verifier vérificateur de jetons
+   * @param users stockage des comptes
+   */
   public AuthenticatedUserResolver(TokenVerifierPort verifier, UserRepositoryPort users) {
     this.verifier = verifier;
     this.users = users;

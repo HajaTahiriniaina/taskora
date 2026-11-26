@@ -15,10 +15,17 @@ import java.util.TreeSet;
 /** Reprise idempotente (A14, identity-migration.md §3-4). */
 public class LegacyImportService implements ImportLegacyUsersUseCase {
   static final String DUPLICATES_CHECK = "normalizedEmailDuplicates";
+  static final String ABSENT = "absent";
 
   private final LegacyUserSourcePort source;
   private final UnitOfWorkPort unitOfWork;
 
+  /**
+   * Assemble le cas d'utilisation.
+   *
+   * @param source accès à la source et à la cible de la reprise
+   * @param unitOfWork transaction de la copie
+   */
   public LegacyImportService(LegacyUserSourcePort source, UnitOfWorkPort unitOfWork) {
     this.source = source;
     this.unitOfWork = unitOfWork;
@@ -52,8 +59,8 @@ public class LegacyImportService implements ImportLegacyUsersUseCase {
     for (String key : new TreeSet<>(union(sourceMetrics, targetMetrics))) {
       String expected = sourceMetrics.get(key);
       String actual = targetMetrics.get(key);
-      metrics.put("source." + key, String.valueOf(expected));
-      metrics.put("target." + key, String.valueOf(actual));
+      metrics.put("source." + key, Objects.toString(expected, ABSENT));
+      metrics.put("target." + key, Objects.toString(actual, ABSENT));
       if (!Objects.equals(expected, actual)) {
         failed.add(key);
       }

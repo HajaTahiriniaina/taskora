@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------- build
 # JDK Temurin 25 + wrapper Maven 3.10.2 (l'image maven:3.10.2-eclipse-temurin-25 n'existe pas
 # pour toutes les plateformes, ex. arm64).
-FROM eclipse-temurin:25-jdk AS build
+FROM eclipse-temurin:25-jdk@sha256:ce2ef9d2d67a68de5e196d4de9d743327c44a10b57fe02ec39f572c652cacfd3 AS build
 WORKDIR /build
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -ntp -q -pl identity-service -
  && java -Djarmode=tools -jar /build/app.jar extract --layers --launcher --destination /build/extracted
 
 # ---------------------------------------------------------------- exécution
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:25-jre@sha256:4ed132f6832e9804b123e89a849a7b4502756ae64a4ee08ebab939d9d5d0a9fa
 RUN groupadd --system --gid 10001 identity \
  && useradd --system --uid 10001 --gid identity --no-create-home --shell /usr/sbin/nologin identity
 WORKDIR /app

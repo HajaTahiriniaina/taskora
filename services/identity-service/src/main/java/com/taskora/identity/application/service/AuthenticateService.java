@@ -19,6 +19,13 @@ public class AuthenticateService implements AuthenticateUseCase {
   private final PasswordHasherPort hasher;
   private final TokenIssuerPort tokens;
 
+  /**
+   * Assemble le cas d'utilisation.
+   *
+   * @param users stockage des comptes
+   * @param hasher hachage compatible Symfony
+   * @param tokens émetteur de jetons
+   */
   public AuthenticateService(
       UserRepositoryPort users, PasswordHasherPort hasher, TokenIssuerPort tokens) {
     this.users = users;

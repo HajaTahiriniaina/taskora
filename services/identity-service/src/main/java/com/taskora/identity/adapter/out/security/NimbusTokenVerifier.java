@@ -13,6 +13,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.Map;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Validation au format Lexik, précédence du §8.1 (A1) : jeton illisible → INVALID ; now ≥ exp →
@@ -34,7 +35,7 @@ public class NimbusTokenVerifier implements TokenVerifierPort {
     if (parts.length != 3 || parts[0].isEmpty() || parts[1].isEmpty()) {
       throw rejected(TokenRejection.INVALID);
     }
-    Map<String, Object> header = json(parts[0]);
+    final Map<String, Object> header = json(parts[0]);
     Map<String, Object> claims = json(parts[1]);
     long now = clock.instant().getEpochSecond();
 
@@ -84,7 +85,7 @@ public class NimbusTokenVerifier implements TokenVerifierPort {
   }
 
   /** Date numérique (nombre ou chaîne numérique, comme lcobucci) ; absente → null. */
-  private static Double numericDate(Map<String, Object> claims, String name) {
+  private static @Nullable Double numericDate(Map<String, Object> claims, String name) {
     Object value = claims.get(name);
     if (value == null) {
       return null;

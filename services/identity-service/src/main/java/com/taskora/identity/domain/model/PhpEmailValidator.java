@@ -12,11 +12,16 @@ import java.util.regex.Pattern;
 public final class PhpEmailValidator {
   private static final int MAX_BYTES = 320;
 
-  private static final String ATOM = "[\\x21\\x23-\\x27\\x2A\\x2B\\x2D\\x2F-\\x39\\x3D\\x3F\\x5E-\\x7E]+";
-  private static final String QUOTED =
-      "\\x22(?:[\\x01-\\x08\\x0B\\x0C\\x0E-\\x1F\\x21\\x23-\\x5B\\x5D-\\x7F]|(?:\\x5C[\\x00-\\x7F]))*\\x22";
+  private static final String ATOM =
+      "[\\x21\\x23-\\x27\\x2A\\x2B\\x2D\\x2F-\\x39\\x3D\\x3F\\x5E-\\x7E]+";
+  private static final String QUOTED_CHAR =
+      "[\\x01-\\x08\\x0B\\x0C\\x0E-\\x1F\\x21\\x23-\\x5B\\x5D-\\x7F]";
+  private static final String QUOTED = "\\x22(?:" + QUOTED_CHAR + "|(?:\\x5C[\\x00-\\x7F]))*\\x22";
   private static final String WORD = "(?:(?:" + ATOM + ")|(?:" + QUOTED + "))";
-  private static final String COUNTED = "(?:(?:\\x22?\\x5C[\\x00-\\x7E]\\x22?)|(?:\\x22?[^\\x5C\\x22]\\x22?))";
+  // Sonar S5998 (récursion des répétitions alternées) : l'entrée est bornée à 320 octets par
+  // isValid avant toute confrontation à l'expression, ce qui borne la pile.
+  private static final String COUNTED =
+      "(?:(?:\\x22?\\x5C[\\x00-\\x7E]\\x22?)|(?:\\x22?[^\\x5C\\x22]\\x22?))";
   private static final String HOSTNAME =
       "(?:(?!.*[^.]{64,})(?:(?:(?:xn--)?[a-z0-9]+(?:-+[a-z0-9]+)*\\.){1,126}){1,}"
           + "(?:(?:[a-z][a-z0-9]*)|(?:(?:xn--)[a-z0-9]+))(?:-+[a-z0-9]+)*)";
@@ -54,6 +59,12 @@ public final class PhpEmailValidator {
 
   private PhpEmailValidator() {}
 
+  /**
+   * Indique si filter_var accepterait l'adresse.
+   *
+   * @param email adresse déjà trimée, tronquée et en minuscules
+   * @return {@code true} si l'adresse est valide ; {@code false} au-delà de 320 octets
+   */
   public static boolean isValid(String email) {
     byte[] bytes = email.getBytes(StandardCharsets.UTF_8);
     if (bytes.length > MAX_BYTES) {

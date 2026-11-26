@@ -44,7 +44,9 @@ public class MeController {
             Optional.ofNullable(name),
             Optional.ofNullable(avatarColor),
             Optional.ofNullable(currentPassword),
-            Optional.ofNullable(newPassword).filter(value -> !value.isEmpty()));
+            newPassword == null || newPassword.isEmpty()
+                ? Optional.empty()
+                : Optional.of(newPassword));
     return UserResponse.of(update.update(me.id(), change));
   }
 }

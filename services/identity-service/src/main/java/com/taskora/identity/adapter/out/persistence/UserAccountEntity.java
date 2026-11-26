@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -16,7 +17,7 @@ import org.hibernate.type.SqlTypes;
 public class UserAccountEntity {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Integer id;
+  private @Nullable Integer id;
 
   @Column(name = "email", nullable = false, length = 180)
   private String email;
@@ -41,8 +42,10 @@ public class UserAccountEntity {
 
   /** UTC, propre à identity. */
   @Column(name = "updated_at")
-  private LocalDateTime updatedAt;
+  private @Nullable LocalDateTime updatedAt;
 
+  /** Constructeur réservé à JPA (les champs sont renseignés par Hibernate). */
+  @SuppressWarnings("initialization.fields.uninitialized")
   protected UserAccountEntity() {}
 
   UserAccountEntity(
@@ -60,8 +63,13 @@ public class UserAccountEntity {
     this.createdAt = createdAt;
   }
 
+  /** Identifiant généré, présent dès que l'entité a été insérée (IDENTITY). */
   Integer getId() {
-    return id;
+    Integer value = id;
+    if (value == null) {
+      throw new IllegalStateException("Entité non persistée");
+    }
+    return value;
   }
 
   String getEmail() {

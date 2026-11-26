@@ -8,7 +8,9 @@ public record Email(String value) {
   static final String REQUIRED = "Le champ \"email\" est obligatoire.";
   static final String INVALID = "Adresse e-mail invalide.";
 
-  /** trim → obligatoire → tronqué à 180 → minuscules → format. */
+  /**
+   * Normalise l'e-mail d'inscription : trim, obligatoire, 180 points de code, minuscules, format.
+   */
   public static Email fromRegistration(String raw) {
     String trimmed = raw == null ? "" : PhpString.trim(raw);
     if (trimmed.isEmpty()) {
@@ -21,6 +23,12 @@ public record Email(String value) {
     return new Email(normalized);
   }
 
+  /**
+   * Reprend un e-mail déjà normalisé (lu en base), sans contrôle.
+   *
+   * @param value e-mail stocké
+   * @return e-mail
+   */
   public static Email ofStored(String value) {
     return new Email(value);
   }

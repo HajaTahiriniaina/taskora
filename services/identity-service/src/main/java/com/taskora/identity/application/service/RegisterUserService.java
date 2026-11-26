@@ -49,7 +49,18 @@ public class RegisterUserService implements RegisterUserUseCase {
   private final RandomGenerator random;
 
   /**
+   * Assemble le cas d'utilisation.
+   *
+   * @param users stockage des comptes
+   * @param hasher hachage compatible Symfony
+   * @param tokens émetteur de jetons
+   * @param projection projection taskora.user
+   * @param outbox outbox transactionnelle
+   * @param unitOfWork transaction de l'inscription
+   * @param delivery livraison synchrone du premier claim, après validation
+   * @param clock horloge (created_at, événements, échéances)
    * @param legacyZone fuseau de created_at (Europe/Paris, comme PHP)
+   * @param random tirage de la couleur d'avatar
    */
   public RegisterUserService(
       UserRepositoryPort users,
@@ -76,8 +87,9 @@ public class RegisterUserService implements RegisterUserUseCase {
 
   @Override
   public AuthResult register(RegisterUserCommand command) {
-    // Ordre des contrôles : name → email → longueur minimale puis maximale du mot de passe → unicité.
-    PersonName name = PersonName.of(command.name());
+    // Ordre des contrôles : name → email → longueur minimale puis maximale du mot de passe →
+    // unicité.
+    final PersonName name = PersonName.of(command.name());
     Email email = Email.fromRegistration(command.email());
     PlainPassword password = PlainPassword.of(command.password());
     password.requireMinimumLength();
@@ -101,31 +113,32 @@ public class RegisterUserService implements RegisterUserUseCase {
     UUID registeredEventId = UUID.randomUUID();
 
     User user =
-        unitOfWork.inTransaction(
-            () -> {
-              User created = users.insert(candidate);
-              projection.upsert(created);
-              outbox.appendInvitationClaim(
-                  new InvitationClaim(immediateClaimId, created.id(), created.email()), now);
-              outbox.appendInvitationClaim(
-                  new InvitationClaim(catchUpClaimId, created.id(), created.email()),
-                  now.plus(CATCH_UP_DELAY));
-              outbox.appendEvent(
-                  new UserRegistered(
-                      registeredEventId,
-                      now,
-                      created.id(),
-                      created.email().value(),
-                      created.name().value(),
-                      created.avatarColor().value()));
-              return created;
-            });
+        unitOfWork.inTransaction(() -> {
+          User created = users.insert(candidate);
+          projection.upsert(created);
+          outbox.appendInvitationClaim(
+              new InvitationClaim(immediateClaimId, created.id(), created.email()), now);
+          outbox.appendInvitationClaim(
+              new InvitationClaim(catchUpClaimId, created.id(), created.email()),
+              now.plus(CATCH_UP_DELAY));
+          outbox.appendEvent(
+              new UserRegistered(
+                  registeredEventId,
+                  now,
+                  created.id(),
+                  created.email().value(),
+                  created.name().value(),
+                  created.avatarColor().value()));
+          return created;
+        });
 
     deliverImmediately(immediateClaimId, user);
     return new AuthResult(tokens.issue(user), UserViews.of(user));
   }
 
-  /** Livraison synchrone après validation ; un échec laisse le message au relais (201 quand même). */
+  /**
+   * Livraison synchrone après validation ; un échec laisse le message au relais (201 quand même).
+   */
   private void deliverImmediately(UUID claimId, User user) {
     try {
       if (!delivery.deliverNow(claimId)) {

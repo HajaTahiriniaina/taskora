@@ -27,6 +27,14 @@ public class OutboxDeliveryService implements DeliverPendingMessagesUseCase {
   private final UnitOfWorkPort unitOfWork;
   private final Clock clock;
 
+  /**
+   * Assemble le relais.
+   *
+   * @param outbox messages d'outbox
+   * @param client client de l'endpoint Symfony
+   * @param unitOfWork transaction tenant les verrous du lot
+   * @param clock horloge des échéances
+   */
   public OutboxDeliveryService(
       OutboxPort outbox, InvitationClaimPort client, UnitOfWorkPort unitOfWork, Clock clock) {
     this.outbox = outbox;
@@ -39,26 +47,24 @@ public class OutboxDeliveryService implements DeliverPendingMessagesUseCase {
   @Override
   public int deliverDue(int batchSize) {
     Instant now = clock.instant();
-    return unitOfWork.inTransaction(
-        () -> {
-          // Les verrous (FOR UPDATE SKIP LOCKED) sont tenus jusqu'à la fin du lot.
-          List<PendingClaim> due = outbox.lockDueClaims(now, batchSize);
-          for (PendingClaim claim : due) {
-            deliver(claim, now);
-          }
-          return due.size();
-        });
+    return unitOfWork.inTransaction(() -> {
+      // Les verrous (FOR UPDATE SKIP LOCKED) sont tenus jusqu'à la fin du lot.
+      List<PendingClaim> due = outbox.lockDueClaims(now, batchSize);
+      for (PendingClaim claim : due) {
+        deliver(claim, now);
+      }
+      return due.size();
+    });
   }
 
   @Override
   public boolean deliverNow(UUID eventId) {
     Instant now = clock.instant();
-    return unitOfWork.inTransaction(
-        () ->
-            outbox
-                .lockClaim(eventId)
-                .map(claim -> deliver(claim, now) == ClaimOutcome.DELIVERED)
-                .orElse(false));
+    return unitOfWork.inTransaction(() ->
+        outbox
+            .lockClaim(eventId)
+            .map(claim -> deliver(claim, now) == ClaimOutcome.DELIVERED)
+            .orElse(false));
   }
 
   private ClaimOutcome deliver(PendingClaim pending, Instant now) {
@@ -92,6 +98,7 @@ public class OutboxDeliveryService implements DeliverPendingMessagesUseCase {
               attempts);
         }
       }
+      default -> throw new IllegalStateException("Résultat de livraison inconnu : " + outcome);
     }
     return outcome;
   }

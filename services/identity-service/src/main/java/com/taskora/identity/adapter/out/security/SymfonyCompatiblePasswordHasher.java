@@ -27,13 +27,18 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
   private final int bcryptCost;
   private final SecureRandom random = new SecureRandom();
   private final Argon2PasswordEncoder argon2 = new Argon2PasswordEncoder(16, 32, 1, 65536, 4);
-  private volatile String dummyHash;
+
+  /** Hash factice $2y$ au coût configuré, prêt dès le démarrage (A2, SC-IDENT-008). */
+  private final String dummyHash;
 
   public SymfonyCompatiblePasswordHasher(int bcryptCost) {
     if (bcryptCost < 4 || bcryptCost > 31) {
       throw new IllegalArgumentException("Coût bcrypt hors de [4, 31] : " + bcryptCost);
     }
     this.bcryptCost = bcryptCost;
+    byte[] secret = new byte[32];
+    random.nextBytes(secret);
+    this.dummyHash = bcrypt(HexFormat.of().formatHex(secret), bcryptCost, random);
   }
 
   @Override
@@ -42,7 +47,7 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
       // Garde défensive : le domaine refuse avant (E15).
       throw new PasswordTooLongException();
     }
-    return new HashedPassword(bcrypt(password.value()));
+    return new HashedPassword(bcrypt(password.value(), bcryptCost, random));
   }
 
   @Override
@@ -68,30 +73,14 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
   @Override
   public void verifyAgainstDummy(PlainPassword password) {
     try {
-      BCrypt.checkpw(bcryptInput(password.value()), dummyHash());
+      BCrypt.checkpw(bcryptInput(password.value()), dummyHash);
     } catch (RuntimeException e) {
       // Résultat ignoré : seul le temps de calcul compte.
     }
   }
 
-  private String dummyHash() {
-    String hash = dummyHash;
-    if (hash == null) {
-      synchronized (this) {
-        hash = dummyHash;
-        if (hash == null) {
-          byte[] secret = new byte[32];
-          random.nextBytes(secret);
-          hash = bcrypt(HexFormat.of().formatHex(secret));
-          dummyHash = hash;
-        }
-      }
-    }
-    return hash;
-  }
-
-  private String bcrypt(String plain) {
-    return BCrypt.hashpw(bcryptInput(plain), BCrypt.gensalt(BCRYPT_PREFIX, bcryptCost, random));
+  private static String bcrypt(String plain, int cost, SecureRandom random) {
+    return BCrypt.hashpw(bcryptInput(plain), BCrypt.gensalt(BCRYPT_PREFIX, cost, random));
   }
 
   private static boolean isBcrypt(String encoded) {
@@ -106,10 +95,7 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
   static byte[] bcryptInput(String plain) {
     byte[] bytes = plain.getBytes(StandardCharsets.UTF_8);
     if (bytes.length > BCRYPT_MAX_BYTES || plain.indexOf('\0') >= 0) {
-      bytes =
-          Base64.getEncoder()
-              .encodeToString(sha512(bytes))
-              .getBytes(StandardCharsets.US_ASCII);
+      bytes = Base64.getEncoder().encodeToString(sha512(bytes)).getBytes(StandardCharsets.US_ASCII);
     }
     return bytes.length > BCRYPT_MAX_BYTES ? Arrays.copyOf(bytes, BCRYPT_MAX_BYTES) : bytes;
   }

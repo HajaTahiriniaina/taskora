@@ -14,18 +14,19 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * API sans état : pas de session ni de CSRF (jeton porté par l'en-tête Authorization, aucun cookie),
- * /api/auth/** public, tout le reste authentifié par le filtre compatible Lexik (A1, A4).
+ * API sans état : pas de session ni de CSRF (jeton porté par l'en-tête Authorization, aucun
+ * cookie), /api/auth/** public, tout le reste authentifié par le filtre compatible Lexik (A1, A4).
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnWebApplication
 public class SecurityConfig {
 
   @Bean
-  public SecurityFilterChain apiSecurity(HttpSecurity http, ResolveAuthenticatedUserUseCase resolver)
-      throws Exception {
+  public SecurityFilterChain apiSecurity(
+      HttpSecurity http, ResolveAuthenticatedUserUseCase resolver) throws Exception {
     LexikAuthenticationEntryPoint entryPoint = new LexikAuthenticationEntryPoint();
-    // Filtre instancié ici (pas un bean) : il ne doit pas être enregistré une seconde fois par Boot.
+    // Filtre instancié ici (pas un bean) : il ne doit pas être enregistré une seconde fois par
+    // Boot.
     LexikCompatibleJwtFilter jwtFilter =
         new LexikCompatibleJwtFilter(resolver, new LexikTokenExtractor(), entryPoint);
     return http.csrf(AbstractHttpConfigurer::disable)
@@ -35,12 +36,12 @@ public class SecurityConfig {
         .logout(AbstractHttpConfigurer::disable)
         .requestCache(AbstractHttpConfigurer::disable)
         .anonymous(a -> {})
-        .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers("/api/auth/**", "/error", "/actuator/health/**", "/actuator/health")
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated())
+        .authorizeHttpRequests(auth ->
+            auth.requestMatchers(
+                    "/api/auth/**", "/error", "/actuator/health/**", "/actuator/health")
+                .permitAll()
+                .anyRequest()
+                .authenticated())
         .exceptionHandling(e -> e.authenticationEntryPoint(entryPoint))
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
         .build();

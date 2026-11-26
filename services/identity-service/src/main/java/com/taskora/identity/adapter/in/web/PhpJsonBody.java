@@ -1,6 +1,7 @@
 package com.taskora.identity.adapter.in.web;
 
 import com.taskora.identity.domain.exception.ValidationException;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
@@ -54,7 +55,7 @@ public final class PhpJsonBody {
    * Inscription et connexion : null si la clé est absente ; présente et non chaîne (null compris) →
    * ValidationException("Le champ \"key\" doit être une chaîne de caractères.") (E17, E19).
    */
-  public String requiredString(String key) {
+  public @Nullable String requiredString(String key) {
     JsonNode value = object.get(key);
     if (value == null) {
       return null;
@@ -63,7 +64,7 @@ public final class PhpJsonBody {
   }
 
   /** PATCH /api/me : null si absente ou null ; autre non-chaîne → même exception (E17). */
-  public String optionalString(String key) {
+  public @Nullable String optionalString(String key) {
     JsonNode value = object.get(key);
     if (value == null || value.isNull()) {
       return null;
@@ -73,7 +74,7 @@ public final class PhpJsonBody {
 
   private static String asString(String key, JsonNode value) {
     if (!value.isString()) {
-      throw new ValidationException(ErrorMessages.notAString(key));
+      throw new ValidationException(ErrorMessages.notString(key));
     }
     return value.stringValue();
   }

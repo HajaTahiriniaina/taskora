@@ -8,9 +8,11 @@ import com.taskora.identity.domain.exception.TokenRejectedException;
 import com.taskora.identity.domain.exception.ValidationException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +30,14 @@ public class ApiErrorHandler {
 
   @ExceptionHandler(ValidationException.class)
   public ResponseEntity<Map<String, String>> validation(ValidationException e) {
-    return error(HttpStatus.BAD_REQUEST, e.getMessage());
+    String message = e.getMessage();
+    return error(HttpStatus.BAD_REQUEST, message == null ? ErrorMessages.INVALID_JSON : message);
+  }
+
+  /** Corps au-delà de 64 Kio (A18, SC-IDENT-035). */
+  @ExceptionHandler(RequestBodyTooLargeException.class)
+  public ResponseEntity<Map<String, String>> bodyTooLarge() {
+    return error(HttpStatus.CONTENT_TOO_LARGE, ErrorMessages.BODY_TOO_LARGE);
   }
 
   @ExceptionHandler(PasswordTooLongException.class)
@@ -61,9 +70,8 @@ public class ApiErrorHandler {
   public ResponseEntity<Map<String, String>> methodNotAllowed(
       HttpRequestMethodNotSupportedException e) {
     HttpHeaders headers = new HttpHeaders();
-    if (e.getSupportedHttpMethods() != null) {
-      headers.setAllow(e.getSupportedHttpMethods());
-    }
+    Set<HttpMethod> supported = e.getSupportedHttpMethods();
+    headers.setAllow(supported == null ? Set.of() : supported);
     return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
         .headers(headers)
         .contentType(MediaType.APPLICATION_JSON)

@@ -1,6 +1,7 @@
 package com.taskora.identity.adapter.in.web.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.http.HttpHeaders;
 
 /**
@@ -11,7 +12,7 @@ public final class LexikTokenExtractor {
   private static final String PREFIX = "Bearer";
 
   /** Le jeton, ou null s'il est absent (→ « JWT Token not found »). */
-  public String extract(HttpServletRequest request) {
+  public @Nullable String extract(HttpServletRequest request) {
     String header = request.getHeader(HttpHeaders.AUTHORIZATION);
     if (header == null || header.isEmpty()) {
       return null;

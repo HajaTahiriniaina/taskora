@@ -4,6 +4,7 @@ import com.taskora.identity.application.port.in.DeliverPendingMessagesUseCase;
 import com.taskora.identity.application.port.in.ImportLegacyUsersUseCase;
 import com.taskora.identity.application.port.in.ImportReport;
 import com.taskora.identity.application.port.in.VerificationReport;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.slf4j.Logger;
@@ -21,7 +22,7 @@ import org.springframework.boot.ExitCodeGenerator;
  *   <li>{@code --identity.outbox-drain} : livre les messages d'invitation dus puis s'arrête.
  * </ul>
  *
- * Code de sortie ≠ 0 si les contrôles sont incohérents. La sortie ne contient que des nombres et
+ * <p>Code de sortie ≠ 0 si les contrôles sont incohérents. La sortie ne contient que des nombres et
  * des empreintes.
  */
 public class LegacyImportRunner implements ApplicationRunner, ExitCodeGenerator {
@@ -43,15 +44,17 @@ public class LegacyImportRunner implements ApplicationRunner, ExitCodeGenerator 
   @Override
   public void run(ApplicationArguments args) {
     if (args.containsOption(IMPORT_OPTION)) {
-      String mode = String.join(",", args.getOptionValues(IMPORT_OPTION));
-      exitCode = switch (mode) {
-        case "run" -> runImport();
-        case "verify" -> verify();
-        default -> {
-          LOG.error("--{} attend run ou verify", IMPORT_OPTION);
-          yield 2;
-        }
-      };
+      List<String> values = args.getOptionValues(IMPORT_OPTION);
+      String mode = values == null ? "" : String.join(",", values);
+      exitCode =
+          switch (mode) {
+            case "run" -> runImport();
+            case "verify" -> verify();
+            default -> {
+              LOG.error("--{} attend run ou verify", IMPORT_OPTION);
+              yield 2;
+            }
+          };
     } else if (args.containsOption(DRAIN_OPTION)) {
       int total = 0;
       int processed;

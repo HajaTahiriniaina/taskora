@@ -51,18 +51,18 @@ public class LexikKeyLoader {
     PrivateKey key;
     try {
       JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
-      if (pem instanceof PKCS8EncryptedPrivateKeyInfo encrypted) {
-        InputDecryptorProvider decryptor =
-            new JceOpenSSLPKCS8DecryptorProviderBuilder()
-                .setProvider(new BouncyCastleProvider())
-                .build(passphrase);
-        key = converter.getPrivateKey(encrypted.decryptPrivateKeyInfo(decryptor));
-      } else if (pem instanceof PrivateKeyInfo info) {
-        key = converter.getPrivateKey(info);
-      } else if (pem instanceof PEMKeyPair pair) {
-        key = converter.getPrivateKey(pair.getPrivateKeyInfo());
-      } else {
-        throw new IllegalStateException("Clé privée JWT : format PEM non pris en charge");
+      switch (pem) {
+        case PKCS8EncryptedPrivateKeyInfo encrypted -> {
+          InputDecryptorProvider decryptor =
+              new JceOpenSSLPKCS8DecryptorProviderBuilder()
+                  .setProvider(new BouncyCastleProvider())
+                  .build(passphrase);
+          key = converter.getPrivateKey(encrypted.decryptPrivateKeyInfo(decryptor));
+        }
+        case PrivateKeyInfo info -> key = converter.getPrivateKey(info);
+        case PEMKeyPair pair -> key = converter.getPrivateKey(pair.getPrivateKeyInfo());
+        case null, default ->
+            throw new IllegalStateException("Clé privée JWT : format PEM non pris en charge");
       }
     } catch (IllegalStateException e) {
       throw e;

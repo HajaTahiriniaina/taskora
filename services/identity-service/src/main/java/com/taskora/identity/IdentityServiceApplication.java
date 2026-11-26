@@ -10,17 +10,24 @@ import org.springframework.context.ConfigurableApplicationContext;
 /** Point d'entrée d'identity-service. */
 // Pas d'utilisateur en mémoire ni de mot de passe généré : l'authentification est le filtre JWT.
 @SpringBootApplication(
-    excludeName = "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration")
+    excludeName =
+        "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration")
 public class IdentityServiceApplication {
 
+  /**
+   * Démarre le service HTTP ; avec {@code --identity.legacy-import=run|verify} ou {@code
+   * --identity.outbox-drain}, exécute la commande ponctuelle sans serveur web et sort avec son code
+   * (≠ 0 si les contrôles de reprise sont incohérents).
+   *
+   * @param args arguments de la ligne de commande Spring Boot
+   */
   public static void main(String[] args) {
     SpringApplication app = new SpringApplication(IdentityServiceApplication.class);
     boolean command =
         Arrays.stream(args)
-            .anyMatch(
-                a ->
-                    a.startsWith("--identity.legacy-import")
-                        || a.startsWith("--identity.outbox-drain"));
+            .anyMatch(a ->
+                a.startsWith("--identity.legacy-import")
+                    || a.startsWith("--identity.outbox-drain"));
     if (!command) {
       app.run(args);
       return;

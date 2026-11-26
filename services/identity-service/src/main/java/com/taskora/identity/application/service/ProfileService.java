@@ -28,6 +28,16 @@ public class ProfileService implements GetProfileUseCase, UpdateProfileUseCase {
   private final UnitOfWorkPort unitOfWork;
   private final Clock clock;
 
+  /**
+   * Assemble les cas d'utilisation du profil.
+   *
+   * @param users stockage des comptes
+   * @param hasher hachage du nouveau mot de passe
+   * @param projection projection taskora.user
+   * @param outbox événements UserProfileUpdated
+   * @param unitOfWork transaction unique de la modification
+   * @param clock horloge des événements
+   */
   public ProfileService(
       UserRepositoryPort users,
       PasswordHasherPort hasher,
@@ -50,29 +60,28 @@ public class ProfileService implements GetProfileUseCase, UpdateProfileUseCase {
 
   @Override
   public UserView update(UserId id, ProfileUpdate update) {
-    return unitOfWork.inTransaction(
-        () -> {
-          User current = load(id);
-          // Toute la validation a lieu ici ; une exception n'écrit rien (A8, SC-IDENT-019).
-          ProfileUpdateResult result = current.updateProfile(update, hasher);
-          if (!result.anyChange()) {
-            return UserViews.of(current);
-          }
-          User next = result.user();
-          users.update(next);
-          projection.upsert(next);
-          if (!result.changedFields().isEmpty()) {
-            outbox.appendEvent(
-                new UserProfileUpdated(
-                    UUID.randomUUID(),
-                    clock.instant(),
-                    next.id(),
-                    next.name().value(),
-                    next.avatarColor().value(),
-                    List.copyOf(result.changedFields())));
-          }
-          return UserViews.of(next);
-        });
+    return unitOfWork.inTransaction(() -> {
+      User current = load(id);
+      // Toute la validation a lieu ici ; une exception n'écrit rien (A8, SC-IDENT-019).
+      ProfileUpdateResult result = current.updateProfile(update, hasher);
+      if (!result.anyChange()) {
+        return UserViews.of(current);
+      }
+      User next = result.user();
+      users.update(next);
+      projection.upsert(next);
+      if (!result.changedFields().isEmpty()) {
+        outbox.appendEvent(
+            new UserProfileUpdated(
+                UUID.randomUUID(),
+                clock.instant(),
+                next.id(),
+                next.name().value(),
+                next.avatarColor().value(),
+                List.copyOf(result.changedFields())));
+      }
+      return UserViews.of(next);
+    });
   }
 
   /** Compte disparu entre la validation du jeton et l'appel : même refus que le filtre. */
