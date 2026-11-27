@@ -166,11 +166,20 @@ jobs:
           if [ -n "$SONAR_PROJECT_KEY" ]; then args+=(-Dsonar.projectKey="$SONAR_PROJECT_KEY"); fi
           ./mvnw -B -ntp -pl identity-service -am verify sonar:sonar "${args[@]}"
 
+  # Build puis analyse Trivy de la même image (C-B1), sans push. Trivy tourne depuis son image
+  # officielle figée par digest (pas d'action tierce) et lit l'image en archive (docker save) :
+  # pas de socket Docker monté. Bloquant : HIGH/CRITICAL avec correctif disponible, OS et Java.
   identity-image:
+    name: identity-image (build, Trivy)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
+    env:
+      # aquasec/trivy:0.76.2 ; même index multi-architecture sur Docker Hub et sur GHCR
+      # (vérifié par docker buildx imagetools inspect sur les deux).
+      TRIVY_IMAGE_DIGEST: sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+      TRIVY_IMAGES: docker.io/aquasec/trivy:0.76.2 ghcr.io/aquasecurity/trivy:0.76.2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -179,3 +188,119 @@ jobs:
       - name: docker build
         working-directory: .
         run: docker build -f services/identity-service/Dockerfile -t taskora/identity-service:ci services/
+      - name: Archive de l'image et image Trivy (figée par digest)
+        working-directory: .
+        run: |
+          TRIVY_WORK="$RUNNER_TEMP/trivy"
+          TRIVY_CACHE="$RUNNER_TEMP/trivy-cache"
+          echo "TRIVY_WORK=$TRIVY_WORK" >> "$GITHUB_ENV"
+          echo "TRIVY_CACHE=$TRIVY_CACHE" >> "$GITHUB_ENV"
+          mkdir -p "$TRIVY_WORK" "$TRIVY_CACHE"
+          docker save -o "$TRIVY_WORK/identity-image.tar" taskora/identity-service:ci
+          for attempt in 1 2 3; do
+            for ref in $TRIVY_IMAGES; do
+              if docker pull -q "$ref@$TRIVY_IMAGE_DIGEST"; then
+                echo "TRIVY_REF=$ref@$TRIVY_IMAGE_DIGEST" >> "$GITHUB_ENV"
+                exit 0
+              fi
+            done
+            sleep $((attempt * 15))
+          done
+          echo "::error::Image Trivy introuvable (Docker Hub et GHCR)."
+          exit 1
+      - name: Jour (clé de cache Trivy)
+        id: day
+        working-directory: .
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      - name: Cache des bases Trivy (restauration)
+        id: trivy-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ steps.day.outputs.day }}
+          restore-keys: trivy-db-
+      # Base mise à jour si le cache a plus de 6 h (métadonnées Trivy). Dépôts de repli dans l'ordre,
+      # trois tentatives : un échec de téléchargement fait échouer le job (pas d'analyse sur une base périmée).
+      - name: Bases Trivy (vulnérabilités, Java)
+        id: trivy-db
+        working-directory: .
+        run: |
+          trivy() {
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$TRIVY_CACHE":/cache -v "$TRIVY_WORK":/work -v "$GITHUB_WORKSPACE":/repo:ro \
+              -e TRIVY_CACHE_DIR=/cache -e TRIVY_NO_PROGRESS=true \
+              -e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 \
+              -e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1 \
+              "$TRIVY_REF" "$@"
+          }
+          for db in --download-db-only --download-java-db-only; do
+            ok=false
+            for attempt in 1 2 3; do
+              if trivy image "$db"; then ok=true; break; fi
+              echo "::warning::trivy image $db : tentative $attempt en échec."
+              sleep $((attempt * 20))
+            done
+            [ "$ok" = true ] || { echo "::error::Base Trivy indisponible ($db)."; exit 1; }
+          done
+      # Seuil : HIGH/CRITICAL corrigeables (--ignore-unfixed), paquets OS et bibliothèques Java.
+      # Exceptions : services/identity-service/.trivyignore (justification et « exp: », docs/ci/README.md).
+      - name: Trivy (HIGH/CRITICAL corrigeables bloquants)
+        working-directory: .
+        run: |
+          ignore=()
+          if [ -f services/identity-service/.trivyignore ]; then
+            ignore=(--ignorefile /repo/services/identity-service/.trivyignore)
+          else
+            ignore=(--ignorefile "")
+          fi
+          set +e
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$TRIVY_CACHE":/cache -v "$TRIVY_WORK":/work -v "$GITHUB_WORKSPACE":/repo:ro \
+            -e TRIVY_CACHE_DIR=/cache -e TRIVY_NO_PROGRESS=true \
+            "$TRIVY_REF" image --input /work/identity-image.tar \
+            --scanners vuln --pkg-types os,library \
+            --severity HIGH,CRITICAL --ignore-unfixed "${ignore[@]}" \
+            --skip-db-update --skip-java-db-update \
+            --format json --output /work/trivy-identity-image.json --exit-code 1
+          status=$?
+          set -e
+          if [ -s "$TRIVY_WORK/trivy-identity-image.json" ]; then
+            docker run --rm --user "$(id -u):$(id -g)" -v "$TRIVY_WORK":/work -e TRIVY_CACHE_DIR=/tmp \
+              "$TRIVY_REF" convert --scanners vuln --format table --output /work/trivy-identity-image.txt /work/trivy-identity-image.json
+            cat "$TRIVY_WORK/trivy-identity-image.txt"
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::error::Trivy : vulnérabilité HIGH/CRITICAL corrigeable dans l'image identity-service (code $status, voir l'artefact identity-image-trivy)."
+          fi
+          exit "$status"
+      - name: Cache des bases Trivy (sauvegarde)
+        if: always() && steps.trivy-db.outcome == 'success' && steps.trivy-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ steps.day.outputs.day }}
+      # Les rapports ne contiennent que des métadonnées de paquets ; contrôle de fuite par principe
+      # (même motif que frontend.yml) avant toute publication.
+      - name: Contrôle de fuite du rapport Trivy
+        id: scan-report
+        if: always()
+        working-directory: .
+        run: |
+          rm -f "$TRIVY_WORK/identity-image.tar"
+          if grep -rqaE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----' "$TRIVY_WORK"; then
+            rm -rf "$TRIVY_WORK"
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Le rapport Trivy contient un jeton ou une clé privée : non publié."
+            exit 1
+          fi
+          echo "clean=true" >> "$GITHUB_OUTPUT"
+      - name: Rapport Trivy
+        if: always() && steps.scan-report.outputs.clean == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: identity-image-trivy
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/trivy/trivy-identity-image.json
+            ${{ runner.temp }}/trivy/trivy-identity-image.txt
