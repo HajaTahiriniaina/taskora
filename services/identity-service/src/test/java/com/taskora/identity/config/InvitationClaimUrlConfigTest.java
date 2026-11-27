@@ -222,6 +222,10 @@ class InvitationClaimUrlConfigTest {
     static class PropertiesOnly {}
 
     private ApplicationContextRunner runner(String claimSecret) {
+      return runner(claimSecret, "http://board:8080");
+    }
+
+    private ApplicationContextRunner runner(String claimSecret, String claimUrl) {
       Map<String, Object> props = new LinkedHashMap<>();
       props.put("identity.jwt.private-key-path", "/tmp/absent/private.pem");
       props.put("identity.jwt.public-key-path", "/tmp/absent/public.pem");
@@ -232,7 +236,7 @@ class InvitationClaimUrlConfigTest {
       props.put("identity.symfony.internal-secret", SECRET_A);
       props.put("identity.password.bcrypt-cost", "4");
       props.put("identity.outbox.relay.enabled", "false");
-      props.put("identity.invitations.claim-url", "http://board:8080");
+      props.put("identity.invitations.claim-url", claimUrl);
       props.put("identity.invitations.claim-secret", claimSecret);
       return new ApplicationContextRunner()
           .withUserConfiguration(PropertiesOnly.class)
@@ -272,6 +276,34 @@ class InvitationClaimUrlConfigTest {
                 .doesNotContain(SECRET_B)
                 .doesNotContain(SECRET_A);
           });
+    }
+
+    @ParameterizedTest(name = "claim-url = \"{0}\"")
+    @ValueSource(strings = {"", " ", "board:8080", "ftp://board:8080", "http://", "http:///x"})
+    @DisplayName(
+        "m5 (§12.2) — INVITATION_CLAIM_URL vide, relative, sans hôte ou hors http(s) → démarrage"
+            + " refusé, message nommant INVITATION_CLAIM_URL, sans secret")
+    void invalidClaimUrlRefused(String claimUrl, CapturedOutput output) {
+      runner(SECRET_B, claimUrl)
+          .run(context -> {
+            assertThat(context).hasFailed();
+            List<String> messages = new ArrayList<>();
+            for (Throwable t = context.getStartupFailure(); t != null; t = t.getCause()) {
+              messages.add(String.valueOf(t.getMessage()));
+            }
+            assertThat(String.join("\n", messages))
+                .contains("INVITATION_CLAIM_URL")
+                .doesNotContain(SECRET_B)
+                .doesNotContain(SECRET_A);
+          });
+      assertThat(output.getAll()).doesNotContain(SECRET_B).doesNotContain(SECRET_A);
+    }
+
+    @ParameterizedTest(name = "claim-url = \"{0}\"")
+    @ValueSource(strings = {"http://board:8080", "http://api:80", "https://board.exemple.test"})
+    @DisplayName("m5 (§12.2) — INVITATION_CLAIM_URL http(s) absolue avec hôte → démarrage")
+    void validClaimUrlAccepted(String claimUrl) {
+      runner(SECRET_B, claimUrl).run(context -> assertThat(context).hasNotFailed());
     }
   }
 }
