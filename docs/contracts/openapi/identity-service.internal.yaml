@@ -7,7 +7,7 @@ info:
     **Non public.** Jamais routé par nginx (seuls /api/ et /uploads/ le sont). Réseau Docker interne.
     - `POST /internal/invitations/claim` est servi par le **backend Symfony** et appelé par identity-service
       (adapter `SymfonyInvitationClaimClient`, livraison synchrone après l'inscription puis rejeu par l'outbox).
-      Il disparaît à la migration de board-service, qui consommera `UserRegistered`.
+      **Phase 3 (27/11/2026)** : à la bascule de T1, le même contrat est servi par board-service (board-service.internal.yaml) ; identity choisit la cible par `INVITATION_CLAIM_URL` (défaut `SYMFONY_INTERNAL_URL`). La consommation de `UserRegistered` par un broker reste pour plus tard (U7-a).
     - Les schémas `UserRegistered` et `UserProfileUpdated` décrivent les charges écrites dans
       `identity.outbox_message.payload` (destination `broker`, statut `HELD` en phase 1 : pas de RabbitMQ).
       Ils sont destinés à board-service et notification-service.

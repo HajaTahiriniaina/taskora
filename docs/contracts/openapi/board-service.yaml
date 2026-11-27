@@ -1,0 +1,736 @@
+openapi: 3.1.0
+info:
+  title: Taskora board-service
+  version: 0.1.0
+  summary: Tableaux, membres, invitations, listes, cartes, étiquettes, champs, checklists, commentaires, historique, archives et corbeille
+  description: |
+    Contrat **public** de board-service (phase 3). Publié **avant** le code. Statut par tranche :
+    - **T0 (socle) et T1 (tableaux, membres, invitations, corbeille des tableaux) : détaillés ci-dessous.**
+    - T2 à T5 : routes listées dans `x-tranches` (même contrat que Symfony au 27/11/2026, divergences décidées
+      rappelées) ; détaillées avant le début de chaque tranche.
+
+    Les routes, statuts, corps et messages sont ceux du backend Symfony au 27/11/2026 (`backend/src/Controller`),
+    **sauf** les divergences décidées par l'utilisateur (docs/specs/decisions.md), toutes exclues des tests miroir :
+    - **E1** (avec U8-a) : un non-membre reçoit **404**, indiscernable d'une ressource inexistante (statut, corps,
+      en-têtes), jamais 403 ; Symfony est aligné à la bascule de T1 (U8-a), le miroir compare donc aussi ces cas.
+    - **E12** : identifiant de chemin non entier positif → 404 `{"error":"Ressource introuvable."}`.
+    - **E22** : champ texte présent qui n'est pas une chaîne JSON (nombre, booléen, tableau, objet) → 400
+      `Le champ "<nom>" doit être une chaîne de caractères.` (plus de conversion PHP ni de 500) ; `ids` non tableau
+      → 400 `Le champ "ids" doit être un tableau.` ; couleur de plus de 20 caractères → 400 `Couleur invalide.`
+    - **E23** : champ booléen présent qui n'est pas un booléen JSON (`null` compris) → 400 `Le champ "<nom>" doit être un booléen.`
+    - **E28** : pas d'énumération des comptes : membre visé inexistant ou non membre → 404 `Membre introuvable.` ;
+      invitation inexistante ou d'un autre tableau → 404 `Ressource introuvable.`
+    - Concurrence : adhésions et invitations simultanées → 409 (messages actuels), jamais 500.
+    - T2+ : E8 (date invalide → 400 `Date invalide.`), E25, E26, E27, E31 (échéance en UTC), E32, E2 (403).
+    Conservés (comportement actuel) : E13, E24 (rôle d'une invitation par e-mail non mémorisé), E29, E30.
+
+    Règles transverses (identiques à Symfony sauf mention) :
+    - Authentification : `Authorization: Bearer <JWT RS256>` émis par identity-service **ou** Symfony
+      (docs/architecture/backend-hexagonal.md B-ADR-2). Erreurs au format Lexik `{"code":401,"message":…}`
+      + `WWW-Authenticate: Bearer`.
+    - Corps : JSON UTF-8. **Corps vide = `{}`** (le front envoie `favorite` sans corps ; la règle E20 de phase 1 ne
+      s'applique pas ici). Corps non JSON ou JSON scalaire (`"x"`, `42`, `true`, `null`) → 400 `JSON invalide.`
+      Un tableau JSON (`[]`, `[1]`) est traité comme un objet sans clé connue (comportement PHP reproduit,
+      `x-compat`). Clés inconnues ignorées.
+    - Ordre des contrôles : authentification → identifiant de chemin (E12) → **accès** (§5.3 de la spec) →
+      analyse du corps → validation. Un non-membre ne voit jamais un message de validation.
+    - Champs texte : `trim` PHP (espace, \t, \n, \r, \0, \x0B), longueurs en points de code, troncature silencieuse
+      à la longueur maximale ; vide après trim → 400 `Le champ "<nom>" est obligatoire.`
+    - Dates : ATOM avec le décalage de Paris (`2026-12-01T17:00:00+01:00`), secondes entières (B-ADR-11).
+    - Création → 201 ; suppression → 204 sans corps ; 5xx → `{"error":"Erreur interne du serveur."}` sans trace.
+    - Ordres déterministes (R8) : accueil `createdAt` décroissant puis `id` décroissant ; membres et étiquettes par
+      `id` ; listes par `position, id` ; champs par `position, id` ; corbeille `deletedAt` décroissant puis `id` décroissant.
+    - Réponses de Symfony : non-ASCII échappé (`è`) ; équivalence **sémantique** du JSON.
+
+    Références : docs/specs/phase-3-board-service.md, docs/specs/boards-members.md, docs/specs/archives-trash.md,
+    docs/architecture/board-migration.md, docs/contracts/openapi/board-service.internal.yaml.
+servers:
+  - url: /api
+    description: Mêmes routes qu'aujourd'hui ; nginx route chaque tranche vers board-service (`BOARD_Tn_UPSTREAM`)
+tags:
+  - name: boards
+  - name: members
+  - name: trash
+security:
+  - bearerAuth: []
+x-tranches:
+  T0:
+    routes: []
+    scenarios: [SC-BOARD-020, SC-BOARD-021, SC-BOARD-022, SC-BOARD-023, SC-BOARD-024, SC-BOARD-025, SC-BOARD-026, SC-BOARD-027, SC-BOARD-028]
+  T1:
+    status: détaillé
+    routes:
+      - GET /boards
+      - POST /boards
+      - GET /boards/{id}
+      - PATCH /boards/{id}
+      - DELETE /boards/{id}
+      - POST /boards/{id}/favorite
+      - POST /boards/{id}/members
+      - PATCH /boards/{id}/members/{userId}
+      - DELETE /boards/{id}/members/{userId}
+      - DELETE /boards/{id}/invitations/{invId}
+      - GET /trash/boards
+      - POST /trash/boards/{id}/restore
+      - POST /internal/invitations/claim (board-service.internal.yaml)
+  T2:
+    status: listé (à détailler avant T2)
+    routes:
+      - POST /boards/{id}/lists
+      - POST /boards/{id}/lists/reorder
+      - PATCH /lists/{id}
+      - DELETE /lists/{id}
+      - POST /lists/{id}/archive
+      - POST /lists/{id}/restore
+      - GET /lists/{id}/cards
+      - POST /lists/{id}/cards
+      - GET /boards/{id}/cards
+      - GET /cards/{id}
+      - PATCH /cards/{id}
+      - DELETE /cards/{id}
+      - POST /cards/{id}/move
+      - POST /cards/{id}/archive
+      - POST /cards/{id}/restore
+      - POST /cards/{id}/assignees
+      - GET /cards/{id}/activity
+      - GET /boards/{id}/archived
+      - GET /boards/{id}/archived-lists
+      - GET /boards/{id}/trash
+      - POST /trash/cards/{id}/restore
+      - POST /trash/lists/{id}/restore
+    divergences: [E8, E22, E23, E27, E31, E32]
+  T3:
+    status: listé
+    routes:
+      - POST /boards/{id}/labels
+      - PATCH /labels/{id}
+      - DELETE /labels/{id}
+      - POST /boards/{id}/custom-fields
+      - PATCH /custom-fields/{id}
+      - DELETE /custom-fields/{id}
+      - PUT /cards/{id}/custom-fields/{fieldId}
+      - POST /cards/{id}/checklist
+      - PATCH /checklist/{id}
+      - DELETE /checklist/{id}
+    divergences: [E8, E22, E23, E25, E26]
+  T4:
+    status: listé
+    routes:
+      - POST /cards/{id}/comments
+      - DELETE /comments/{id}
+    divergences: [E2, 'B-ADR-6 (503 si l''inspection des fichiers est impossible)']
+  T5:
+    status: listé
+    routes:
+      - DELETE /trash/cards/{id}
+      - DELETE /trash/lists/{id}
+      - DELETE /trash/boards/{id}
+    divergences: []
+  symfony-only:
+    description: jamais servies par board-service en phase 3
+    routes:
+      - /cards/{id}/attachments
+      - /attachments/**
+      - /uploads
+      - /boards/{id}/trello-files/**
+      - /import/**
+      - /notifications/**
+      - /push/**
+      - /health
+paths:
+  /boards:
+    get:
+      tags: [boards]
+      operationId: listMyBoards
+      summary: Lister les tableaux ouverts dont l'appelant est membre
+      description: |
+        Tableaux dont l'appelant est membre, hors corbeille, triés par `createdAt` décroissant puis `id` décroissant.
+        Compteurs : listes ouvertes (ni archivées ni dans la corbeille) et cartes ouvertes de ces listes.
+        Nombre de requêtes SQL constant quel que soit le nombre de tableaux (B-ADR-8).
+      x-scenarios: [SC-BOARD-002, SC-BOARD-008, SC-BOARD-020, SC-BOARD-023, SC-BOARD-027, SC-BOARD-029]
+      responses:
+        '200':
+          description: Tableaux de l'appelant
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/BoardSummary' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      tags: [boards]
+      operationId: createBoard
+      summary: Créer un tableau (propriétaire = appelant), avec le contenu par défaut
+      description: |
+        Contrôles dans l'ordre : corps → types (E22, E23) → `title` (trim, obligatoire, 160).
+        - `description` : chaîne ou `null`, **stockée telle quelle** (ni trim ni troncature, comme aujourd'hui).
+        - `background` : valeur hors liste, ou non chaîne, **ignorée** (défaut `aurora`).
+        - `withDefaults` (booléen JSON, défaut `true`) : 4 listes `À faire`, `En cours`, `En revue`, `Terminé`
+          (positions 0–3) et 6 étiquettes `Urgent #ef4444`, `Bug #f97316`, `Feature #6366f1`, `Design #ec4899`,
+          `Backend #14b8a6`, `Idée #eab308`.
+        L'appelant devient membre `owner`. Réponse : tableau complet (`invitations: []`, `trelloFiles: 0`,
+        compteurs à 0). Événement `BoardCreated` (outbox, `HELD`). Une seule transaction.
+      x-scenarios: [SC-BOARD-001, SC-BOARD-023, SC-BOARD-024, SC-BOARD-028, SC-CARD-043]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBoardRequest' }
+            examples:
+              nominal: { value: { title: Lancement produit, background: ocean } }
+              empty: { summary: sans contenu par défaut, value: { title: Vide, withDefaults: false } }
+      responses:
+        '201':
+          description: Tableau créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Board' }
+        '400':
+          description: Corps ou champ invalide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidJson: { value: { error: JSON invalide. } }
+                titleRequired: { value: { error: 'Le champ "title" est obligatoire.' } }
+                titleNotString: { summary: E22, value: { error: 'Le champ "title" doit être une chaîne de caractères.' } }
+                descriptionNotString: { summary: E22, value: { error: 'Le champ "description" doit être une chaîne de caractères.' } }
+                withDefaultsNotBoolean: { summary: E23, value: { error: 'Le champ "withDefaults" doit être un booléen.' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /boards/{id}:
+    parameters:
+      - $ref: '#/components/parameters/BoardId'
+    get:
+      tags: [boards]
+      operationId: getBoard
+      summary: Coquille d'un tableau (listes ouvertes sans cartes, étiquettes, champs, invitations)
+      description: |
+        Listes : ouvertes seulement (ni archivées ni dans la corbeille), triées `position, id`, avec `cardCount`
+        (cartes ouvertes). `listCount`/`cardCount` du tableau = sommes sur ces listes. `trelloFiles` = fichiers d'import
+        Trello dont le statut n'est pas `done` (lecture de `trello_import_file`). `invitations` visibles par tout membre.
+      x-scenarios: [SC-BOARD-003, SC-BOARD-004, SC-BOARD-006, SC-BOARD-018, SC-BOARD-021, SC-BOARD-027, SC-BOARD-029, SC-BOARD-034]
+      responses:
+        '200':
+          description: Tableau
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Board' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/BoardNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    patch:
+      tags: [boards]
+      operationId: updateBoard
+      summary: Modifier titre, description, fond, affichage des numéros (tout membre, E4)
+      description: |
+        Champs absents : inchangés. `title` présent : trim, obligatoire, 160. `description` présente : `""` et `"0"`
+        deviennent `null` (règle PHP « falsy » reproduite), sinon stockée telle quelle ; `null` → `null`.
+        `background` hors liste ou non chaîne : ignoré. `showCardNumbers` : booléen JSON (E23).
+        Réponse : résumé du tableau **avec `listCount` et `cardCount` à 0** (comportement actuel reproduit, `x-compat`).
+      x-compat: réponse sans compteurs (Presenter::boardSummary appelé sans compteurs)
+      x-scenarios: [SC-BOARD-005, SC-BOARD-021, SC-BOARD-024, SC-CARD-043]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateBoardRequest' }
+      responses:
+        '200':
+          description: Tableau modifié
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BoardSummary' }
+        '400':
+          description: Corps ou champ invalide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidJson: { value: { error: JSON invalide. } }
+                titleRequired: { value: { error: 'Le champ "title" est obligatoire.' } }
+                titleNotString: { summary: E22, value: { error: 'Le champ "title" doit être une chaîne de caractères.' } }
+                showCardNumbersNotBoolean: { summary: E23, value: { error: 'Le champ "showCardNumbers" doit être un booléen.' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/BoardNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    delete:
+      tags: [boards]
+      operationId: trashBoard
+      summary: Mettre le tableau dans la corbeille du propriétaire (30 jours)
+      description: |
+        Propriétaire seulement. Le tableau et tout son contenu deviennent invisibles (404 `Ce tableau est dans la
+        corbeille.` pour les membres, sur les routes de board-service **et** de Symfony). Événement `BoardTrashed` (`HELD`).
+      x-scenarios: [SC-BOARD-007, SC-TRASH-007, SC-BOARD-034, SC-BOARD-021]
+      responses:
+        '204': { description: Tableau dans la corbeille }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Membre non propriétaire
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                notOwner: { value: { error: Seul le propriétaire peut supprimer le tableau. } }
+        '404': { $ref: '#/components/responses/BoardNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /boards/{id}/favorite:
+    parameters:
+      - $ref: '#/components/parameters/BoardId'
+    post:
+      tags: [boards]
+      operationId: toggleFavorite
+      summary: Basculer le favori de l'appelant (propre à chaque membre)
+      description: Corps ignoré (le front n'en envoie pas). Bascule `board_member.favorite` de l'appelant.
+      x-scenarios: [SC-BOARD-008, SC-BOARD-021, SC-BOARD-024]
+      responses:
+        '200':
+          description: Nouvel état
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [favorite]
+                properties:
+                  favorite: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/BoardNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /boards/{id}/members:
+    parameters:
+      - $ref: '#/components/parameters/BoardId'
+    post:
+      tags: [members]
+      operationId: addMember
+      summary: Ajouter un compte existant ou inviter un e-mail (gestionnaires)
+      description: |
+        Gestionnaire (`owner` ou `admin`) seulement. `email` : chaîne (E22), trim, obligatoire, **tronqué à 180 puis
+        mis en minuscules**, puis `FILTER_VALIDATE_EMAIL` de PHP. `role` : `admin` ou `member` ; toute autre valeur
+        (dont `owner`) → `member`.
+        Compte trouvé (comparaison SQL avec la collation de `user.email`) :
+        - déjà membre → 409 ;
+        - sinon adhésion → 201 ; notifications (outbox) : `board_invite` au nouveau membre
+          (`<nom de l'appelant> vous a ajouté au tableau « <titre> »`), `member_joined` aux autres membres
+          (`<nom du nouveau membre> a rejoint le tableau « <titre> »`), jamais à l'appelant ; `MemberAdded` (`HELD`).
+        Aucun compte : invitation (index unique `(board_id, email)`) → 202 ; invitation déjà en attente → 409.
+        Le rôle d'une invitation n'est pas mémorisé (E24 conservé). Requêtes concurrentes : une seule réussit, les
+        autres → 409, jamais 500 (SC-BOARD-017, SC-BOARD-031).
+      x-scenarios: [SC-BOARD-009, SC-BOARD-010, SC-BOARD-011, SC-BOARD-013, SC-BOARD-017, SC-BOARD-021, SC-BOARD-025, SC-BOARD-031]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddMemberRequest' }
+            examples:
+              existing: { value: { email: ' Bob@Exemple.test ', role: admin } }
+      responses:
+        '201':
+          description: Compte existant ajouté
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberAdded' }
+        '202':
+          description: Invitation enregistrée (aucun compte pour cet e-mail)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberInvited' }
+              examples:
+                invited:
+                  value: { status: invited, message: 'Invitation enregistrée : nouveau@exemple.test rejoindra le tableau à son inscription.' }
+        '400':
+          description: Corps ou e-mail invalide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidJson: { value: { error: JSON invalide. } }
+                emailRequired: { value: { error: 'Le champ "email" est obligatoire.' } }
+                emailNotString: { summary: E22, value: { error: 'Le champ "email" doit être une chaîne de caractères.' } }
+                emailInvalid: { value: { error: Adresse e-mail invalide. } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ManagerOnly' }
+        '404': { $ref: '#/components/responses/BoardNotFound' }
+        '409':
+          description: Déjà membre, ou invitation déjà en attente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                alreadyMember: { value: { error: Cet utilisateur est déjà membre du tableau. } }
+                alreadyInvited: { value: { error: Une invitation est déjà en attente pour cette adresse. } }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /boards/{id}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/BoardId'
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      tags: [members]
+      operationId: changeMemberRole
+      summary: Changer le rôle d'un membre (gestionnaires)
+      description: |
+        Ordre : accès gestionnaire → membre visé (E28 : compte inexistant **ou** non membre → 404 `Membre introuvable.`)
+        → propriétaire visé → 403 → `role` ∈ {`admin`, `member`} sinon 400 `Rôle invalide.` (y compris `owner` et
+        une valeur non chaîne). Un gestionnaire peut se rétrograder lui-même. Le propriétaire reste unique ; aucune
+        route ne transfère la propriété (SC-BOARD-032). Verrou sur l'adhésion visée (B-ADR-4). `MemberRoleChanged` (`HELD`).
+      x-scenarios: [SC-BOARD-014, SC-BOARD-021, SC-BOARD-032, SC-BOARD-035]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeRoleRequest' }
+      responses:
+        '200':
+          description: Membre modifié
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+        '400':
+          description: Rôle invalide ou JSON invalide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidRole: { value: { error: Rôle invalide. } }
+                invalidJson: { value: { error: JSON invalide. } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Gestionnaire requis, ou propriétaire visé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                managerOnly: { value: { error: Action réservée aux administrateurs du tableau. } }
+                ownerRole: { value: { error: Le rôle du propriétaire ne peut pas être modifié. } }
+        '404':
+          description: Tableau introuvable (dont non-membre), ou membre visé introuvable (E28)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                boardNotFound: { value: { error: Tableau introuvable. } }
+                boardInTrash: { value: { error: Ce tableau est dans la corbeille. } }
+                memberNotFound: { summary: compte inexistant ou non membre (E28), value: { error: Membre introuvable. } }
+                badId: { summary: E12, value: { error: Ressource introuvable. } }
+        '500': { $ref: '#/components/responses/InternalError' }
+    delete:
+      tags: [members]
+      operationId: removeMember
+      summary: Retirer un membre (gestionnaires) ou quitter le tableau (soi-même)
+      description: |
+        Soi-même : tout membre ; autrui : gestionnaire. Membre visé inexistant ou non membre → 404 `Membre introuvable.`
+        (E28) ; propriétaire visé (y compris soi-même) → 403. Effets, dans une transaction : suppression de toutes les
+        assignations du membre sur les cartes du tableau, puis de l'adhésion. Notification `member_removed` au membre
+        retiré (`<nom de l'appelant> vous a retiré du tableau « <titre> »`, sans tableau associé), **pas** quand on quitte
+        soi-même. `MemberRemoved` (`HELD`). La requête suivante du membre retiré reçoit 404 (§5.3).
+      x-scenarios: [SC-BOARD-015, SC-BOARD-016, SC-BOARD-021, SC-BOARD-025, SC-BOARD-033, SC-BOARD-035]
+      responses:
+        '204': { description: Membre retiré }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Gestionnaire requis, ou propriétaire visé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                managerOnly: { value: { error: Action réservée aux administrateurs du tableau. } }
+                ownerLeaves: { value: { error: Le propriétaire ne peut pas quitter son tableau. } }
+        '404':
+          description: Tableau introuvable (dont non-membre), ou membre visé introuvable (E28)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                boardNotFound: { value: { error: Tableau introuvable. } }
+                memberNotFound: { value: { error: Membre introuvable. } }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /boards/{id}/invitations/{invId}:
+    parameters:
+      - $ref: '#/components/parameters/BoardId'
+      - name: invId
+        in: path
+        required: true
+        description: Identifiant d'invitation (entier positif ; sinon 404 `Ressource introuvable.`, E12)
+        schema: { type: integer, format: int32, minimum: 1 }
+    delete:
+      tags: [members]
+      operationId: cancelInvitation
+      summary: Annuler une invitation en attente (gestionnaires)
+      description: Invitation inexistante **ou** d'un autre tableau → 404 `Ressource introuvable.` (E28 ; Symfony répondait `Erreur` pour un autre tableau).
+      x-scenarios: [SC-BOARD-012, SC-BOARD-021, SC-BOARD-035]
+      responses:
+        '204': { description: Invitation supprimée }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ManagerOnly' }
+        '404':
+          description: Tableau introuvable (dont non-membre), ou invitation introuvable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                boardNotFound: { value: { error: Tableau introuvable. } }
+                invitationNotFound: { summary: E28, value: { error: Ressource introuvable. } }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /trash/boards:
+    get:
+      tags: [trash]
+      operationId: listTrashedBoards
+      summary: Tableaux dans la corbeille dont l'appelant est propriétaire
+      description: Triés par `deletedAt` décroissant puis `id` décroissant. `deletedBy` = nom de l'auteur (ou `null`). `purgeAt` = `deletedAt` + 30 jours.
+      x-scenarios: [SC-TRASH-007, SC-BOARD-034, SC-BOARD-028]
+      responses:
+        '200':
+          description: Corbeille de l'appelant
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TrashedBoard' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /trash/boards/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/BoardId'
+    post:
+      tags: [trash]
+      operationId: restoreBoard
+      summary: Restaurer un tableau de la corbeille (propriétaire)
+      description: |
+        Tableau absent de la corbeille, inexistant, **ou** dont l'appelant n'est pas membre → 404 `Ce tableau n’est pas
+        dans la corbeille.` (E1 ; Symfony répondait 403 au non-membre) ; membre non propriétaire → 403. Restauration :
+        tout le contenu redevient visible. `BoardRestored` (`HELD`). La suppression définitive
+        (`DELETE /trash/boards/{id}`) reste servie par Symfony jusqu'à T5.
+      x-scenarios: [SC-TRASH-007, SC-BOARD-034, SC-BOARD-021]
+      responses:
+        '200':
+          description: Tableau restauré
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id]
+                properties:
+                  id: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Membre non propriétaire
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                notOwner: { value: { error: Seul le propriétaire du tableau peut le restaurer ou le supprimer. } }
+        '404':
+          description: Pas dans la corbeille (dont non-membre et identifiant non numérique)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                notInTrash: { value: { error: 'Ce tableau n’est pas dans la corbeille.' } }
+                badId: { summary: E12, value: { error: Ressource introuvable. } }
+        '500': { $ref: '#/components/responses/InternalError' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT (RS256, émis par identity-service ou Symfony)
+  parameters:
+    BoardId:
+      name: id
+      in: path
+      required: true
+      description: Identifiant de tableau. Non entier positif (`abc`, `0`) → 404 `{"error":"Ressource introuvable."}` (E12).
+      schema: { type: integer, format: int32, minimum: 1 }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: Identifiant de compte. Non entier positif → 404 `Ressource introuvable.` (E12).
+      schema: { type: integer, format: int32, minimum: 1 }
+  responses:
+    Unauthorized:
+      description: "Jeton absent, invalide, expiré, ou compte introuvable (format Lexik, en-tête `WWW-Authenticate: Bearer`)"
+      headers:
+        WWW-Authenticate: { schema: { type: string, const: Bearer } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AuthError' }
+          examples:
+            notFound: { value: { code: 401, message: JWT Token not found } }
+            invalid: { value: { code: 401, message: Invalid JWT Token } }
+            expired: { value: { code: 401, message: Expired JWT Token } }
+            noUsername: { value: { code: 401, message: 'Unable to find key "username" in the token payload.' } }
+            unknownAccount: { value: { code: 401, message: Invalid credentials. } }
+    BoardNotFound:
+      description: |
+        Tableau inexistant, **ou** appelant non membre (tableau ouvert ou dans la corbeille) → `Tableau introuvable.` ;
+        membre et tableau dans la corbeille → `Ce tableau est dans la corbeille.` ; identifiant non numérique (E12)
+        → `Ressource introuvable.` Statut, corps et en-têtes identiques pour non-membre et inexistant (SC-BOARD-021).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            notFound: { value: { error: Tableau introuvable. } }
+            inTrash: { value: { error: Ce tableau est dans la corbeille. } }
+            badId: { value: { error: Ressource introuvable. } }
+    ManagerOnly:
+      description: Membre sans droit de gestion
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            managerOnly: { value: { error: Action réservée aux administrateurs du tableau. } }
+    InternalError:
+      description: Erreur interne (aucun cas connu sur entrée client)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            internal: { value: { error: Erreur interne du serveur. } }
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { type: string }
+    AuthError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: integer, const: 401 }
+        message: { type: string }
+    UserSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, avatarColor]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        avatarColor: { type: string }
+    Member:
+      allOf:
+        - $ref: '#/components/schemas/UserSummary'
+        - type: object
+          required: [role, joinedAt]
+          properties:
+            role: { type: string, enum: [owner, admin, member] }
+            joinedAt: { type: string, format: date-time, description: ATOM, heure de Paris }
+      unevaluatedProperties: false
+    Background:
+      type: string
+      enum: [aurora, sunset, ocean, forest, midnight, peach, lagoon, berry, graphite, sand]
+    BoardSummary:
+      type: object
+      additionalProperties: false
+      required: [id, title, description, background, showCardNumbers, favorite, role, members, listCount, cardCount, createdAt]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 160 }
+        description: { type: [string, 'null'] }
+        background: { $ref: '#/components/schemas/Background' }
+        showCardNumbers: { type: boolean }
+        favorite: { type: boolean, description: favori de l'appelant }
+        role: { type: [string, 'null'], enum: [owner, admin, member, null], description: rôle de l'appelant }
+        members: { type: array, items: { $ref: '#/components/schemas/Member' }, description: 'triés par id d''adhésion' }
+        listCount: { type: integer, minimum: 0 }
+        cardCount: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+    Board:
+      allOf:
+        - $ref: '#/components/schemas/BoardSummary'
+        - type: object
+          required: [trelloFiles, lists, labels, customFields, invitations]
+          properties:
+            trelloFiles: { type: integer, minimum: 0, description: fichiers d'import Trello restant à copier }
+            lists: { type: array, items: { $ref: '#/components/schemas/List' } }
+            labels: { type: array, items: { $ref: '#/components/schemas/Label' } }
+            customFields: { type: array, items: { $ref: '#/components/schemas/CustomField' } }
+            invitations: { type: array, items: { $ref: '#/components/schemas/Invitation' } }
+      unevaluatedProperties: false
+    List:
+      type: object
+      additionalProperties: false
+      required: [id, title, position, color, archivedAt, cardCount]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 160 }
+        position: { type: integer }
+        color: { type: [string, 'null'], maxLength: 20 }
+        archivedAt: { type: [string, 'null'], format: date-time }
+        cardCount: { type: integer, minimum: 0 }
+    Label:
+      type: object
+      additionalProperties: false
+      required: [id, name, color]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 60 }
+        color: { type: string, maxLength: 20 }
+    CustomField:
+      type: object
+      additionalProperties: false
+      required: [id, name, type, options, showOnCard, position]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 80 }
+        type: { type: string, description: 'text, number, date, checkbox, select (détaillé en T3)' }
+        options: { type: array, description: 'options des listes déroulantes, relues telles qu''écrites (encodage PHP, R5) ; format figé en T3' }
+        showOnCard: { type: boolean }
+        position: { type: integer }
+    Invitation:
+      type: object
+      additionalProperties: false
+      required: [id, email, createdAt]
+      properties:
+        id: { type: integer }
+        email: { type: string, maxLength: 180 }
+        createdAt: { type: string, format: date-time }
+    CreateBoardRequest:
+      type: object
+      properties:
+        title: { type: string, description: 'obligatoire ; trim ; tronqué à 160' }
+        description: { type: [string, 'null'] }
+        background: { description: 'valeur de Background, sinon ignorée' }
+        withDefaults: { type: boolean, default: true }
+    UpdateBoardRequest:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: [string, 'null'] }
+        background: { description: 'valeur de Background, sinon ignorée' }
+        showCardNumbers: { type: boolean }
+    AddMemberRequest:
+      type: object
+      properties:
+        email: { type: string, description: 'obligatoire ; trim ; tronqué à 180 ; minuscules' }
+        role: { description: '`admin` ou `member` ; toute autre valeur → `member`' }
+    ChangeRoleRequest:
+      type: object
+      properties:
+        role: { type: string, enum: [admin, member] }
+    MemberAdded:
+      type: object
+      additionalProperties: false
+      required: [status, member]
+      properties:
+        status: { const: added }
+        member: { $ref: '#/components/schemas/Member' }
+    MemberInvited:
+      type: object
+      additionalProperties: false
+      required: [status, message]
+      properties:
+        status: { const: invited }
+        message: { type: string }
+    TrashedBoard:
+      type: object
+      additionalProperties: false
+      required: [id, title, background, deletedAt, deletedBy, purgeAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        background: { $ref: '#/components/schemas/Background' }
+        deletedAt: { type: string, format: date-time }
+        deletedBy: { type: [string, 'null'], description: nom de l'auteur de la suppression }
+        purgeAt: { type: string, format: date-time }
