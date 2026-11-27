@@ -10,6 +10,8 @@ WORKDIR /build
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
 COPY identity-service/pom.xml identity-service/
+# Réacteur complet : services/pom.xml déclare aussi board-service (pom seul, sans ses sources).
+COPY board-service/pom.xml board-service/
 COPY identity-service/src identity-service/src
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -ntp -q -pl identity-service -am package -DskipTests \
  && cp identity-service/target/identity-service-*.jar /build/app.jar \
