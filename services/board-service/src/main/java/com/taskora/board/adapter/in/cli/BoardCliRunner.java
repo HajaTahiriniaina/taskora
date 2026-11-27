@@ -32,18 +32,19 @@ public class BoardCliRunner implements ApplicationRunner, ExitCodeGenerator {
   private static final int DRAIN_BATCH = 50;
   private static final JsonMapper JSON = JsonMapper.builder().build();
 
-  private final VerifyBoardInvariantsUseCase verify;
+  private final VerifyBoardInvariantsUseCase invariants;
   private final DeliverPendingMessagesUseCase relay;
   private volatile int exitCode = OK;
 
   /**
    * Crée le lanceur.
    *
-   * @param verify commande verify
+   * @param invariants commande verify
    * @param relay relais de l'outbox
    */
-  public BoardCliRunner(VerifyBoardInvariantsUseCase verify, DeliverPendingMessagesUseCase relay) {
-    this.verify = verify;
+  public BoardCliRunner(
+      VerifyBoardInvariantsUseCase invariants, DeliverPendingMessagesUseCase relay) {
+    this.invariants = invariants;
     this.relay = relay;
   }
 
@@ -52,7 +53,7 @@ public class BoardCliRunner implements ApplicationRunner, ExitCodeGenerator {
     exitCode = OK;
     try {
       if (args.containsOption(VERIFY)) {
-        exitCode = verify(single(args, VERIFY), single(args, BASELINE_FILE));
+        exitCode = runVerify(single(args, VERIFY), single(args, BASELINE_FILE));
       } else if (args.containsOption(DRAIN)) {
         int total = 0;
         int processed;
@@ -73,9 +74,9 @@ public class BoardCliRunner implements ApplicationRunner, ExitCodeGenerator {
     return exitCode;
   }
 
-  private int verify(String mode, String file) throws IOException {
+  private int runVerify(String mode, String file) throws IOException {
     Path baseline = Path.of(file);
-    InvariantReport current = verify.measure();
+    InvariantReport current = invariants.measure();
     print(current);
     if ("baseline".equals(mode)) {
       Files.writeString(baseline, JSON.writeValueAsString(current.counters()));
@@ -85,7 +86,7 @@ public class BoardCliRunner implements ApplicationRunner, ExitCodeGenerator {
       throw new IllegalArgumentException("mode");
     }
     InvariantReport initial = read(baseline);
-    boolean regressed = verify.regressed(initial, current);
+    boolean regressed = invariants.regressed(initial, current);
     IO.println("verify.regressed=" + (regressed ? 1 : 0));
     return regressed ? REGRESSED : OK;
   }

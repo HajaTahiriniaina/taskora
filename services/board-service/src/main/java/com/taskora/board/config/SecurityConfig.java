@@ -69,6 +69,14 @@ public class SecurityConfig {
         .build();
   }
 
+  /**
+   * Socle commun aux deux chaînes, toutes deux sans état.
+   *
+   * <p>CSRF désactivé à bon escient : l'authentification repose uniquement sur un jeton Bearer (ou
+   * le secret interne) porté par un en-tête que le navigateur n'ajoute jamais de lui-même ; aucune
+   * session n'est créée (STATELESS) et aucun cookie d'authentification n'est émis ni lu. Une
+   * requête forgée depuis un autre site ne transporte donc aucun identifiant exploitable.
+   */
   private static HttpSecurity stateless(HttpSecurity http) throws Exception {
     return http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
