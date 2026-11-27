@@ -39,8 +39,9 @@ info:
       à la longueur maximale ; vide après trim → 400 `Le champ "<nom>" est obligatoire.`
     - Dates : ATOM avec le décalage de Paris (`2026-12-01T17:00:00+01:00`), secondes entières (B-ADR-11).
     - Création → 201 ; suppression → 204 sans corps ; 5xx → `{"error":"Erreur interne du serveur."}` sans trace.
-    - Ordres déterministes (R8) : accueil `createdAt` décroissant puis `id` décroissant ; membres et étiquettes par
-      `id` ; listes par `position, id` ; champs par `position, id` ; corbeille `deletedAt` décroissant puis `id` décroissant.
+    - Ordres déterministes (R8, ceux de Symfony constatés par le miroir) : accueil `createdAt` décroissant puis `id`
+      croissant ; membres par `id` (identifiant d'utilisateur) ; étiquettes par `id` ; listes par `position, id` ;
+      champs par `position, id` ; corbeille `deletedAt` décroissant puis `id` croissant.
     - Réponses de Symfony : non-ASCII échappé (`è`) ; équivalence **sémantique** du JSON.
 
     Références : docs/specs/phase-3-board-service.md, docs/specs/boards-members.md, docs/specs/archives-trash.md,
@@ -149,7 +150,7 @@ paths:
       operationId: listMyBoards
       summary: Lister les tableaux ouverts dont l'appelant est membre
       description: |
-        Tableaux dont l'appelant est membre, hors corbeille, triés par `createdAt` décroissant puis `id` décroissant.
+        Tableaux dont l'appelant est membre, hors corbeille, triés par `createdAt` décroissant puis `id` croissant (égalités à la seconde : ordre de Symfony).
         Compteurs : listes ouvertes (ni archivées ni dans la corbeille) et cartes ouvertes de ces listes.
         Nombre de requêtes SQL constant quel que soit le nombre de tableaux (B-ADR-8).
       x-scenarios: [SC-BOARD-002, SC-BOARD-008, SC-BOARD-020, SC-BOARD-023, SC-BOARD-027, SC-BOARD-029]
@@ -267,8 +268,10 @@ paths:
       operationId: trashBoard
       summary: Mettre le tableau dans la corbeille du propriétaire (30 jours)
       description: |
-        Propriétaire seulement. Le tableau et tout son contenu deviennent invisibles (404 `Ce tableau est dans la
-        corbeille.` pour les membres, sur les routes de board-service **et** de Symfony). Événement `BoardTrashed` (`HELD`).
+        Propriétaire seulement. Le tableau et tout son contenu deviennent invisibles pour les membres, sur les routes
+        de board-service **et** de Symfony (§5.3 de la spec) : 404 `Ce tableau est dans la corbeille.` sur
+        `/api/boards/{id}/**`, les étiquettes et les champs ; 404 `Cet élément est dans la corbeille.` sur les listes,
+        cartes et objets d'une carte. Événement `BoardTrashed` (`HELD`).
       x-scenarios: [SC-BOARD-007, SC-TRASH-007, SC-BOARD-034, SC-BOARD-021]
       responses:
         '204': { description: Tableau dans la corbeille }
@@ -485,7 +488,7 @@ paths:
       tags: [trash]
       operationId: listTrashedBoards
       summary: Tableaux dans la corbeille dont l'appelant est propriétaire
-      description: Triés par `deletedAt` décroissant puis `id` décroissant. `deletedBy` = nom de l'auteur (ou `null`). `purgeAt` = `deletedAt` + 30 jours.
+      description: Triés par `deletedAt` décroissant puis `id` croissant. `deletedBy` = nom de l'auteur (ou `null`). `purgeAt` = `deletedAt` + 30 jours.
       x-scenarios: [SC-TRASH-007, SC-BOARD-034, SC-BOARD-028]
       responses:
         '200':
@@ -651,7 +654,7 @@ components:
         showCardNumbers: { type: boolean }
         favorite: { type: boolean, description: favori de l'appelant }
         role: { type: [string, 'null'], enum: [owner, admin, member, null], description: rôle de l'appelant }
-        members: { type: array, items: { $ref: '#/components/schemas/Member' }, description: 'triés par id d''adhésion' }
+        members: { type: array, items: { $ref: '#/components/schemas/Member' }, description: 'triés par id (identifiant d''utilisateur), comme Symfony' }
         listCount: { type: integer, minimum: 0 }
         cardCount: { type: integer, minimum: 0 }
         createdAt: { type: string, format: date-time }

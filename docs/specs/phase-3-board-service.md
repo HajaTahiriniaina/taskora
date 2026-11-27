@@ -118,7 +118,7 @@ Pourquoi ce découpage :
 | R5 | Encodages JSON identiques à ceux de PHP (`json_encode` sans option : `/` échappé, non-ASCII en `\uXXXX`, entiers sans `.0`) pour `custom_field_value.value`, `custom_field.options`, `activity.data` : l'autre backend doit relire, filtrer et afficher les mêmes valeurs | SC-CARD-044, SC-ACTIVITY-008 |
 | R6 | Numérotation : uniquement par l'incrément atomique sur `board.card_seq` (même requête ou `SELECT … FOR UPDATE` sur la ligne `board`) | SC-CARD-002, 003, 032 |
 | R7 | Positions des cartes : après la bascule de T2, board-service est le **seul** écrivain de positions sur les tableaux existants (l'import ne crée que des tableaux neufs). Il sérialise par liste (verrou de ligne `board_list` pris dans l'ordre croissant des ids) | SC-CARD-033, 034 |
-| R8 | Ordre déterministe partout où Symfony ne l'est pas : `position, id` (listes, cartes, checklist, champs) ; membres par `board_member.id` ; tableaux par `created_at DESC, id DESC` (HYPOTHÈSE : ordre de Symfony à figer par test miroir) | SC-BOARD-029, SC-LIST-014 |
+| R8 | Ordre déterministe partout où Symfony ne l'est pas : `position, id` (listes, cartes, checklist, champs) ; membres par identifiant d'utilisateur (`board_member.user_id`, ordre constaté de Symfony) ; tableaux par `created_at DESC, id ASC` ; corbeille par `deleted_at DESC, id ASC` (ordres de Symfony constatés par le miroir, ordre de travail T0–T1 §13 ; l'hypothèse initiale `id DESC` / `board_member.id` est réfutée) | SC-BOARD-029, SC-LIST-014 |
 | R9 | Aucune écriture de board-service ne dépend d'un état mis en cache entre deux requêtes (Symfony peut avoir écrit entre-temps) | Revue |
 | R10 | Les migrations Doctrine générées par `doctrine:migrations:diff` ne doivent jamais supprimer un objet ajouté pour board-service : interdiction de générer un diff automatique sur ces tables pendant la cohabitation | Revue (BackReviewer, `git diff backend/migrations`) |
 
@@ -321,7 +321,7 @@ Validation : intégration (horloge injectée, deux fuseaux de test), compatibili
 Étant donné un jeu de données de référence (favoris, rôles, listes archivées et dans la corbeille, cartes archivées, invitations, fichiers Trello en attente)
 Quand on appelle `GET /api/boards` et `GET /api/boards/{id}` sur les deux amonts
 Alors les corps JSON sont sémantiquement identiques : compteurs `listCount`, `cardCount`, `trelloFiles`, `members` (rôle, `joinedAt`), `lists` (ordre, `cardCount`), `labels`, `customFields`, `invitations`
-Limites : ordre des membres par `board_member.id`, des tableaux par `created_at DESC, id DESC` (HYPOTHÈSE à figer par ce test) ; 200 tableaux et 300 listes sans N+1 (nombre de requêtes SQL borné et indépendant du volume)
+Limites : ordre des membres par identifiant d'utilisateur, des tableaux par `created_at DESC, id ASC`, de la corbeille par `deleted_at DESC, id ASC` (constatés sur Symfony, figés par ce test avec des égalités de date provoquées et un membre d'identifiant inférieur à celui du propriétaire) ; 200 tableaux et 300 listes sans N+1 (nombre de requêtes SQL borné et indépendant du volume)
 Validation : compatibilité, intégration (compteur de requêtes) [back] ; e2e accueil et page Tableau sur les deux amonts [front] — Acceptation : 0 différence hors divergences listées au §9.3
 
 ### SC-BOARD-030 — Consommation des invitations servie par board-service (critique)
@@ -355,7 +355,7 @@ Validation : intégration (concurrence, verrou sur l'adhésion) [back] ; e2e (to
 ### SC-BOARD-034 — Corbeille transitive cohérente entre les deux backends (critique)
 Étant donné T1 basculée et T2 encore sur Symfony
 Quand Alice (propriétaire) met le tableau à la corbeille via board-service
-Alors toutes les routes de ses listes et cartes, servies par Symfony, répondent 404 `Ce tableau est dans la corbeille.` aux membres ; le tableau apparaît dans `GET /api/trash/boards` d'Alice seulement ; après restauration, tout réapparaît avec son contenu
+Alors toutes les routes de ses listes et cartes, servies par Symfony, répondent 404 aux membres avec les messages du §5.3 : `Cet élément est dans la corbeille.` sur les routes des ressources enfants (`/api/lists/{id}/**`, `/api/cards/{id}/**`, checklist, commentaires, pièces jointes) et `Ce tableau est dans la corbeille.` sur les routes `/api/boards/{id}/**` ainsi que sur les étiquettes et champs personnalisés (§12.1 de l'ordre de travail T0–T1) ; le tableau apparaît dans `GET /api/trash/boards` d'Alice seulement ; après restauration, tout réapparaît avec son contenu
 Limites : restauration par un admin → 403 ; tableau non supprimé → 404 `Ce tableau n’est pas dans la corbeille.` ; purge (`DELETE /api/trash/boards/{id}`) encore servie par Symfony jusqu'à T5
 Validation : intégration, compatibilité [back] ; e2e corbeille de l'accueil [front] — Acceptation : 404 en cascade sur les deux amonts
 
