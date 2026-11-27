@@ -66,7 +66,7 @@ public class JdbcBoardReadModel implements BoardReadModelPort {
                     + OPEN_CARD
                     + ") AS card_count FROM board b"
                     + " JOIN board_member m ON m.board_id = b.id AND m.user_id = ?"
-                    + " WHERE b.deleted_at IS NULL ORDER BY b.created_at DESC, b.id DESC")
+                    + " WHERE b.deleted_at IS NULL ORDER BY b.created_at DESC, b.id ASC")
             .param(viewer.value())
             .query((rs, n) -> boardRow(rs, rs.getInt("list_count"), rs.getInt("card_count")))
             .list();
@@ -76,7 +76,7 @@ public class JdbcBoardReadModel implements BoardReadModelPort {
                     MEMBER_COLUMNS
                         + " JOIN board_member mine ON mine.board_id = m.board_id"
                         + " AND mine.user_id = ? JOIN board b ON b.id = m.board_id"
-                        + " WHERE b.deleted_at IS NULL ORDER BY m.board_id, m.id")
+                        + " WHERE b.deleted_at IS NULL ORDER BY m.board_id, m.user_id")
                 .param(viewer.value())
                 .query((rs, n) -> memberRow(rs))
                 .list());
@@ -177,7 +177,7 @@ public class JdbcBoardReadModel implements BoardReadModelPort {
             "SELECT b.id, b.title, b.background, b.deleted_at, u.name AS deleted_by FROM board b"
                 + " JOIN board_member m ON m.board_id = b.id AND m.user_id = ? AND m.role = 'owner'"
                 + " LEFT JOIN `user` u ON u.id = b.deleted_by_id"
-                + " WHERE b.deleted_at IS NOT NULL ORDER BY b.deleted_at DESC, b.id DESC")
+                + " WHERE b.deleted_at IS NOT NULL ORDER BY b.deleted_at DESC, b.id ASC")
         .param(owner.value())
         .query((rs, n) -> {
           LocalDateTime deletedAt = SqlRows.wall(rs, "deleted_at");
@@ -206,7 +206,7 @@ public class JdbcBoardReadModel implements BoardReadModelPort {
   }
 
   private List<MemberView> membersOf(BoardId board) {
-    return jdbc.sql(MEMBER_COLUMNS + " WHERE m.board_id = ? ORDER BY m.id")
+    return jdbc.sql(MEMBER_COLUMNS + " WHERE m.board_id = ? ORDER BY m.user_id")
         .param(board.value())
         .query((rs, n) -> memberRow(rs).member())
         .list();
