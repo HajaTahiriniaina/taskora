@@ -2,8 +2,8 @@
 -- Comptes @exemple.test, hashes factices (aucun mot de passe réel), aucune copie de la base taskora.
 -- Chargé par le compte root du conteneur de test (BoardDatabase.loadReference), après vidage des tables.
 -- Dates : heure murale Europe/Paris, comme Symfony (FA4). Égalités voulues pour éprouver les tris :
---   tableaux 101 et 102 créés au même instant (accueil : id DESC) ; tableaux 103 et 105 mis à la corbeille
---   au même instant (corbeille : id DESC) ; listes 202 et 205 à la même position (position, id) ;
+--   tableaux 101 et 102 créés au même instant (accueil : id ASC) ; tableaux 103 et 105 mis à la corbeille
+--   au même instant (corbeille : id ASC) ; listes 202 et 205 à la même position (position, id) ;
 --   champs 601 et 602 à la même position. Dates d'été (+02:00), d'hiver (+01:00) et heure ambiguë
 --   d'octobre (invitation 302, 2026-10-25 02:30:00 → +02:00, décalage le plus ancien).
 -- Jeu « sain » pour verify (V1–V8 = 0) : positions des cartes ouvertes contiguës, archivées/corbeille à -1,

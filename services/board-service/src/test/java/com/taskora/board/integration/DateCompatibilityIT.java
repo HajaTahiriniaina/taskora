@@ -80,10 +80,10 @@ class DateCompatibilityIT extends ApiTestBase {
     CLOCK.set(Instant.parse("2026-10-10T10:00:00Z"));
     assertStatus(delete(alice(), "/api/boards/101"), 204);
     JsonNode trash = json(get(alice(), "/api/trash/boards"));
-    // deleted_at DESC, id DESC : les fixtures 105 et 103 (supprimées plus tard) précèdent 101.
+    // deleted_at DESC, id ASC : les fixtures 103 et 105 (supprimées plus tard) précèdent 101.
     List<Integer> ids = new ArrayList<>();
     trash.forEach(t -> ids.add(t.get("id").asInt()));
-    assertThat(ids).containsExactly(105, 103, 101);
+    assertThat(ids).containsExactly(103, 105, 101);
     JsonNode trashed = null;
     for (JsonNode t : trash) {
       if (t.get("id").asInt() == 101) {

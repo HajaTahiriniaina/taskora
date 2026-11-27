@@ -24,6 +24,15 @@ class TrashBoardIT extends ApiTestBase {
     return out;
   }
 
+  private static JsonNode trashed(JsonNode list, int id) {
+    for (JsonNode n : list) {
+      if (n.get("id").asInt() == id) {
+        return n;
+      }
+    }
+    throw new AssertionError("tableau " + id + " absent de la corbeille");
+  }
+
   @Test
   @DisplayName(
       "SC-BOARD-007 — admin → 403 Seul le propriétaire peut supprimer le tableau. ; rien ne change")
@@ -56,20 +65,22 @@ class TrashBoardIT extends ApiTestBase {
 
   @Test
   @DisplayName(
-      "SC-TRASH-007 — corbeille du propriétaire seulement : deleted_at DESC puis id DESC, deletedBy, purgeAt = +30 jours")
+      "SC-TRASH-007 — corbeille du propriétaire seulement : deleted_at DESC puis id ASC, deletedBy, purgeAt = +30 jours")
   void trashList() {
     assertStatus(delete(alice(), "/api/boards/101"), 204);
     Response r = get(alice(), "/api/trash/boards");
     assertStatus(r, 200);
     JsonNode list = json(r);
-    assertThat(ids(list)).containsExactly(101, Fixture.DRAFT_TRASHED, Fixture.OLD_TRASHED);
+    assertThat(ids(list)).containsExactly(101, Fixture.OLD_TRASHED, Fixture.DRAFT_TRASHED);
     JsonNode launch = list.get(0);
     assertThat(launch.get("title").asString()).isEqualTo(Fixture.LAUNCH_TITLE);
     assertThat(launch.get("background").asString()).isEqualTo("ocean");
     assertAtom(launch.get("deletedAt"), "2026-11-27T11:00:00+01:00");
     assertAtom(launch.get("purgeAt"), "2026-12-27T11:00:00+01:00");
     assertThat(launch.get("deletedBy").asString()).isEqualTo("Alice Martin");
-    assertThat(list.get(1).get("deletedBy").isNull()).as("deleted_by_id NULL").isTrue();
+    assertThat(trashed(list, Fixture.DRAFT_TRASHED).get("deletedBy").isNull())
+        .as("deleted_by_id NULL")
+        .isTrue();
     assertAtom(list.get(2).get("deletedAt"), "2026-11-25T09:30:00+01:00");
     assertAtom(list.get(2).get("purgeAt"), "2026-12-25T09:30:00+01:00");
     assertThat(json(get(bruno(), "/api/trash/boards"))).as("admin : pas propriétaire").isEmpty();

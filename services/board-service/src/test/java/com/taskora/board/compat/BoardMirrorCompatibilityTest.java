@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.taskora.board.compat.CompatStack.Account;
 import io.restassured.response.Response;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +84,9 @@ class BoardMirrorCompatibilityTest {
           "{\"email\":\"pas-un-email\"}",
           "{\"role\":\"admin\"}",
           "{\"role\":\"owner\"}");
+
+  /** Paires tentées au plus pour obtenir deux horodatages égaux (même seconde). */
+  private static final int MAX_TIE_ATTEMPTS = 10;
 
   /** Horodatage ATOM en tête de chaîne (même motif que l'ancienne normalisation textuelle). */
   private static final Pattern ATOM_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T.");
@@ -309,6 +313,96 @@ class BoardMirrorCompatibilityTest {
     twin("{\"title\":\"Membres\"}", carla, "DELETE", "/members/" + carla.id(), null);
     twin("{\"title\":\"Membres\"}", bob, "DELETE", "/members/" + alice.id(), null);
     twin("{\"title\":\"Membres\"}", carla, "DELETE", "/members/" + bob.id(), null);
+  }
+
+  @Test
+  @DisplayName(
+      "SC-BOARD-029 — égalités : accueil created_at DESC puis id ASC, corbeille deleted_at DESC puis id ASC, membres par identifiant d'utilisateur")
+  void tieOrders() {
+    // (a) Accueil : deux tableaux créés sur Symfony dans la même seconde.
+    int[] created = null;
+    for (int i = 0; i < MAX_TIE_ATTEMPTS && created == null; i++) {
+      JsonNode first = json(send(SYMFONY, alice, "POST", "/api/boards", "{\"title\":\"Égalité\"}"));
+      JsonNode second =
+          json(send(SYMFONY, alice, "POST", "/api/boards", "{\"title\":\"Égalité\"}"));
+      if (first.get("createdAt").asString().equals(second.get("createdAt").asString())) {
+        created = new int[] {first.get("id").asInt(), second.get("id").asInt()};
+      }
+    }
+    assertThat(created).as("égalité non obtenue (createdAt)").isNotNull();
+    same(alice, "GET", "/api/boards", null);
+    assertSmallerIdFirst(
+        json(send(SYMFONY, alice, "GET", "/api/boards", null)), created, "Symfony, accueil");
+
+    // (b) Corbeille : deux tableaux mis à la corbeille sur Symfony dans la même seconde.
+    int[] trashed = null;
+    for (int i = 0; i < MAX_TIE_ATTEMPTS && trashed == null; i++) {
+      int first = createOn(SYMFONY, "{\"title\":\"Égalité corbeille\"}");
+      int second = createOn(SYMFONY, "{\"title\":\"Égalité corbeille\"}");
+      send(SYMFONY, alice, "DELETE", "/api/boards/" + first, null);
+      send(SYMFONY, alice, "DELETE", "/api/boards/" + second, null);
+      JsonNode trash = json(send(SYMFONY, alice, "GET", "/api/trash/boards", null));
+      if (byId(trash, first)
+          .get("deletedAt")
+          .asString()
+          .equals(byId(trash, second).get("deletedAt").asString())) {
+        trashed = new int[] {first, second};
+      }
+    }
+    assertThat(trashed).as("égalité non obtenue (deletedAt)").isNotNull();
+    same(alice, "GET", "/api/trash/boards", null);
+    assertSmallerIdFirst(
+        json(send(SYMFONY, alice, "GET", "/api/trash/boards", null)),
+        trashed,
+        "Symfony, corbeille");
+
+    // (c) Membres : Carla crée, ajoute Bob (admin) puis Alice (membre) ; ordre d'adhésion
+    // Carla, Bob, Alice ; identifiants d'utilisateurs Alice < Bob < Carla.
+    Response board = send(SYMFONY, carla, "POST", "/api/boards", "{\"title\":\"Membres triés\"}");
+    assertThat(board.statusCode()).as(board.asString()).isEqualTo(201);
+    int id = json(board).get("id").asInt();
+    send(
+        SYMFONY,
+        carla,
+        "POST",
+        "/api/boards/" + id + "/members",
+        MIRROR_BODIES.get(5).formatted(bob.email()));
+    send(
+        SYMFONY,
+        carla,
+        "POST",
+        "/api/boards/" + id + "/members",
+        MIRROR_BODIES.get(6).formatted(alice.email()));
+    for (Account a : new Account[] {carla, bob, alice}) {
+      same(a, "GET", "/api/boards/" + id, null);
+      same(a, "GET", "/api/boards", null);
+    }
+    List<Integer> members = new ArrayList<>();
+    json(send(SYMFONY, carla, "GET", "/api/boards/" + id, null))
+        .get("members")
+        .forEach(m -> members.add(m.get("id").asInt()));
+    assertThat(members).as("Symfony : members[*].id croissants").hasSize(3).isSorted();
+  }
+
+  private static JsonNode byId(JsonNode boards, int id) {
+    for (JsonNode b : boards) {
+      if (b.get("id").asInt() == id) {
+        return b;
+      }
+    }
+    throw new AssertionError("tableau " + id + " absent");
+  }
+
+  /** Dans la réponse donnée, le plus petit des deux ids à égalité précède l'autre. */
+  private static void assertSmallerIdFirst(JsonNode boards, int[] tie, String what) {
+    List<Integer> ids = new ArrayList<>();
+    boards.forEach(b -> ids.add(b.get("id").asInt()));
+    int low = Math.min(tie[0], tie[1]);
+    int high = Math.max(tie[0], tie[1]);
+    assertThat(ids).as(what).contains(low, high);
+    assertThat(ids.indexOf(low))
+        .as("%s : %d avant %d", what, low, high)
+        .isLessThan(ids.indexOf(high));
   }
 
   @Test

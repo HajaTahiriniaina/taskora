@@ -32,11 +32,11 @@ class ListMyBoardsIT extends ApiTestBase {
 
   @Test
   @DisplayName(
-      "SC-BOARD-002 / 029 — tableaux ouverts de l'appelant, created_at DESC puis id DESC (égalité 101/102), sans corbeille ni tableaux d'autrui")
+      "SC-BOARD-002 / 029 — tableaux ouverts de l'appelant, created_at DESC puis id ASC (égalité 101/102), sans corbeille ni tableaux d'autrui")
   void listAndOrder() {
     Response r = get(alice(), "/api/boards");
     assertStatus(r, 200);
-    assertThat(ids(json(r))).containsExactly(Fixture.IMPORTED, Fixture.LAUNCH);
+    assertThat(ids(json(r))).containsExactly(Fixture.LAUNCH, Fixture.IMPORTED);
   }
 
   @Test
@@ -53,7 +53,7 @@ class ListMyBoardsIT extends ApiTestBase {
 
   @Test
   @DisplayName(
-      "SC-BOARD-002 — résumé complet : rôle et favori de l'appelant, membres par id d'adhésion, dates ATOM")
+      "SC-BOARD-002 — résumé complet : rôle et favori de l'appelant, membres par identifiant d'utilisateur, dates ATOM")
   void summary() {
     JsonNode launch = board(json(get(carla(), "/api/boards")), Fixture.LAUNCH);
     assertThat(launch.get("title").asString()).isEqualTo(Fixture.LAUNCH_TITLE);
@@ -74,6 +74,26 @@ class ListMyBoardsIT extends ApiTestBase {
     assertThat(bruno.get("avatarColor").asString()).isEqualTo("#ef4444");
     assertAtom(bruno.get("joinedAt"), "2026-07-15T10:00:00+02:00");
     assertAtom(launch.get("members").get(3).get("joinedAt"), "2026-11-22T09:15:00+01:00");
+  }
+
+  @Test
+  @DisplayName(
+      "SC-BOARD-029 — membres triés par identifiant d'utilisateur, pas par ordre d'adhésion (détail et accueil)")
+  void membersOrderedByUserId() {
+    String path = "/api/boards/" + Fixture.EVE_BOARD + "/members";
+    assertStatus(
+        post(eve(), path, "{\"email\":\"" + Fixture.BRUNO_EMAIL + "\",\"role\":\"admin\"}"), 201);
+    assertStatus(post(eve(), path, "{\"email\":\"" + Fixture.ALICE_EMAIL + "\"}"), 201);
+    List<Integer> expected = List.of(Fixture.ALICE, Fixture.BRUNO, Fixture.EVE);
+    assertThat(ids(json(get(eve(), "/api/boards/" + Fixture.EVE_BOARD)).get("members")))
+        .as("GET /api/boards/104 (Ève)")
+        .containsExactlyElementsOf(expected);
+    assertThat(ids(board(json(get(eve(), "/api/boards")), Fixture.EVE_BOARD).get("members")))
+        .as("GET /api/boards (Ève)")
+        .containsExactlyElementsOf(expected);
+    assertThat(ids(board(json(get(alice(), "/api/boards")), Fixture.EVE_BOARD).get("members")))
+        .as("GET /api/boards (Alice)")
+        .containsExactlyElementsOf(expected);
   }
 
   @Test

@@ -63,8 +63,16 @@ class CrossWritesCompatTest {
     int board = json(created).get("id").asInt();
     JsonNode home = json(send(BOARD, alice, "GET", "/api/boards", null));
     assertThat(home.size()).isEqualTo(before + 1);
-    assertThat(home.get(0).get("id").asInt()).isEqualTo(board);
-    assertThat(home.get(0).get("listCount").asInt()).isEqualTo(4);
+    // Recherche par id : avec created_at DESC, id ASC, un tableau créé dans la même seconde par un
+    // autre test peut le précéder (l'ordre est couvert par le miroir).
+    JsonNode found = null;
+    for (JsonNode b : home) {
+      if (b.get("id").asInt() == board) {
+        found = b;
+      }
+    }
+    assertThat(found).as("tableau %d dans l'accueil", board).isNotNull();
+    assertThat(found.get("listCount").asInt()).isEqualTo(4);
   }
 
   @Test
