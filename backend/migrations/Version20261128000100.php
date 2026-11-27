@@ -25,16 +25,13 @@ final class Version20261128000100 extends AbstractMigration
         return false;
     }
 
-    // Exécution directe (et non addSql) dans up() ET down() : Doctrine Migrations réutilise et gèle
-    // l'instance après up() ; dans un même processus (migrate puis migrate <version>), down() lèverait
-    // FrozenMigration et les requêtes planifiées de up() seraient rejouées au retour arrière.
     public function up(Schema $schema): void
     {
-        $this->connection->executeStatement('CREATE TABLE internal_event_receipt (event_id CHAR(36) NOT NULL, type VARCHAR(64) NOT NULL, received_at DATETIME NOT NULL, PRIMARY KEY (event_id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci`');
+        $this->addSql('CREATE TABLE internal_event_receipt (event_id CHAR(36) NOT NULL, type VARCHAR(64) NOT NULL, received_at DATETIME NOT NULL, PRIMARY KEY (event_id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci`');
     }
 
     public function down(Schema $schema): void
     {
-        $this->connection->executeStatement('DROP TABLE IF EXISTS internal_event_receipt');
+        $this->addSql('DROP TABLE internal_event_receipt');
     }
 }
