@@ -161,7 +161,7 @@ Orchestration (26/11/2026) : `frontend.yml` est appelé par `ci.yml` (job `front
 ### Jobs
 | Job | Bloquant | Écarts ou précisions par rapport au §2 |
 |---|---|---|
-| `frontend-quality` | oui | `ng lint --max-warnings=$LINT_MAX_WARNINGS` (904, ligne de base relevée par FrontReviewer) : échec si 1 erreur **ou** si les avertissements dépassent la ligne de base. Sortie JSON `reports/eslint.json` (artefact `frontend-lint-report`), résumé et annotations `::error` des erreurs. Une notice demande d'abaisser `LINT_MAX_WARNINGS` quand le compte baisse. Prettier bloquant (plus de `continue-on-error`). Les trois `tsc --noEmit`. |
+| `frontend-quality` | oui | `ng lint --max-warnings=$LINT_MAX_WARNINGS` (761 au 27/11/2026 après les lots B1 et B2 ; ligne de base initiale 904. Le seuil ne fait que baisser, jusqu'au compte mesuré ; toute hausse est interdite ; un changement d'option de règle qui supprime des avertissements sans corriger le code demande l'accord de Manuel et de FrontPierre dans la PR, cf. `docs/architecture/frontend.md` §5.2) : échec si 1 erreur **ou** si les avertissements dépassent la ligne de base. Sortie JSON `reports/eslint.json` (artefact `frontend-lint-report`), résumé et annotations `::error` des erreurs. Une notice demande d'abaisser `LINT_MAX_WARNINGS` quand le compte baisse. Prettier bloquant (plus de `continue-on-error`). Les trois `tsc --noEmit`. |
 | `frontend-unit` | oui | `npx ng test --watch=false --coverage`, sans condition `hashFiles`. Artefact `frontend-unit-reports` (JUnit + `coverage/`). Pas de seuil (phase 2). |
 | `frontend-build` | oui | inchangé. Trois jobs séparés (un `npm ci` chacun, cache npm), comme proposé. |
 | `frontend-image` | oui | `docker build -f frontend/Dockerfile -t taskora/web:ci frontend/`, sans push. |

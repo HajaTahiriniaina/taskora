@@ -71,6 +71,7 @@ describe('AuthService', () => {
     expect(failed).toBe(false);
     expect(() => ctx.auth.logout()).not.toThrow();
     expect(ctx.auth.isLoggedIn()).toBe(false);
+    ctx.http.verify();
   });
 
   it('SC-IDENT-007 — login stocke taskora.token et taskora.user', () => {

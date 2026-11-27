@@ -2,9 +2,9 @@ import { Activity, PRIORITIES } from '../../core/models';
 
 /** A sentence piece: plain text, bold value, or colored label chip. Rendered with interpolation only (no innerHTML). */
 export interface Seg {
-  t: string;
   b?: boolean;
   color?: string;
+  t: string;
 }
 
 const fmtDate = (iso: string) =>

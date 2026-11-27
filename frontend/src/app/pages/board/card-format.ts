@@ -4,7 +4,7 @@ import { Card, CustomField } from '../../core/models';
 export function formatFieldValue(
   field: CustomField,
   value: unknown,
-): null | { text: string; color?: string } {
+): null | { color?: string; text: string } {
   if (value === null || value === undefined || value === '') return null;
   switch (field.type) {
     case 'checkbox':

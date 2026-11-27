@@ -9,15 +9,15 @@ import { ToastService } from './toast.service';
 export const MAX_ATTACHMENT = 100 * 1024 * 1024;
 
 export interface PendingUpload {
-  uid: number;
   cardId: number;
+  loaded: number;
   name: string;
-  size: number;
   /** 0-100: bytes sent to the server */
   progress: number;
-  loaded: number;
   /** All bytes sent: the server is storing the file (Amazon S3) */
   saving: boolean;
+  size: number;
+  uid: number;
 }
 
 /**
@@ -32,7 +32,7 @@ export class AttachmentUploadsService {
 
   readonly pending = signal<PendingUpload[]>([]);
   /** Emitted for each attachment once stored. */
-  readonly added = new Subject<{ cardId: number; attachment: Attachment }>();
+  readonly added = new Subject<{ attachment: Attachment; cardId: number }>();
 
   /** cardId → overall progress (0-100) of its in-flight uploads (100 = being stored) */
   readonly progressByCard = computed(() => {
