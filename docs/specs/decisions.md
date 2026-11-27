@@ -44,6 +44,16 @@ Toutes les recommandations de Paul (`phase-3-board-service.md` §6) sont validé
 | E12 | **Corrigé** : 404 `{"error":"Ressource introuvable."}` pour toute route du périmètre. |
 | E13 | **Conservé** en phase 3. |
 
+## 2026-11-27 : phase 3, points soulevés par BackAli (étape 2)
+Toutes les recommandations sont validées par l'utilisateur : « Comme recommandé ».
+
+| Réf. | Décision |
+|---|---|
+| U10 | **B-ADR-6 accepté** : un commentaire contenant un fichier inconnu reçoit **503** et rien n'est écrit si le stockage Symfony ne répond pas (divergence voulue ; SC-COMMENT-013 à ajuster par Paul avant T4). |
+| U11 | **Mesure `board-facts.sql` (F0–F13)** sur la base réelle : lancée par Manuel **avec l'accord explicite de l'utilisateur au moment de la lancer**, après la démo client, avant la répétition RB0 de T1 (puis avant T2). Agrégats seulement, session en lecture seule. |
+| U12 | **Secrets internes séparés par appelant dès la phase 3** (pas de secret unique partagé) : chaque endpoint interne n'accepte que le secret de son appelant. |
+| U13 | **E16 étendu à board-service** : un corps JSON qui n'est pas un objet (ex. `[]`) → 400, comme dans identity. |
+
 ## 2026-11-26 : écarts corrigés dans identity-service (au lieu d'être reproduits)
 Décision de l'utilisateur : **corriger** ces écarts dans identity-service. Le backend Symfony n'est pas modifié. Les tests `compat` excluent ces cas, qui sont des divergences voulues.
 
