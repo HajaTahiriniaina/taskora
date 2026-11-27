@@ -118,21 +118,39 @@ Toasts SweetAlert2 : utiliser le rôle si le toast en expose un (à vérifier pa
   - préfixe des sélecteurs : `tk` (élément kebab-case, attribut camelCase).
 - Règles perfectionist (tri `natural`, `asc`) :
   - en **erreur**, car leur correction automatique est sans risque : `sort-imports`, `sort-named-imports`, `sort-named-exports`, `sort-union-types`, `sort-intersection-types` ;
-  - en **avertissement** en phase 2 : `sort-classes`, `sort-objects`, `sort-interfaces`, `sort-object-types`. Un réordonnancement massif peut changer le comportement, par exemple l'ordre des initialiseurs de champs qui dépendent d'`inject()`, ou l'ordre des routes. Ces règles ne sont **pas** corrigées automatiquement sur le code existant. Elles passeront en erreur après un chantier dédié.
+  - en **erreur** depuis le lot B1 (27/11/2026, `3e4a1c3`) : `sort-interfaces`, `sort-object-types` (types seulement, bundle identique) ;
+  - en **avertissement** : `sort-classes`, `sort-objects`. Un réordonnancement massif peut changer le comportement, par exemple l'ordre des initialiseurs de champs qui dépendent d'`inject()`, ou l'ordre des routes. Ces règles ne sont **pas** corrigées automatiquement sur le code existant. Elles passeront en erreur à la fin du lot B4.
+- Passées en **erreur** par le lot B2 (27/11/2026, `80ba705`) : `@typescript-eslint/no-explicit-any`, `@typescript-eslint/no-unused-vars` (avec `ignoreRestSiblings: true`, commenté dans `eslint.config.js`), `no-irregular-whitespace`, `@angular-eslint/component-selector` (racine `tk-root`).
 - Dossiers ignorés : `dist`, `.angular`, `node_modules`, `reports`, `public`.
 - Ligne de base : une erreur non corrigible automatiquement dans le code existant fait passer la règle en `warn` dans `eslint.config.js`, avec le commentaire `// ligne de base phase 2`, et la liste va dans le rapport de FrontReviewer. Aucun `eslint-disable` dans le code.
 - Avertissements dans une PR (règle précisée à la recette, m2, 26/11/2026) :
   - **fichier nouveau** : aucun avertissement (`npx eslint --max-warnings=0 <fichiers>`) ;
   - **fichier existant modifié** : pour chaque règle, le nombre d'avertissements du fichier n'augmente pas par rapport à `git merge-base` (comparaison `eslint --format json` des deux versions, donnée par le Reviewer) ;
   - avertissements d'accessibilité de template sur les **lignes modifiées** : corrigés dans la même PR, avec un test si le comportement au clavier change ;
-  - **global** : `LINT_MAX_WARNINGS` (CI, 904 au 26/11/2026) ne fait que baisser ; une PR qui réduit le compte l'abaisse dans le même commit.
-- Réduction de la ligne de base : lots B1 à B4 de `docs/reviews/2026-11-26-frontend-identity-recette.md` §4.7 (types d'abord, puis petites règles, accessibilité page par page avec tests, `sort-objects`/`sort-classes` en dernier dans un chantier dédié).
+  - **global** : `LINT_MAX_WARNINGS` (CI) ne fait que baisser, jamais monter ; une PR qui réduit le compte l'abaisse dans le même commit. Historique : 904 (26/11/2026), 769 (B1), **761** (B2, 27/11/2026, valeur courante).
+  - **accord de Manuel** (position de FrontPierre à la recette des suites, m1, 27/11/2026, soumise à Manuel) : une **baisse** de `LINT_MAX_WARNINGS` jusqu'au compte mesuré applique la règle « le seuil ne fait que baisser » et ne demande pas d'accord au cas par cas. FrontCodeur l'applique dans le commit qui réduit le compte et y cite le compte mesuré ; Manuel en est informé par la PR. Toute **hausse** est interdite (aucune exception sans décision de l'utilisateur). Tout changement d'option de règle qui fait disparaître des avertissements sans corriger le code demande l'accord explicite de Manuel et de FrontPierre, écrit dans la PR. Tant que Manuel n'a pas confirmé cette position dans `docs/ci/requests/frontend.md` §8, son accord est demandé dans la PR.
+- Réduction de la ligne de base : lots B1 à B4 de `docs/reviews/2026-11-26-frontend-identity-recette.md` §4.7. État au 27/11/2026 (`docs/reviews/2026-11-27-frontend-recette-suites-recette.md`) :
+
+| Lot | Règles | Nombre | État |
+|---|---|---:|---|
+| B1 | `sort-interfaces`, `sort-object-types` | 135 | **fait** (`3e4a1c3`, dans `.git-blame-ignore-revs`) ; bundle identique octet pour octet |
+| B2 | `no-explicit-any`, `no-unused-vars`, `no-irregular-whitespace`, `component-selector`, avertissement CommonJS `sweetalert2` | 8 | **fait** (`80ba705`) |
+| B3 | accessibilité des templates : `click-events-have-key-events` (35), `interactive-supports-focus` (28), `no-autofocus` (10), `label-has-associated-control` (5) | 78 | **suivant** : page par page, dans l'ordre de travail de chaque page, test clavier d'abord (FrontTesteur) puis correctif (FrontCodeur). Pas de lot global. |
+| ST | `strictTemplates` (hors lint, §5.4) | — | **à faire avant B4** |
+| B4 | `sort-objects` (353), `sort-classes` (330) | 683 | **après ST** et après les tests des pages concernées ; configuration des groupes de `sort-classes` d'abord, jamais `--fix` global |
 
 ### 5.3 Formatage
 Prettier 3.10.1 avec la configuration `.prettierrc` existante : largeur 100, guillemets simples, parseur `angular` pour le HTML. Les 59 fichiers non conformes sont reformatés dans un commit dédié (§7). Ensuite, `prettier --check` est bloquant en CI.
 - Blancs dans les templates (décision m1) : Prettier peut remettre une interpolation sur sa propre ligne ; Angular rend alors une espace de chaque côté du texte. C'est invisible en `white-space: normal`, mais **visible dans un conteneur `white-space: pre*`** (exemple : visionneuse JSON). Dans ces conteneurs, l'interpolation reste collée à ses balises, ou passe par un `computed` court qui tient sur la ligne.
 
-### 5.4 Versions
+### 5.4 Vérification des templates (`strictTemplates`)
+Décision de recette m4 (27/11/2026) : `strictTemplates` n'est pas activé aujourd'hui (`angularCompilerOptions` ne contient que `strictInjectionParameters` et `strictInputAccessModifiers`, et `compilerOptions` n'active pas `strict`). Les liaisons de template ne sont donc vérifiées qu'en mode de base.
+- `strictTemplates: true` est activé dans un lot dédié **ST**, **avant** B4 : B4 réordonne des membres de classes utilisés par les templates, et on veut que le compilateur vérifie ces liaisons pendant ce chantier.
+- Méthode (FrontCodeur) : mesure d'abord, sur une branche jetable, des erreurs de compilation par fichier avec le drapeau activé, rendue dans le rapport ; puis corrections de types seulement (annotations, garde de type, `computed` typé), sans `$any()` ni `// @ts-ignore`, et le drapeau dans le même commit, car une erreur de template bloque le build et ne peut pas aller dans une ligne de base. Bundle de production comparé avant et après ; tout écart est expliqué. Tests unitaires, build et e2e verts.
+- Si la mesure dépasse 40 erreurs, le lot est découpé page par page (corrections d'abord, drapeau en dernier).
+- Le passage de TypeScript en `strict` n'est **pas** décidé : il est mesuré en même temps (compte d'erreurs `tsc --strict --noEmit` dans le rapport ST) et sera tranché à la recette de ST.
+
+### 5.5 Versions
 Le tableau détaillé des versions et de leur vérification est dans `docs/ci/requests/frontend.md` §7.
 - Il faut Node ≥ 24.15.0 en CI comme en local. Le poste de développement actuel a Node 16 ; à mettre à niveau par l'utilisateur.
 - La version d'Angular ne change pas.
@@ -150,5 +168,6 @@ Le tableau détaillé des versions et de leur vérification est dans `docs/ci/re
 ## 7. Historique des décisions
 | Date | Décision |
 |---|---|
+| 27/11/2026 (recette des suites) | Suites S1–S3 acceptées (`docs/reviews/2026-11-27-frontend-recette-suites-recette.md`). `role="alert"` en place sur `/login` et `/register` ; visionneuse JSON sans espace parasite ; lots B1 et B2 faits, `LINT_MAX_WARNINGS` = 761. Position m1 soumise à Manuel : une baisse du seuil jusqu'au compte mesuré ne demande pas d'accord au cas par cas ; hausse interdite. Contrôle visuel de la visionneuse JSON rattaché à l'e2e SC-ATTACH-010 (m3). `strictTemplates` activé dans un lot ST avant B4 (m4, §5.4). Ordre des suites : scénarios IDENT front, B3 par page, ST, SC-ATTACH-010, B4. |
 | 26/11/2026 (recette) | Phase 2 acceptée (`docs/reviews/2026-11-26-frontend-identity-recette.md`). Règles précisées : avertissements ESLint par fichier (m2, §5.2), mots de passe des specs (m4, §4.2), `verify()` (m5bis, §4.2), blancs en `pre-wrap` (m1, §5.3), limites du proxy (m9, §6). `role="alert"` sur les messages d'erreur des formulaires (m6). Plan de réduction de la ligne de base B1–B4. |
 | 26/11/2026 | Vitest + jsdom via `@angular/build:unit-test` ; Playwright Chromium ; un fichier e2e par page avec l'étiquette `@identity` ; comptes créés par l'API dans chaque test ; ESLint (angular-eslint + perfectionist) avec ligne de base ; formatage Prettier dans un commit dédié. |

@@ -318,6 +318,69 @@ Validation : intégration (démarrage du contexte Spring) [back] — Acceptation
 - Services externes : aucun (pas d'envoi d'e-mail aujourd'hui).
 
 ## 6. Exigences non fonctionnelles
-- **Performance** : `POST /api/auth/login` p95 < 500 ms (hachage compris, coût 13) ; `GET /api/me` p95 < 50 ms hors réseau ; validation du JWT sans appel réseau (clé publique en mémoire).
+- **Performance** : critère de latence de la décision **PERF-IDENT-1** ci-dessous (remplace l'ancien seuil absolu « login p95 < 500 ms ») ; `GET /api/me` p95 < 50 ms ; validation du JWT sans appel réseau (clé publique en mémoire).
+
+### 6.1 Décision PERF-IDENT-1 — critère de latence de la connexion et de l'inscription (Paul, 26/11/2026)
+Origine : constat B1 de la répétition du retour arrière (`docs/reviews/2026-11-26-identity-rollback-rehearsal.md` §5, §7). Note de décision : `docs/reviews/2026-11-26-identity-latency-decision-paul.md`.
+
+**Pourquoi l'ancien seuil absolu est abandonné pour `login` et `register`.** Ces deux routes passent l'essentiel de leur temps dans bcrypt `$2y$` coût 13 (environ 0,4 à 0,5 s par opération, voulu). Un seuil absolu de 500 ms mesure donc surtout la vitesse du processeur de la machine de mesure : Symfony lui-même n'y passe que de justesse sur le poste de recette (p95 498,3 ms). Il ne dit rien de l'écart propre à identity-service, qui est la seule chose que la migration peut dégrader.
+
+**Le coût bcrypt n'est pas une variable d'ajustement.**
+- Coût 13, `$2y$`, imposé pour la coexistence (A2 de `phase-1-identity.md` ; `identity-migration.md` §6.2 : hashes lisibles par PHP au retour arrière ; `backend-hexagonal.md` : `BCryptVersion.$2Y, 13`).
+- Baisser le coût des nouveaux hashes affaiblirait la résistance au cassage hors ligne (chaque cran divise par deux le travail d'un attaquant) et ne corrigerait même pas la connexion : la vérification d'un hash existant se fait au coût **inscrit dans le hash**, donc coût 13 pour tous les comptes repris.
+- Sont interdits pour tenir le critère : baisser le coût, sauter ou mettre en cache une vérification, raccourcir le chemin « e-mail inconnu » (SC-IDENT-008 : écart médian < 50 % entre e-mail inconnu et mauvais mot de passe), abandonner la comparaison à temps constant.
+- Après la coexistence, toute évolution du coût est une décision de sécurité distincte, uniquement **à la hausse**, avec re-hachage à la connexion. Le critère ci-dessous se recalcule alors avec la nouvelle référence.
+
+**Critère pendant la coexistence (référence Symfony disponible).** Pour `POST /api/auth/login` et `POST /api/auth/register`, mesurés selon le protocole ci-dessous, les trois conditions sont exigées :
+| Réf. | Condition | Statut |
+|---|---|---|
+| L1 | p95 identity ≤ **1,15 ×** p95 Symfony | bloquant |
+| L2 | p50 identity ≤ **1,15 ×** p50 Symfony (le surcoût est systématique, pas un effet de queue) | bloquant |
+| L3 | p95 identity ≤ **1 000 ms** en valeur absolue (plafond d'expérience utilisateur, quel que soit le matériel) | bloquant |
+| L4 | objectif de conception : ratio ≤ 1,10 | non bloquant, à viser |
+| L5 | 0 réponse 5xx et 100 % des codes attendus (200 au login, 201 à l'inscription) | bloquant |
+
+Justification de la marge de 15 % :
+- l'écart entre deux échantillons d'un même amont est inférieur à 1 % (641,6 / 643,5 ms), donc 15 % ne sert pas à absorber du bruit de mesure ;
+- 15 % de 0,5 s représentent environ 75 ms sur une action rare : le jeton dure 7 jours, la connexion n'a lieu qu'environ une fois par semaine et par navigateur, et l'inscription une seule fois ;
+- cette marge laisse à la JVM un écart raisonnable face à l'implémentation C de PHP, sans tolérer le surcoût de 30 % constaté, qui révèle un défaut d'implémentation ou de ressources et non une limite de bcrypt.
+
+`GET /api/me` (pas de hachage) garde un critère **absolu** : p95 < 50 ms, mesuré à travers nginx sur la même stack. Aucun critère relatif : l'écart de 5,7 contre 5,1 ms est sous la milliseconde et sans effet perceptible.
+
+**Critère après la coexistence (Symfony ne sert plus l'authentification).** La référence devient le **p95 Symfony figé** de la dernière mesure conforme, sur le matériel où il a été mesuré, consigné dans le compte rendu. Conditions : L1 et L2 calculées contre cette référence figée, plus L3 et L5. Si le matériel de production change, la référence est remesurée sur le nouveau matériel avec l'image `api` démarrée dans une stack de recette, tant qu'elle reste constructible depuis le dépôt.
+
+**Protocole de mesure (normatif).**
+| Élément | Règle |
+|---|---|
+| Matériel | Le critère étant relatif, le poste de recette (Apple M1, Docker Desktop, images `arm64` natives) est **valable** pour R8. Si la production tourne sur un autre matériel, le même protocole y est rejoué sur une stack de recette avant d'annoncer la bascule (condition de `identity-migration.md` §6.3). |
+| Conditions | Même stack, même session, mêmes limites de ressources que le `docker-compose.yml` versionné (aucune surcharge propre à la mesure : identity `mem_limit` 768m, pas de limite CPU, ni pour `api` ni pour `identity`). Poste sur secteur, sans autre charge notable. Ressources de Docker Desktop consignées. |
+| Chemin | Client sur l'hôte → nginx (`web`) → amont. Commutation de l'amont par `IDENTITY_UPSTREAM` (recréation de `web` seule). Jamais par le port de développement d'identity. |
+| Ordre | Blocs **alternés** : Symfony, identity, Symfony, identity. Les deux amonts sont mesurés dans la même session, à moins de 30 min d'écart. |
+| Échantillon | Par bloc : **50 requêtes de chauffe exclues**, puis **200 mesurées**. Soit 400 mesures par amont et par route. Login : un même compte haché par Symfony (`$2y$` coût 13), identifiants corrects. Inscription : e-mails uniques `@exemple.test`. `GET /api/me` : 1 000 mesures par bloc identity. |
+| Concurrence | **Séquentielle** (une requête à la fois) pour le critère : elle isole le coût par requête et rend les deux amonts comparables. Une mesure informative à 4 requêtes simultanées (p95, débit) est consignée, sans seuil en phase 1 ; seul L5 s'y applique. |
+| Calcul | Ratios p95 et p50 calculés sur les 400 mesures regroupées par amont. Chaque bloc est aussi reporté, pour vérifier la stabilité : si l'écart entre les deux blocs d'un même amont dépasse 5 %, la mesure est invalide et elle est rejouée. Le rapport donne p50, p95, p99, max et les codes. |
+| Contenu du rapport | Comptages, durées et ratios uniquement : ni mot de passe, ni hash, ni jeton, ni secret. |
+
+**Application au constat B1 (mesures du 26/11/2026).** Ces mesures n'ont pas suivi ce protocole : 10 requêtes de chauffe seulement, blocs non alternés. Elles restent probantes : l'écart est stable d'un échantillon à l'autre (< 1 %) et très au-delà de la marge.
+| Route | Symfony p50 / p95 | identity p50 / p95 | Ratio p50 / p95 | L1–L3 |
+|---|---|---|---|---|
+| login | 459,7 / 498,3 ms | 605,5–609,5 / 641,6–643,5 ms | 1,32–1,33 / 1,29 | L1 ❌ L2 ❌ L3 ✅ |
+| register | 461,6 / 492,5 ms | 615,1 / 658,7 ms | 1,33 / 1,34 | L1 ❌ L2 ❌ L3 ✅ |
+| `GET /api/me` | — / 5,1 ms | — / 4,5–5,7 ms | — | < 50 ms ✅ |
+
+**B1 reste bloquant.** Cible pour BackAli, avec la référence Symfony actuelle, à confirmer par la nouvelle mesure, qui seule fait foi :
+- login : p95 ≤ ~573 ms et p50 ≤ ~529 ms (objectif L4 : p95 ≤ ~548 ms) ;
+- inscription : p95 ≤ ~566 ms et p50 ≤ ~531 ms (objectif L4 : p95 ≤ ~542 ms).
+
+Le gain à obtenir est d'au moins 70 ms par connexion et 90 ms par inscription au p95, à coût bcrypt égal. Si la cible est hors d'atteinte sans enfreindre les interdits ci-dessus, BackAli le documente, puis Paul soumet à l'utilisateur l'acceptation explicite de l'écart comme risque. Aucun assouplissement du seuil ni du coût n'est décidé sans lui.
+
+Re-mesure après correction : `identity-migration.md` §6.3, « Reprise de R8 ».
+
+**Décision de l'utilisateur du 27/11/2026 (après la reprise de R8).** Citation : « Pour la R8, pourquoi faire des mesures? Tant que ça fonctionne, on règlera les mesures plus tard », confirmée par « Oui, consigne-la ». Note : `docs/reviews/2026-11-27-identity-phase1-exit-paul.md`.
+- **L1 à L4 ne bloquent plus la bascule.** Ils deviennent un **suivi après la bascule** : mesure des p50 et p95 sur le matériel cible ou sur un poste au calme, selon le protocole ci-dessus, et ligne de journal `INFO` nommant le moteur bcrypt actif (constat N2 de `docs/reviews/2026-11-27-identity-r8-rerun.md`). La condition « rejouer le protocole sur le matériel de production avant d'annoncer la bascule » (ligne « Matériel » du protocole) relève désormais de ce suivi.
+- **L5 reste exigé** (0 × 5xx, 100 % des codes attendus) : constaté conforme en R8 (0 × 5xx sur 12 800 requêtes).
+- Le critère PERF-IDENT-1 et son protocole **restent la référence** de la mesure de suivi ; ils ne sont pas assouplis.
+- B1 est clos : cause corrigée (moteur natif), prouvée par `BcryptLatencyIT` (ratio 1,00), qui tourne en CI sur chaque PR touchant `services/` et bloque via `ci-gate`.
+- Risque résiduel accepté par l'utilisateur : le p95 à travers nginx n'est pas prouvé selon le protocole (M3 de R8 invalide, hôte chargé). Mitigation : garde `BcryptLatencyIT` en CI, retour arrière rapide vers Symfony (~1 s), mesure après la bascule.
 - **Sécurité** : clé privée lue depuis un volume ou un secret, jamais dans l'image ni dans Git ; comparaison de hash à temps constant ; dépendances sans CVE critique (OWASP Dependency-Check) ; CORS limité à l'origine du front.
-- **Accessibilité** : formulaires avec `<label for>` ; bouton « Afficher le mot de passe » avec `aria-label` ; messages d'erreur annoncés : **décision** (Paul, 26/11/2026, sur proposition de FrontPierre, recette m6), les messages d'erreur des formulaires `/login` et `/register` sont portés par `<div class="error" role="alert">`, sans `aria-live` supplémentaire (`role="alert"` l'implique) ; absent du code au 26/11/2026, ajouté par la suite S1/S2 de `docs/reviews/2026-11-26-frontend-identity-recette.md` §5 (test d'abord) ; navigation au clavier complète.
+- **Accessibilité** : formulaires avec `<label for>` ; bouton « Afficher le mot de passe » avec `aria-label` ; messages d'erreur annoncés : **décision** (Paul, 26/11/2026, sur proposition de FrontPierre, recette m6), les messages d'erreur des formulaires `/login` et `/register` sont portés par `<div class="error" role="alert">`, sans `aria-live` supplémentaire (`role="alert"` l'implique) ; en place depuis `66a493a` (27/11/2026), ajouté par la suite S1/S2 de `docs/reviews/2026-11-26-frontend-identity-recette.md` §5 (test d'abord) ; navigation au clavier complète.

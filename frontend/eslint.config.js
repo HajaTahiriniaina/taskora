@@ -28,9 +28,8 @@ module.exports = defineConfig([
           style: 'camelCase',
         },
       ],
-      // ligne de base phase 2 : app-root (src/index.html, src/app/app.ts), 1 occurrence.
       '@angular-eslint/component-selector': [
-        'warn',
+        'error',
         {
           type: 'element',
           prefix: 'tk',
@@ -43,16 +42,18 @@ module.exports = defineConfig([
       'perfectionist/sort-named-exports': ['error', sortOptions],
       'perfectionist/sort-union-types': ['error', sortOptions],
       'perfectionist/sort-intersection-types': ['error', sortOptions],
+      // Types seulement, corrigés au lot B1 (recette §4.7) : en erreur.
+      'perfectionist/sort-interfaces': ['error', sortOptions],
+      'perfectionist/sort-object-types': ['error', sortOptions],
       // Réordonnancement à risque (ordre des inject(), des routes…) : avertissement en phase 2,
-      // jamais corrigé automatiquement sur le code existant.
+      // jamais corrigé automatiquement sur le code existant (lot B4).
       'perfectionist/sort-classes': ['warn', sortOptions],
       'perfectionist/sort-objects': ['warn', sortOptions],
-      'perfectionist/sort-interfaces': ['warn', sortOptions],
-      'perfectionist/sort-object-types': ['warn', sortOptions],
-      // ligne de base phase 2 : erreurs existantes non corrigibles automatiquement sans risque.
-      '@typescript-eslint/no-explicit-any': 'warn', // ligne de base phase 2
-      '@typescript-eslint/no-unused-vars': 'warn', // ligne de base phase 2
-      'no-irregular-whitespace': 'warn', // ligne de base phase 2
+      // Lot B2 (recette §4.7) : corrigés, en erreur. ignoreRestSiblings : la déstructuration
+      // { a, ...reste } sert à omettre des propriétés (board.component.ts, onCardChanged).
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+      'no-irregular-whitespace': 'error',
     },
   },
   {

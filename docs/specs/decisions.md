@@ -13,6 +13,12 @@ Les recommandations de Paul sont validées par l'utilisateur.
 | E4 | Règle métier **confirmée** : tout membre peut modifier le tableau, ses listes, étiquettes et champs personnalisés. |
 | E14 | **Corrigé** dans le backend Symfony : après un import Trello, `card_seq` vaut le plus grand numéro réellement attribué. |
 
+## 2026-11-27 : latence et bascule d'identity-service
+
+| Réf. | Décision |
+|---|---|
+| U5 | Les critères de latence L1 à L4 (PERF-IDENT-1) ne bloquent plus la bascule : « Tant que ça fonctionne, on règlera les mesures plus tard. » Ils deviennent un suivi après la bascule. L5 (aucune 5xx) reste exigé. Risque accepté : p95 de bout en bout non prouvé ; parades : `BcryptLatencyIT` en CI, retour arrière en ~1 s. Détail : [sortie de phase 1](../reviews/2026-11-27-identity-phase1-exit-paul.md). |
+
 ## 2026-11-26 : écarts corrigés dans identity-service (au lieu d'être reproduits)
 Décision de l'utilisateur : **corriger** ces écarts dans identity-service. Le backend Symfony n'est pas modifié. Les tests `compat` excluent ces cas, qui sont des divergences voulues.
 

@@ -102,13 +102,14 @@ Le rapport n'affiche que des nombres et des empreintes. Il est conservé dans le
 Prérequis : tests critiques verts, rapport BackReviewer sans bloquant, **retour arrière répété en recette** (§6), sauvegarde `mariadb-dump` de `taskora.user` (fichier hors dépôt).
 
 Conditions préalables à la bascule (revue 2, toutes obligatoires ; aucune n'est remplie par un run local) :
-| Réf. | Condition | Responsable | Dépend de | Statut (recette BackAli, 26/11/2026) |
+| Réf. | Condition | Responsable | Dépend de | Statut (recette BackAli du 26/11/2026, mis à jour le 27/11/2026) |
 |---|---|---|---|---|
-| **C1** | Run CI `identity-security` (OWASP dependency-check) vert : aucune dépendance CVSS ≥ 7, résumé dans `docs/ci/requests/backend.md` | Manuel | push approuvé par l'utilisateur | **remplie** : `identity-security` vert sur la PR #1 (fusion `86b3b07`), aucune dépendance CVSS ≥ 7 ; résumé chiffré encore à reporter dans `docs/ci/requests/backend.md` (Manuel) |
-| **C2** | Runs CI `identity-service` (tests, qualité, image) et `identity-compat` verts ; `identity-compat` prouve les tests miroir SC-IDENT-001…018 et croisés SC-IDENT-010/023, jamais exécutés en local | Manuel | push approuvé par l'utilisateur | **remplie** : `identity-service` (build, tests, qualité, image) et `identity-compat` (32/32, dont `MirrorCompatibilityTest`) verts sur la PR #1 ; job Sonar sauté (voir C4) |
-| **C3** | Passphrase JWT changée partout où elle a servi (elle figure dans l'historique git, revue 1 m11) ; nouvelle paire de clés générée, jetons existants invalidés (annonce aux utilisateurs) | utilisateur | — | **remplie en local (26/11/2026)** : nouvelle passphrase dans `.env` et `backend/.env`, paire régénérée (`--overwrite`), ancien jeton refusé (401), nouvelle connexion acceptée (200). À refaire sur tout autre environnement où l'ancienne passphrase a servi. |
-| **C4** | Quality gate Sonar vert sur le serveur de CI, sur la référence de CI (exclusions limitées à A16 `e1`–`e3`) | Manuel, BackReviewer | push approuvé par l'utilisateur | **en attente de l'utilisateur** : variable `SONAR_HOST_URL` et secret `SONAR_TOKEN` à créer sur GitHub (job `identity-sonar` sauté sur la PR #1) |
+| **C1** | Run CI `identity-security` (OWASP dependency-check) vert : aucune dépendance CVSS ≥ 7, résumé dans `docs/ci/requests/backend.md` | Manuel | push approuvé par l'utilisateur | **remplie** (consignée le 27/11/2026) : `identity-security` vert sur la PR #1 (fusion `86b3b07`), aucune dépendance CVSS ≥ 7 ; résumé chiffré encore à reporter dans `docs/ci/requests/backend.md` (Manuel) |
+| **C2** | Runs CI `identity-service` (tests, qualité, image) et `identity-compat` verts ; `identity-compat` prouve les tests miroir SC-IDENT-001…018 et croisés SC-IDENT-010/023, jamais exécutés en local | Manuel | push approuvé par l'utilisateur | **remplie** (consignée le 27/11/2026) : `identity-service` (build, tests, qualité, image) et `identity-compat` (32/32, dont `MirrorCompatibilityTest`) verts sur la PR #1 ; job Sonar sauté (voir C4) |
+| **C3** | Passphrase JWT changée partout où elle a servi (elle figure dans l'historique git, revue 1 m11) ; nouvelle paire de clés générée, jetons existants invalidés (annonce aux utilisateurs) | utilisateur | — | **remplie** (consignée le 27/11/2026) ; faite en local le 26/11/2026 : nouvelle passphrase dans `.env` et `backend/.env`, paire régénérée (`--overwrite`), ancien jeton refusé (401), nouvelle connexion acceptée (200). À refaire sur tout autre environnement où l'ancienne passphrase a servi. |
+| **C4** | Quality gate Sonar vert sur le serveur de CI, sur la référence de CI (exclusions limitées à A16 `e1`–`e3`) | Manuel, BackReviewer | push approuvé par l'utilisateur | **remplie** (27/11/2026) : l'utilisateur a confirmé que le job Sonar s'exécute en CI (PR #7). Historique : job `identity-sonar` sauté sur la PR #1 faute de `SONAR_HOST_URL` / `SONAR_TOKEN`. |
 La bascule (étape 1 ci-dessous) n'est pas annoncée tant que C1 à C4 ne sont pas consignées comme remplies. Détail et preuves : [recette BackAli](../reviews/2026-11-26-identity-service-recette.md).
+**C1 à C4 consignées comme remplies le 27/11/2026** ([décision utilisateur du 27/11/2026 et sortie de phase 1](../reviews/2026-11-27-identity-phase1-exit-paul.md)). La bascule peut être planifiée ; liste de préparation dans ce document, §5.
 1. **T-24 h** : annonce de la coupure des écritures d'identité (inscription, profil).
 2. **T-10 min** : `identity` déployé mais **non routé** ; `verify` lancé à blanc (la cible peut être vide ou ancienne).
 3. **T0 — gel** : nginx renvoie `503 {"error":"Maintenance en cours, réessayez dans quelques minutes."}` sur `POST /api/auth/register` et `PATCH /api/me` uniquement (login et lectures restent servis par Symfony, ils n'écrivent pas dans `user`).
@@ -131,6 +132,64 @@ Dégel nginx, rien d'autre : Symfony n'a jamais cessé d'être l'écrivain.
 
 ### 6.3 Répétition en recette (critère de sortie, Paul)
 Sur une copie de la base : bascule → inscription + changement de mot de passe via identity → retour arrière → login avec le nouveau mot de passe **via Symfony** → nouvelle inscription via Symfony → re-bascule → `verify` vert → login des deux comptes via identity. Résultat consigné dans `docs/reviews/`.
+
+**Statut au 27/11/2026 : RÉUSSIE** — R1–R7 et R9 du 26/11/2026, R8 repris le 27/11/2026 (M0, M1, M2, M4, M5, M6 conformes ; M3 invalide, ses critères L1–L4 passés en suivi après la bascule par décision de l'utilisateur). Référence : [décision utilisateur du 27/11/2026 et sortie de phase 1](../reviews/2026-11-27-identity-phase1-exit-paul.md).
+
+Historique — **statut (répétition R0–R10 du 26/11/2026, stack `taskora-rehearsal`, `main` `934dd2c`) : ÉCHOUÉE**, sur la seule étape R8 (performance). Détail : [compte rendu](../reviews/2026-11-26-identity-rollback-rehearsal.md).
+- **Conforme** :
+  - deux bascules (16 s et 14 s, gel 503 sur les deux écritures, lectures servies), avec `verify` vert à chaque fois ;
+  - retour arrière : routage en 1 s, outbox vidée (`PENDING` = 0 en 38 s, 0 `FAILED`) ;
+  - mot de passe changé via identity, accepté par Symfony ; ancien mot de passe refusé ; jetons acceptés dans les deux sens ;
+  - inscription via Symfony rapatriée, login des deux comptes via identity ;
+  - non-régression board/notification/push ;
+  - e2e `@identity` 14/14 sur les deux amonts ;
+  - comptages R0 + 2 ; 0 fuite et 0 × 5xx dans les journaux.
+- **Non conforme** : `POST /api/auth/login` via identity a un p95 de 641,6 et 643,5 ms, pour un seuil < 500 ms. Symfony est à 498,3 ms sur le même hôte. Renvoi à BackAli (B1).
+  - Seuil tranché par Paul : décision **PERF-IDENT-1** (`docs/specs/identity.md` §6.1). Le critère devient relatif à Symfony : p95 et p50 ≤ 1,15 × Symfony, plus un plafond de p95 ≤ 1 000 ms, à coût 13 inchangé.
+  - Avec ce critère, **B1 reste bloquant** (+29 % au login, +34 % à l'inscription). **B1 clos le 27/11/2026** : moteur bcrypt natif ([revue B1](../reviews/2026-11-26-identity-b1-native-bcrypt.md), `BcryptLatencyIT` ratio 1,00).
+  - Cible : login p95 ≤ ~573 ms, inscription p95 ≤ ~566 ms, contre la référence Symfony actuelle.
+- Écart : la base de recette a été remplie par l'API avec des comptes synthétiques au lieu d'une copie de la base de travail, qui contient des données personnelles.
+
+#### Reprise de R8 après correction de B1 (Paul, 26/11/2026)
+Cette reprise remplace la « nouvelle répétition R7–R9 » demandée plus haut. R1–R7 et R9 sont acquis le 26/11/2026 : on ne les rejoue pas, **à condition** que la correction ne touche ni au routage nginx, ni au gel, ni à la reprise (`legacy-import`), ni à la projection `taskora.user`, ni à l'outbox. Si elle y touche, la répétition complète R0–R10 est rejouée.
+
+Préalables (BackAli) :
+- correction sur une branche dédiée, avec un rapport BackReviewer sans bloquant ;
+- aucun test modifié ni affaibli ;
+- tests verts : `SymfonyCompatiblePasswordHasherTest` (hashes de référence PHP), `LoginTimingIT` (SC-IDENT-008) ;
+- CI `identity-compat` verte (`CrossPasswordCompatibilityTest`, SC-IDENT-017/023), car la vérification des mots de passe change d'implémentation.
+
+| # | Étape | Qui | Attendu |
+|---|---|---|---|
+| M0 | Stack `taskora-rehearsal` **neuve**, construite depuis le commit corrigé, données synthétiques `@exemple.test` remplies par l'API Symfony (comptes `$2y$` coût 13) | Manuel (stack), BackAli (données) | stack saine ; stack `taskora` jamais visée |
+| M1 | Préparation : gel, `--identity.legacy-import=run`, `verify`, routage vers identity (§5, étapes 3 à 5) | BackAli, Manuel | `verify` vert (non rejugé au-delà) |
+| M2 | Contrôles fonctionnels via identity : login d'un compte haché par Symfony (200), mauvais mot de passe (401), e-mail inconnu (401, même corps) | BackAli | 200 / 401 / 401 |
+| M3 | Mesures selon le protocole PERF-IDENT-1 : blocs alternés Symfony / identity / Symfony / identity ; login, inscription, `GET /api/me` ; mesure informative à 4 requêtes simultanées | BackAli (mesures), Manuel (commutations) | L1, L2, L3, L5 conformes ; `GET /api/me` p95 < 50 ms |
+| M4 | e2e `@identity` contre identity | BackAli | 14/14 |
+| M5 | Journaux `identity` et `web` : 0 mot de passe, hash, jeton ni secret (SC-IDENT-024) ; 0 × 5xx | BackAli | 0 / 0 |
+| M6 | Nettoyage : `down -v` du seul projet `taskora-rehearsal`, images et fichier de secrets supprimés | Manuel | aucune ressource `taskora-rehearsal` restante |
+
+- Compte rendu : `docs/reviews/<date>-identity-r8-rerun.md`, rédigé par BackAli. Il contient l'environnement, le commit, un tableau par bloc, les ratios et le verdict L1–L5. Il ne contient que des nombres.
+- Si M2–M5 sont conformes, Paul déclare la répétition §6.3 **réussie** (R1–R7 et R9 du 26/11, R8 repris), passe les lignes back IDENT à `validé` et déclare la sortie de phase 1.
+- Sinon, renvoi à BackAli.
+
+**Résultat (27/11/2026)** : [compte rendu de la reprise](../reviews/2026-11-27-identity-r8-rerun.md), `main` `42a8ee7`.
+| # | Résultat |
+|---|---|
+| M0 | conforme : 6 services sains, 7 comptes `$2y$`/13 créés par l'API Symfony |
+| M1 | conforme : `run` et `verify` verts, routage vers identity |
+| M2 | conforme : 200 / 401 / 401, corps identiques ; moteur natif en service |
+| M3 | **invalide** : écart > 5 % entre blocs d'un même amont, dû à l'hôte (sur batterie, autre projet Docker à ~325 % CPU) ; ratios p50 indicatifs de 0,94 à 1,01 ; L5 : 0 × 5xx |
+| M4 | conforme : e2e `@identity` 14/14 |
+| M5 | conforme : 0 fuite, 0 × 5xx sur 12 800 requêtes |
+| M6 | conforme : aucune ressource `taskora-rehearsal` restante |
+
+**Décision de l'utilisateur (27/11/2026)** : « Pour la R8, pourquoi faire des mesures? Tant que ça fonctionne, on règlera les mesures plus tard », confirmée par « Oui, consigne-la ».
+- L1–L4 de PERF-IDENT-1 ne bloquent plus la bascule ; ils deviennent un suivi après la bascule (p50/p95 sur le matériel cible ou un poste au calme, ligne `INFO` nommant le moteur bcrypt actif, constat N2 de R8). L5 reste exigé. Le critère PERF-IDENT-1 et son protocole restent la référence de cette mesure.
+- Conséquences : R8 conforme sur le périmètre fonctionnel ; répétition §6.3 **réussie** ; B1 clos ; lignes back IDENT à `validé` ; **sortie de phase 1 déclarée** ; la bascule peut être planifiée.
+- Risque résiduel accepté par l'utilisateur : p95 à travers nginx non prouvé selon le protocole. Mitigation : garde `BcryptLatencyIT` en CI (bloquante via `ci-gate`), retour arrière rapide (~1 s), mesure après la bascule.
+- Référence : [décision utilisateur du 27/11/2026 et sortie de phase 1](../reviews/2026-11-27-identity-phase1-exit-paul.md).
+- **Condition supplémentaire avant d'annoncer la bascule (levée le 27/11/2026)** : si la production tourne sur un autre matériel que le poste de recette, M0–M3 et M6 sont rejoués sur ce matériel (BackAli, Manuel). Les mêmes seuils s'appliquent. Le p95 Symfony obtenu devient la référence figée de l'après-coexistence. **Par la décision de l'utilisateur du 27/11/2026, cette mesure n'est plus préalable à la bascule** : elle fait partie du suivi après la bascule.
 
 ## 7. Jeu d'essai versionné (tests)
 `services/identity-service/src/test/resources/fixtures/legacy-users.sql` : comptes **fictifs** (`@exemple.test`), mots de passe de test documentés dans le fichier, hashes générés **une fois** par PHP dans le conteneur `api` (`password_hash`, `sodium_crypto_pwhash_str`) : `$2y$` coût 13, `$2y$` coût 4, `$2a$`, `$2b$`, `$argon2id$`, `$argon2i$`, mot de passe de 100 octets (pré-hachage), mot de passe contenant un caractère accentué, hash tronqué (corrompu). Aucune donnée réelle.

@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -123,12 +124,12 @@ const MAX_COLS = 80;
 interface Sheet {
   name: string;
   rows: string[][];
-  totalRows: number;
   totalCols: number;
+  totalRows: number;
 }
 interface MailAddress {
-  name?: string;
   address?: string;
+  name?: string;
 }
 interface MailFile {
   name: string;
@@ -136,15 +137,15 @@ interface MailFile {
   url: string;
 }
 interface Mail {
-  subject: string;
-  from: string;
-  to: string;
   cc: string;
   date: string;
-  html: null | SafeHtml;
-  text: null | string;
   files: MailFile[];
+  from: string;
+  html: null | SafeHtml;
   remoteImages: boolean;
+  subject: string;
+  text: null | string;
+  to: string;
 }
 
 /**
@@ -188,7 +189,7 @@ export class FileViewerComponent implements OnDestroy {
   sheetIndex = signal(0);
   sheetMode = signal<'pdf' | 'table'>('table');
   mail = signal<Mail | null>(null);
-  private mailSource: null | { html: string; files: Map<string, string> } = null;
+  private mailSource: null | { files: Map<string, string>; html: string } = null;
   private objectUrls: string[] = [];
   private token = 0;
 
@@ -296,10 +297,11 @@ export class FileViewerComponent implements OnDestroy {
     try {
       const { url } = await firstValueFrom(this.api.attachmentPreview(a.id));
       if (!stale()) this.frameUrl.set(this.trusted(url));
-    } catch (e: any) {
+    } catch (e) {
       if (!stale())
         this.error.set(
-          e?.error?.error ?? 'La conversion du document a échoué. Téléchargez-le pour l’ouvrir.',
+          (e as HttpErrorResponse | undefined)?.error?.error ??
+            'La conversion du document a échoué. Téléchargez-le pour l’ouvrir.',
         );
     } finally {
       if (!stale()) this.loading.set(false);
@@ -332,7 +334,7 @@ export class FileViewerComponent implements OnDestroy {
         /* keep UTF-8 */
       }
     }
-    return s.replace(/^﻿/, '');
+    return s.replace(/^\uFEFF/, '');
   }
 
   private showText(buffer: ArrayBuffer) {

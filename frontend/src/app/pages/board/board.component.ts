@@ -69,14 +69,14 @@ const BATCH = 20;
 const GAP = 14;
 
 interface Range {
-  start: number;
   end: number;
+  start: number;
 }
 
 interface ListState {
+  hasMore: boolean;
   loaded: boolean;
   loading: boolean;
-  hasMore: boolean;
   /** Total matching the current filters. */
   total: number;
 }

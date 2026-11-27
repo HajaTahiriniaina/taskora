@@ -218,7 +218,7 @@ export class BoardSettingsComponent implements OnInit {
       : '';
   }
 
-  tabs: { id: Tab; label: string; icon: string }[] = [
+  tabs: { icon: string; id: Tab; label: string }[] = [
     { id: 'members', label: 'Membres', icon: 'users' },
     { id: 'fields', label: 'Champs', icon: 'sliders' },
     { id: 'labels', label: 'Étiquettes', icon: 'tag' },
@@ -226,7 +226,7 @@ export class BoardSettingsComponent implements OnInit {
     { id: 'archived', label: 'Archives', icon: 'archive' },
     { id: 'trash', label: 'Corbeille', icon: 'trash' },
   ];
-  fieldTypes: { value: CustomFieldType; label: string; icon: string }[] = [
+  fieldTypes: { icon: string; label: string; value: CustomFieldType }[] = [
     { value: 'text', label: 'Texte', icon: 'type' },
     { value: 'number', label: 'Nombre', icon: 'hash' },
     { value: 'date', label: 'Date', icon: 'calendar' },
@@ -249,7 +249,7 @@ export class BoardSettingsComponent implements OnInit {
   editingLabel = signal<null | number>(null);
 
   // custom fields
-  newField: { name: string; type: CustomFieldType; options: SelectOption[]; showOnCard: boolean } =
+  newField: { name: string; options: SelectOption[]; showOnCard: boolean; type: CustomFieldType } =
     this.blankField();
   newOption = { label: '', color: PALETTE[5] };
   editingField = signal<null | number>(null);
@@ -403,7 +403,7 @@ export class BoardSettingsComponent implements OnInit {
     return this.fieldTypes.find((x) => x.value === t)!;
   }
 
-  addOption(target: SelectOption[], opt: { label: string; color: string }) {
+  addOption(target: SelectOption[], opt: { color: string; label: string }) {
     const label = opt.label.trim();
     if (!label) return;
     target.push({ id: Math.random().toString(36).slice(2, 10), label, color: opt.color });

@@ -152,4 +152,4 @@ Aucun changement fonctionnel attendu : mêmes routes, mêmes corps, même stocka
 | Divergence des données utilisateur entre schémas | Projection dans la même transaction (U1-B) ; contrôle de cohérence quotidien pendant la coexistence |
 | Invitations non consommées si Symfony est indisponible | Outbox et rejeu idempotent (U2-a) ; test d'intégration avec panne simulée |
 | Clé privée JWT exposée par un nouveau conteneur | Montage lecture seule, fichiers non copiés dans l'image, revue BackReviewer |
-| Login plus lent (coût bcrypt côté JVM) | Mesure p95 < 500 ms en recette |
+| Login plus lent (coût bcrypt côté JVM) | Mesure en recette selon la décision PERF-IDENT-1 (`identity.md` §6.1) : p95 et p50 ≤ 1,15 × Symfony, p95 ≤ 1 000 ms ; coût 13 inchangé |

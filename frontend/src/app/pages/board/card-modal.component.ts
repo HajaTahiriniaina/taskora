@@ -45,8 +45,8 @@ import { describeActivity, Seg } from './activity-text';
 import { dueState } from './card-format';
 
 type FeedItem =
-  | { kind: 'activity'; id: string; at: string; activity: Activity; segs: Seg[] }
-  | { kind: 'comment'; id: string; at: string; comment: Comment };
+  | { activity: Activity; at: string; id: string; kind: 'activity'; segs: Seg[] }
+  | { at: string; comment: Comment; id: string; kind: 'comment' };
 
 type PopKind = 'add' | 'cover' | 'labels' | 'members' | 'more' | 'priority';
 

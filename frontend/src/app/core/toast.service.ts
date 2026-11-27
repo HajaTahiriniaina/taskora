@@ -6,9 +6,9 @@ import { DialogService } from './dialog.service';
 export type ToastKind = 'error' | 'info' | 'success';
 
 interface QueuedToast {
-  message: string;
-  kind: ToastKind;
   duration: number;
+  kind: ToastKind;
+  message: string;
 }
 
 /** Static icons (same stroke style as the app's icons); constant strings, never user data. */

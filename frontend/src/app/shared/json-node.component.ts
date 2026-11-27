@@ -15,9 +15,8 @@ const MAX_CHILDREN = 300;
           (click)="open.set(!open())"
           [attr.aria-expanded]="open()"
           [attr.aria-label]="open() ? 'Replier' : 'Déplier'"
-        >
-          {{ open() ? '▾' : '▸' }}
-        </button>
+          [textContent]="toggleGlyph()"
+        ></button>
       } @else {
         <span class="tog-space"></span>
       }
@@ -27,12 +26,9 @@ const MAX_CHILDREN = 300;
       @if (isContainer()) {
         <span class="p">{{ isArray() ? '[' : '{' }}</span>
         @if (!open()) {
-          <button class="sum" (click)="open.set(true)">
-            {{ count() }}
-            {{
-              isArray() ? (count() > 1 ? 'éléments' : 'élément') : count() > 1 ? 'clés' : 'clé'
-            }}</button
-          ><span class="p">{{ isArray() ? ']' : '}' }}</span>
+          <button class="sum" (click)="open.set(true)">{{ summary() }}</button><span class="p">{{
+            isArray() ? ']' : '}'
+          }}</span>
         }
       } @else {
         <span [class]="'v ' + type()">{{ display() }}</span>
@@ -134,6 +130,13 @@ export class JsonNodeComponent {
   entries = computed(() =>
     this.isContainer() ? Object.entries(this.value() as object).slice(0, MAX_CHILDREN) : [],
   );
+  /** Glyph and summary computed here: the row is `white-space: pre-wrap` (frontend.md §5.3). */
+  summary = computed(() => {
+    const n = this.count();
+    const unit = this.isArray() ? (n > 1 ? 'éléments' : 'élément') : n > 1 ? 'clés' : 'clé';
+    return `${n} ${unit}`;
+  });
+  toggleGlyph = computed(() => (this.open() ? '▾' : '▸'));
   type = computed(() => (this.value() === null ? 'null' : typeof this.value()));
   display = computed(() => {
     const v = this.value();

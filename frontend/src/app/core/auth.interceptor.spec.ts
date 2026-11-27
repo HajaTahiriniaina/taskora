@@ -71,6 +71,7 @@ describe('authInterceptor', () => {
     expect(navigate).toHaveBeenCalledWith('/login');
     expect(toast.show).toHaveBeenCalledWith(SESSION_TOAST, 'error');
     expect(toast.show).toHaveBeenCalledTimes(1);
+    http.verify();
   });
 
   it('SC-IDENT-025 — 401 sur /api/auth/login : ni déconnexion ni toast', () => {
@@ -91,6 +92,7 @@ describe('authInterceptor', () => {
     expect(localStorage.getItem('taskora.token')).toBe(token);
     expect(navigate).not.toHaveBeenCalled();
     expect(toast.show).not.toHaveBeenCalled();
+    http.verify();
   });
 
   it('SC-IDENT-025 — en-tête Authorization ajouté hors /auth/, jamais sur /auth/', () => {
