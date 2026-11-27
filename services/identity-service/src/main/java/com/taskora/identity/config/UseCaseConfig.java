@@ -113,8 +113,17 @@ public class UseCaseConfig {
     return new JdbcLegacyUserSource(jdbc, schema);
   }
 
+  /**
+   * Client de consommation des invitations : {@code identity.invitations.claim-url} et {@code
+   * claim-secret} ensemble (U12), sinon l'URL et le secret de Symfony.
+   */
   @Bean
   public InvitationClaimPort invitationClaimClient(IdentityProperties properties) {
+    IdentityProperties.Invitations invitations = properties.invitations();
+    if (invitations != null) {
+      String secret = invitations.claimSecret();
+      return new SymfonyInvitationClaimClient(invitations.claimUrl(), secret == null ? "" : secret);
+    }
     IdentityProperties.Symfony symfony = properties.symfony();
     return new SymfonyInvitationClaimClient(
         symfony.internalUrl(), symfony.internalSecret() == null ? "" : symfony.internalSecret());

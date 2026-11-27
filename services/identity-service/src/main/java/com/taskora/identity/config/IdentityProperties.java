@@ -14,7 +14,12 @@ import org.springframework.boot.convert.DurationUnit;
  */
 @ConfigurationProperties("identity")
 public record IdentityProperties(
-    Jwt jwt, Legacy legacy, Symfony symfony, Password password, Outbox outbox) {
+    Jwt jwt,
+    Legacy legacy,
+    Symfony symfony,
+    Password password,
+    Outbox outbox,
+    @Nullable Invitations invitations) {
 
   static final String MISSING_INTERNAL_SECRET = "INTERNAL_API_SECRET doit être défini et non vide.";
 
@@ -73,6 +78,38 @@ public record IdentityProperties(
     @Override
     public String toString() {
       return "Symfony[internalUrl=" + internalUrl + "]";
+    }
+  }
+
+  /**
+   * Consommation des invitations (ordre de travail phase 3 §5.2, U12) : URL et secret utilisés
+   * ensemble, lus au moment de l'envoi ; par défaut ceux de Symfony ({@code SYMFONY_INTERNAL_URL},
+   * {@code INTERNAL_API_SECRET}). À la bascule de T1 : board-service et {@code
+   * INTERNAL_SECRET_IDENTITY_TO_BOARD}.
+   *
+   * @param claimUrl URL de base ({@code INVITATION_CLAIM_URL})
+   * @param claimSecret secret envoyé ({@code INVITATION_CLAIM_SECRET}), jamais dans {@link
+   *     #toString()}
+   */
+  public record Invitations(String claimUrl, @Nullable String claimSecret) {
+
+    static final String MISSING_CLAIM_SECRET =
+        "INVITATION_CLAIM_SECRET doit être défini et non vide.";
+
+    /**
+     * Valide le secret de consommation.
+     *
+     * @throws IllegalStateException si le secret est absent ou blanc (refus de démarrer)
+     */
+    public Invitations {
+      if (claimSecret == null || claimSecret.isBlank()) {
+        throw new IllegalStateException(MISSING_CLAIM_SECRET);
+      }
+    }
+
+    @Override
+    public String toString() {
+      return "Invitations[claimUrl=" + claimUrl + "]";
     }
   }
 
