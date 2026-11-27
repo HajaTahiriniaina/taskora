@@ -140,39 +140,28 @@ final class InternalNotificationsTest extends ApiTestCase
     #[TestDox('SC-BOARD-025 — rejeu du même eventId → 200 {created: 0}, aucun doublon, aucun push')]
     public function testReplayIsIdempotent(): void
     {
-        $this->post($this->body());
-        $push = static::getContainer()->get(PushSender::class);
-        $queueBefore = $this->queueOf($push);
+        self::assertSame([200, ['created' => 1]], $this->post($this->body()), 'premier appel');
+        self::assertCount(1, $this->pushed, 'premier appel : un push en file (capture active)');
+        $this->resetPushes();
         [$status, $json] = $this->post($this->body());
         self::assertSame([200, ['created' => 0]], [$status, $json]);
         self::assertCount(1, $this->notifications());
         self::assertSame(1, $this->receipts());
-        self::assertSame($queueBefore, $this->queueOf($push), 'aucun push au rejeu');
-    }
-
-    /** File du PushSender (envoi après la réponse) : lue par réflexion, sans envoi réel. */
-    private function queueOf(PushSender $push): array
-    {
-        $p = new \ReflectionProperty(PushSender::class, 'queue');
-
-        return $p->getValue($push);
+        self::assertSame([], $this->pushed, 'aucun push au rejeu');
     }
 
     #[TestDox('SC-BOARD-025 — Web Push mis en file avec titre du tableau, URL /boards/{id}?card={id} et étiquette card-<id>')]
     public function testPushQueued(): void
     {
-        $push = static::getContainer()->get(PushSender::class);
-        $this->post($this->body(['type' => 'card_assigned', 'cardId' => $this->card->getId(), 'message' => 'Alice Martin vous a assigné la carte « Carte »']));
-        $queue = $this->queueOf($push);
-        if (!$push->isConfigured()) {
-            self::assertSame([], $queue, 'VAPID non configuré : rien en file (comportement actuel)');
-            self::markTestIncomplete('VAPID absent de l\'environnement de test : contenu du push non vérifiable.');
-        }
-        self::assertCount(1, $queue);
-        self::assertSame($this->dora->getId(), $queue[0]['user']);
-        self::assertSame('Lancement produit', $queue[0]['payload']['title'] ?? null);
-        self::assertSame('/boards/'.$this->board->getId().'?card='.$this->card->getId(), $queue[0]['payload']['url'] ?? null);
-        self::assertSame('card-'.$this->card->getId(), $queue[0]['payload']['tag'] ?? null);
+        self::assertTrue(static::getContainer()->get(PushSender::class)->isConfigured(), 'VAPID de test posé par ApiTestCase');
+        [$status, $json] = $this->post($this->body(['type' => 'card_assigned', 'cardId' => $this->card->getId(), 'message' => 'Alice Martin vous a assigné la carte « Carte »']));
+        self::assertSame([200, ['created' => 1]], [$status, $json]);
+        self::assertCount(1, $this->pushed);
+        self::assertSame($this->dora->getId(), $this->pushed[0]['user']);
+        self::assertSame('Lancement produit', $this->pushed[0]['payload']['title'] ?? null);
+        self::assertSame('Alice Martin vous a assigné la carte « Carte »', $this->pushed[0]['payload']['body'] ?? null);
+        self::assertSame('/boards/'.$this->board->getId().'?card='.$this->card->getId(), $this->pushed[0]['payload']['url'] ?? null);
+        self::assertSame('card-'.$this->card->getId(), $this->pushed[0]['payload']['tag'] ?? null);
     }
 
     #[TestDox('SC-BOARD-025 — une transaction : panne à l\'écriture → ni notification ni reçu (rejouable)')]

@@ -5,16 +5,25 @@ namespace App\Tests\Support;
 use App\Entity\Board;
 use App\Entity\BoardMember;
 use App\Entity\User;
+use App\Service\PushSender;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Minishlink\WebPush\VAPID;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * Base des tests fonctionnels de l'API Symfony : base *_test seulement (garde-fou), schéma recréé à
  * chaque test, données inventées (@exemple.test), secrets internes factices et distincts forcés
  * dans l'environnement du processus (U12 : jamais les valeurs réelles de compose).
+ *
+ * Web Push (D7) : une paire VAPID est générée à l'exécution (jamais commitée ni affichée) pour que
+ * PushSender mette réellement en file ; la file est lue sur kernel.terminate par un écouteur de
+ * priorité PUSH_CAPTURE_PRIORITY, donc AVANT PushFlushSubscriber (priorité 0) qui la vide. Aucun
+ * appel réseau : les utilisateurs des tests n'ont aucun abonnement push.
  */
 abstract class ApiTestCase extends WebTestCase
 {
@@ -23,17 +32,33 @@ abstract class ApiTestCase extends WebTestCase
     /** board-service → Symfony (/internal/notifications…). */
     public const BOARD_SECRET = 'test-board-to-symfony-fedcba9876543210ab';
 
+    /** Priorité de l'écouteur de capture : strictement supérieure à celle de PushFlushSubscriber (0). */
+    public const PUSH_CAPTURE_PRIORITY = 1024;
+
+    /** @var array{publicKey: string, privateKey: string}|null paire VAPID du processus, générée à la demande */
+    private static ?array $vapid = null;
+
     protected KernelBrowser $client;
+    /**
+     * Pushs mis en file par PushSender pendant les requêtes depuis le dernier boot() ou resetPushes(),
+     * lus avant leur envoi.
+     *
+     * @var list<array{user: int, payload: array}>
+     */
+    protected array $pushed = [];
     protected EntityManagerInterface $em;
     /** @var array<string, ?string> */
     private array $previous = [];
 
     protected function setUp(): void
     {
-        foreach (['INTERNAL_API_SECRET', 'INTERNAL_SECRET_BOARD_TO_SYMFONY'] as $name) {
+        foreach (['INTERNAL_API_SECRET', 'INTERNAL_SECRET_BOARD_TO_SYMFONY', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'] as $name) {
             $this->previous[$name] = $_SERVER[$name] ?? null;
         }
         $this->setSecrets(self::IDENTITY_SECRET, self::BOARD_SECRET);
+        self::$vapid ??= VAPID::createVapidKeys();
+        self::setEnv('VAPID_PUBLIC_KEY', self::$vapid['publicKey']);
+        self::setEnv('VAPID_PRIVATE_KEY', self::$vapid['privateKey']);
         $this->boot();
     }
 
@@ -68,6 +93,7 @@ abstract class ApiTestCase extends WebTestCase
         self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->client->disableReboot();
+        $this->capturePushes();
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
         $database = (string) $this->em->getConnection()->getDatabase();
         if (!str_ends_with($database, '_test')) {
@@ -81,6 +107,22 @@ abstract class ApiTestCase extends WebTestCase
         }
         $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
         (new SchemaTool($this->em))->createSchema($this->em->getMetadataFactory()->getAllMetadata());
+    }
+
+    /** Écoute kernel.terminate avant PushFlushSubscriber et recopie la file de PushSender (D7). */
+    private function capturePushes(): void
+    {
+        $this->pushed = [];
+        $container = static::getContainer();
+        $queue = new \ReflectionProperty(PushSender::class, 'queue');
+        $container->get(EventDispatcherInterface::class)->addListener(KernelEvents::TERMINATE, function () use ($container, $queue): void {
+            array_push($this->pushed, ...$queue->getValue($container->get(PushSender::class)));
+        }, self::PUSH_CAPTURE_PRIORITY);
+    }
+
+    protected function resetPushes(): void
+    {
+        $this->pushed = [];
     }
 
     protected function user(string $email, string $name): User
