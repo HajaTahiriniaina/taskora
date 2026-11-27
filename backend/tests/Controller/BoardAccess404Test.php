@@ -34,6 +34,8 @@ final class BoardAccess404Test extends ApiTestCase
     private const RESOURCE_NOT_FOUND = 'Ressource introuvable.';
     private const ITEM_NOT_IN_TRASH = 'Cet élément n’est pas dans la corbeille.';
     private const BOARD_NOT_IN_TRASH = 'Ce tableau n’est pas dans la corbeille.';
+    private const BOARD_IN_TRASH = 'Ce tableau est dans la corbeille.';
+    private const ITEM_IN_TRASH = 'Cet élément est dans la corbeille.';
 
     private User $alice;
     private User $bob;
@@ -71,9 +73,18 @@ final class BoardAccess404Test extends ApiTestCase
         $t->addMember(new BoardMember($t, $this->carla));
         $listOfTrashedBoard = new BoardList($t, 'Vieille liste', 0);
         $cardOfTrashedBoard = new Card($listOfTrashedBoard, 'Vieille carte', 0, $this->alice, 1);
+        // B2 (§12.2) : enfants du tableau dans la corbeille, créés avant sa mise à la corbeille.
+        $labelT = new Label($t, 'Ancienne', '#000000');
+        $fieldT = new CustomField($t, 'Ancien champ', 'text', 0);
+        $itemT = new ChecklistItem($cardOfTrashedBoard, 'Ancien point', 0);
+        $commentT = new Comment($cardOfTrashedBoard, $this->carla, '<p>Ancien</p>');
+        $attachmentT = new Attachment($cardOfTrashedBoard, $this->alice, 'ancien.pdf', 'uploads/test/ancien.pdf', 'application/pdf', 10);
         $t->trash($this->alice);
 
         foreach ([$list, $trashedList, $card, $trashedCard, $cardInTrashedList, $label, $field, $item, $comment, $attachment, $invitation, $trello, $listOfTrashedBoard, $cardOfTrashedBoard] as $o) {
+            $this->em->persist($o);
+        }
+        foreach ([$labelT, $fieldT, $itemT, $commentT, $attachmentT] as $o) {
             $this->em->persist($o);
         }
         $this->em->flush();
@@ -83,6 +94,10 @@ final class BoardAccess404Test extends ApiTestCase
             'Lb' => $label->getId(), 'F' => $field->getId(), 'I' => $item->getId(), 'Co' => $comment->getId(),
             'A' => $attachment->getId(), 'Inv' => $invitation->getId(), 'LT' => $listOfTrashedBoard->getId(),
             'CT' => $cardOfTrashedBoard->getId(), 'carla' => $this->carla->getId(),
+        ];
+        $this->ids += [
+            'LbT' => $labelT->getId(), 'FT' => $fieldT->getId(), 'IT' => $itemT->getId(),
+            'CoT' => $commentT->getId(), 'AT' => $attachmentT->getId(),
         ];
     }
 
@@ -245,5 +260,126 @@ final class BoardAccess404Test extends ApiTestCase
         self::assertSame([404, ['error' => self::RESOURCE_NOT_FOUND]], [$status, $json]);
         [$status, $json] = $this->api('GET', $this->path('/api/boards/{B}', false), $this->carla);
         self::assertSame([404, ['error' => self::BOARD_NOT_FOUND]], [$status, $json]);
+    }
+
+    // ------------------------------------------------------------------ B2 (§12.2, TB7–TB10)
+
+    /** @return iterable<string, array{string, string, ?string}> */
+    private static function labelAndFieldRoutes(): iterable
+    {
+        yield 'PATCH label' => ['PATCH', '/api/labels/{LbT}', '{"name":"x","color":"#000000"}'];
+        yield 'DELETE label' => ['DELETE', '/api/labels/{LbT}', null];
+        yield 'PATCH custom-field' => ['PATCH', '/api/custom-fields/{FT}', '{"name":"x"}'];
+        yield 'DELETE custom-field' => ['DELETE', '/api/custom-fields/{FT}', null];
+    }
+
+    /** @return iterable<string, array{string, string, string, ?string}> */
+    public static function memberLabelOrFieldOfTrashedBoard(): iterable
+    {
+        foreach (['alice' => 'propriétaire', 'bob' => 'admin', 'carla' => 'membre'] as $user => $role) {
+            foreach (self::labelAndFieldRoutes() as $name => [$method, $template, $body]) {
+                yield $name.' ('.$user.', '.$role.')' => [$user, $method, $template, $body];
+            }
+        }
+    }
+
+    private function assertLabelAndFieldIntact(): void
+    {
+        self::assertSame(1, $this->countSql('SELECT COUNT(*) FROM label WHERE id = ? AND name = ?', [$this->ids['LbT'], 'Ancienne']), 'étiquette intacte');
+        self::assertSame(1, $this->countSql('SELECT COUNT(*) FROM custom_field WHERE id = ? AND name = ?', [$this->ids['FT'], 'Ancien champ']), 'champ intact');
+    }
+
+    #[DataProvider('memberLabelOrFieldOfTrashedBoard')]
+    #[TestDox('B2 / U8-a — membre (tout rôle) : étiquette ou champ d\'un tableau dans la corbeille → 404 « Ce tableau est dans la corbeille. », aucune écriture : $method $template ($user)')]
+    public function testMemberCannotTouchLabelOrFieldOfTrashedBoard(string $user, string $method, string $template, ?string $body): void
+    {
+        $before = $this->fingerprint();
+        [$status, $json] = $this->api($method, $this->path($template, false), $this->{$user}, $body);
+
+        self::assertSame([404, ['error' => self::BOARD_IN_TRASH]], [$status, $json], sprintf('%s %s (%s)', $method, $template, $user));
+        self::assertSame($before, $this->fingerprint(), 'aucune écriture');
+        $this->assertLabelAndFieldIntact();
+    }
+
+    /** @return iterable<string, array{string, string, ?string}> */
+    public static function nonMemberLabelOrFieldOfTrashedBoard(): iterable
+    {
+        yield from self::labelAndFieldRoutes();
+    }
+
+    #[DataProvider('nonMemberLabelOrFieldOfTrashedBoard')]
+    #[TestDox('B2 / U8-a — non-membre : étiquette ou champ d\'un tableau dans la corbeille ≡ inexistant (404 « Ressource introuvable. ») : $method $template')]
+    public function testNonMemberLabelOrFieldOfTrashedBoard(string $method, string $template, ?string $body): void
+    {
+        $before = $this->fingerprint();
+        [$status, $json, $type] = $this->api($method, $this->path($template, false), $this->nadia, $body);
+        [$missingStatus, $missingJson, $missingType] = $this->api($method, $this->path($template, true), $this->nadia, $body);
+
+        self::assertSame([404, ['error' => self::RESOURCE_NOT_FOUND]], [$status, $json], sprintf('%s %s', $method, $template));
+        self::assertSame([$missingStatus, $missingJson, $missingType], [$status, $json, $type], 'non-membre ≡ inexistant');
+        self::assertSame($before, $this->fingerprint(), 'aucune écriture');
+        $this->assertLabelAndFieldIntact();
+    }
+
+    /** @return iterable<string, array{string, string, string, ?string, string}> */
+    public static function cardChildrenOfTrashedBoard(): iterable
+    {
+        $routes = [
+            'PATCH checklist' => ['PATCH', '/api/checklist/{IT}', '{"content":"x","done":true}'],
+            'DELETE checklist' => ['DELETE', '/api/checklist/{IT}', null],
+            'DELETE comment' => ['DELETE', '/api/comments/{CoT}', null],
+            'PATCH attachment' => ['PATCH', '/api/attachments/{AT}', '{"name":"x"}'],
+            'DELETE attachment' => ['DELETE', '/api/attachments/{AT}', null],
+            'GET attachment content' => ['GET', '/api/attachments/{AT}/content', null],
+            'GET attachment preview' => ['GET', '/api/attachments/{AT}/preview', null],
+            'PUT card custom-field' => ['PUT', '/api/cards/{CT}/custom-fields/{FT}', '{"value":"x"}'],
+            'PATCH card' => ['PATCH', '/api/cards/{CT}', '{"title":"x"}'],
+            'PATCH list' => ['PATCH', '/api/lists/{LT}', '{"title":"x"}'],
+            'DELETE list' => ['DELETE', '/api/lists/{LT}', null],
+            'POST list archive' => ['POST', '/api/lists/{LT}/archive', null],
+            'POST list restore' => ['POST', '/api/lists/{LT}/restore', null],
+            'POST list cards' => ['POST', '/api/lists/{LT}/cards', '{"title":"x"}'],
+        ];
+        foreach (['carla' => self::ITEM_IN_TRASH, 'nadia' => self::RESOURCE_NOT_FOUND] as $user => $message) {
+            foreach ($routes as $name => [$method, $template, $body]) {
+                yield $name.' ('.$user.')' => [$user, $method, $template, $body, $message];
+            }
+        }
+    }
+
+    #[DataProvider('cardChildrenOfTrashedBoard')]
+    #[TestDox('B2 (garde-fou, D6) — objets d\'une liste ou d\'une carte d\'un tableau dans la corbeille : messages inchangés, aucune écriture : $method $template ($user)')]
+    public function testCardChildrenOfTrashedBoardUnchanged(string $user, string $method, string $template, ?string $body, string $message): void
+    {
+        $before = $this->fingerprint();
+        [$status, $json] = $this->api($method, $this->path($template, false), $this->{$user}, $body);
+
+        self::assertSame([404, ['error' => $message]], [$status, $json], sprintf('%s %s (%s)', $method, $template, $user));
+        self::assertSame($before, $this->fingerprint(), 'aucune écriture');
+    }
+
+    /** @return iterable<string, array{string, string, string, string}> */
+    public static function createOnTrashedBoard(): iterable
+    {
+        $routes = [
+            'POST labels' => ['/api/boards/{T}/labels', '{"name":"x","color":"#000000"}'],
+            'POST custom-fields' => ['/api/boards/{T}/custom-fields', '{"name":"x","type":"text"}'],
+        ];
+        foreach (['carla' => self::BOARD_IN_TRASH, 'nadia' => self::BOARD_NOT_FOUND] as $user => $message) {
+            foreach ($routes as $name => [$template, $body]) {
+                yield $name.' ('.$user.')' => [$user, $template, $body, $message];
+            }
+        }
+    }
+
+    #[DataProvider('createOnTrashedBoard')]
+    #[TestDox('B2 (garde-fou) — création d\'étiquette ou de champ sur un tableau dans la corbeille : messages inchangés, aucune écriture : $template ($user)')]
+    public function testCreateOnTrashedBoard(string $user, string $template, string $body, string $message): void
+    {
+        $before = $this->fingerprint();
+        [$status, $json] = $this->api('POST', $this->path($template, false), $this->{$user}, $body);
+
+        self::assertSame([404, ['error' => $message]], [$status, $json], sprintf('POST %s (%s)', $template, $user));
+        self::assertSame($before, $this->fingerprint(), 'aucune écriture');
     }
 }
