@@ -3,8 +3,12 @@ name: taskora
 # Profils :
 #   (aucun)    stack actuelle : database, api (Symfony), converter, web (nginx)
 #   identity   + db-init (droits MariaDB) + identity (identity-service Spring Boot)
+#   board      + db-init (schéma et compte board) + board (board-service Spring Boot, phase 3)
 #   quality    + sonarqube (http://localhost:9000, pour BackReviewer)
 # Ports de développement d'identity (8082) : -f docker-compose.identity-dev.yml
+# Port de développement de board-service (8083) : -f docker-compose.board-dev.yml
+# Secrets internes (U12, un par appelant, tous distincts) : INTERNAL_API_SECRET (identity → Symfony),
+# INTERNAL_SECRET_IDENTITY_TO_BOARD (identity → board), INTERNAL_SECRET_BOARD_TO_SYMFONY (board → Symfony).
 
 services:
   database:
@@ -17,6 +21,9 @@ services:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-taskora_root}
       # Lu par l'init root (schéma et compte identity), jamais affiché.
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_change_me}
+      # Schéma et compte board (board-migration.md §3) ; vide = non créés.
+      BOARD_DB_PASSWORD: ${BOARD_DB_PASSWORD:-}
+      BOARD_GRANT_COMMENT_FILES: ${BOARD_GRANT_COMMENT_FILES:-off}
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     volumes:
       - db_data:/var/lib/mysql
@@ -50,8 +57,10 @@ services:
       APP_SECRET: ${APP_SECRET:-change_me_in_production_please}
       DATABASE_URL: mysql://${DB_USER:-taskora}:${DB_PASSWORD:-taskora}@database:3306/${DB_NAME:-taskora}?serverVersion=11.8.2-MariaDB&charset=utf8mb4
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:-taskora_jwt_passphrase_change_me}
-      # Secret partagé de POST /internal/invitations/claim (ADR A10). Vide = endpoint refusé.
+      # Secret de POST /internal/invitations/claim, appelant identity (ADR A10). Vide = endpoint refusé.
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-}
+      # Secret des endpoints internes appelés par board-service (U12 : /internal/notifications…).
+      INTERNAL_SECRET_BOARD_TO_SYMFONY: ${INTERNAL_SECRET_BOARD_TO_SYMFONY:-}
       SERVER_NAME: ":80"
     volumes:
       - jwt_keys:/app/config/jwt
@@ -87,16 +96,23 @@ services:
       IDENTITY_UPSTREAM: ${IDENTITY_UPSTREAM:-api:80}
       # on = gel des écritures d'identité (503 sur POST /api/auth/register et PATCH /api/me).
       IDENTITY_WRITE_FREEZE: ${IDENTITY_WRITE_FREEZE:-off}
+      # Amonts des tranches de board-service (board-migration.md §5.2) : api:80 (Symfony) ou
+      # board:8080 après la bascule de la tranche. Même commutation : « docker compose up -d web ».
+      BOARD_T1_UPSTREAM: ${BOARD_T1_UPSTREAM:-api:80}
+      BOARD_T2_UPSTREAM: ${BOARD_T2_UPSTREAM:-api:80}
+      BOARD_T3_UPSTREAM: ${BOARD_T3_UPSTREAM:-api:80}
+      BOARD_T4_UPSTREAM: ${BOARD_T4_UPSTREAM:-api:80}
+      BOARD_T5_UPSTREAM: ${BOARD_T5_UPSTREAM:-api:80}
     ports:
       - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:80"
     networks: [default, backend]
 
-  # ---------------------------------------------------------------- profil identity
+  # ---------------------------------------------------------------- profils identity et board
   # Init root idempotente sur un volume existant, après les migrations Symfony
-  # (le droit sur taskora.user exige que la table existe).
+  # (les droits sur les tables de taskora exigent qu'elles existent).
   db-init:
     image: mariadb:11.8@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
-    profiles: [identity]
+    profiles: [identity, board]
     restart: "no"
     user: "999:999"
     depends_on:
@@ -111,6 +127,8 @@ services:
       MARIADB_USER: ${DB_USER:-taskora}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-taskora_root}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_change_me}
+      BOARD_DB_PASSWORD: ${BOARD_DB_PASSWORD:-}
+      BOARD_GRANT_COMMENT_FILES: ${BOARD_GRANT_COMMENT_FILES:-off}
     volumes:
       - ./docker/mariadb/initdb.d:/docker-entrypoint-initdb.d:ro
     networks: [backend]
@@ -151,9 +169,68 @@ services:
       LEGACY_ZONE: Europe/Paris
       SYMFONY_INTERNAL_URL: http://api:80
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-}
+      # Consommation des invitations (U12, board-migration.md §5.3) : URL et secret commutés ENSEMBLE.
+      # Avant la bascule de T1 : Symfony + INTERNAL_API_SECRET. Après : http://board:8080 +
+      # la valeur de INTERNAL_SECRET_IDENTITY_TO_BOARD. Puis « docker compose up -d identity ».
+      INVITATION_CLAIM_URL: ${INVITATION_CLAIM_URL:-http://api:80}
+      INVITATION_CLAIM_SECRET: ${INVITATION_CLAIM_SECRET:-${INTERNAL_API_SECRET:-}}
     volumes:
       - jwt_keys:/run/taskora/jwt:ro
     # Réseau interne uniquement (pas d'accès Internet, port non publié) : nginx (web) y accède.
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8091 && printf 'GET /actuator/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 60s
+
+  # ---------------------------------------------------------------- profil board (phase 3)
+  # Image construite par BackCodeur (services/board-service/Dockerfile) : le profil reste inactif
+  # tant qu'elle n'existe pas. DML seulement sur taskora (board-migration.md §3), Flyway sur `board`.
+  board:
+    build:
+      context: ./services
+      dockerfile: board-service/Dockerfile
+    profiles: [board]
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    # JVM à 75 % de mem_limit (-XX:MaxRAMPercentage=75 dans l'image).
+    mem_limit: 768m
+    pids_limit: 256
+    depends_on:
+      database:
+        condition: service_healthy
+      # Clés JWT (créées par l'entrypoint d'api) et migrations Doctrine passées.
+      api:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      BOARD_DB_URL: jdbc:mariadb://database:3306/${DB_NAME:-taskora}
+      BOARD_DB_USER: board
+      BOARD_DB_PASSWORD: ${BOARD_DB_PASSWORD:-}
+      # Clé PUBLIQUE seulement : ni JWT_PASSPHRASE ni JWT_PRIVATE_KEY_PATH (B-ADR-2).
+      JWT_PUBLIC_KEY_PATH: /run/taskora/jwt/public.pem
+      SYMFONY_INTERNAL_URL: http://api:80
+      # U12 : jamais INTERNAL_API_SECRET ici. Vides ou égaux = refus de démarrer.
+      INTERNAL_SECRET_IDENTITY_TO_BOARD: ${INTERNAL_SECRET_IDENTITY_TO_BOARD:-}
+      INTERNAL_SECRET_BOARD_TO_SYMFONY: ${INTERNAL_SECRET_BOARD_TO_SYMFONY:-}
+      LEGACY_ZONE: Europe/Paris
+      # on = en-tête X-Taskora-Backend: board (tests de routage, CI et recette ; off en exploitation).
+      BOARD_ROUTING_MARKER: ${BOARD_ROUTING_MARKER:-off}
+      # Purge de la corbeille : Symfony jusqu'à T5.
+      BOARD_PURGE_ENABLED: "off"
+    volumes:
+      # Seul public.pem est lu.
+      - jwt_keys:/run/taskora/jwt:ro
+    # Réseau interne uniquement ; port publié seulement par docker-compose.board-dev.yml.
     networks: [backend]
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8091 && printf 'GET /actuator/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]

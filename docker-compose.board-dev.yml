@@ -1,0 +1,9 @@
+# Développement et CI (board-compat) : publie l'API de board-service sur la boucle locale.
+#   docker compose -f docker-compose.yml -f docker-compose.board-dev.yml --profile board up -d --build
+# Le port de management (8091, /actuator/health) n'est jamais publié.
+services:
+  board:
+    # Le réseau « backend » est interne : un réseau non interne est requis pour publier un port.
+    networks: [backend, default]
+    ports:
+      - "${BOARD_BIND:-127.0.0.1}:${BOARD_PORT:-8083}:8080"
