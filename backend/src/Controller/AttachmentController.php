@@ -22,16 +22,15 @@ class AttachmentController extends ApiController
     #[Route('/cards/{id}/attachments', methods: ['GET'])]
     public function index(int $id, BoardAccess $access, AttachmentRepository $repo): JsonResponse
     {
-        $card = $this->find(Card::class, $id);
-        $access->member($card->getBoard(), $this->me());
+        $card = $this->findForMember(Card::class, $id, $access);
         return $this->json(array_map(fn (Attachment $a) => $this->presenter->attachment($a), $repo->forCard($card)));
     }
 
     #[Route('/cards/{id}/attachments', methods: ['POST'])]
     public function upload(int $id, Request $request, BoardAccess $access, Uploads $uploads, ActivityLogger $activity): JsonResponse
     {
-        $card = $this->find(Card::class, $id);
-        $access->member($card->getBoard(), $me = $this->me());
+        $card = $this->findForMember(Card::class, $id, $access);
+        $me = $this->me();
         $f = $uploads->store($request->files->get('file'));
         $attachment = new Attachment($card, $me, $f['name'], $f['key'], $f['mime'], $f['size']);
         if ($f['image']) {
@@ -47,7 +46,7 @@ class AttachmentController extends ApiController
     #[Route('/attachments/{id}', methods: ['PATCH'])]
     public function rename(int $id, Request $request, BoardAccess $access): JsonResponse
     {
-        $attachment = $this->find(Attachment::class, $id);
+        $attachment = $this->findForMember(Attachment::class, $id, $access);
         $this->guard($attachment, $access);
         $name = $this->requireString($this->body($request), 'name');
         // "Rapport" for "rapport.pdf" keeps the extension, so the download still opens with the right app
@@ -67,7 +66,7 @@ class AttachmentController extends ApiController
     #[Route('/attachments/{id}', methods: ['DELETE'])]
     public function delete(int $id, BoardAccess $access, Uploads $uploads, ActivityLogger $activity): JsonResponse
     {
-        $attachment = $this->find(Attachment::class, $id);
+        $attachment = $this->findForMember(Attachment::class, $id, $access);
         $this->guard($attachment, $access);
         $activity->log($attachment->getCard(), $this->me(), 'attachment_removed', ['name' => $attachment->getName()]);
         $card = $attachment->getCard();
@@ -89,8 +88,7 @@ class AttachmentController extends ApiController
     #[Route('/attachments/{id}/content', methods: ['GET'])]
     public function content(int $id, BoardAccess $access, Uploads $uploads): StreamedResponse
     {
-        $attachment = $this->find(Attachment::class, $id);
-        $access->member($attachment->getCard()->getBoard(), $this->me());
+        $attachment = $this->findForMember(Attachment::class, $id, $access);
         $stream = $uploads->storage()->readStream($attachment->getStorageKey());
         $response = new StreamedResponse(function () use ($stream) {
             while (!feof($stream)) {
@@ -110,8 +108,7 @@ class AttachmentController extends ApiController
     #[Route('/attachments/{id}/preview', methods: ['GET'])]
     public function preview(int $id, BoardAccess $access, DocumentPreview $previews): JsonResponse
     {
-        $attachment = $this->find(Attachment::class, $id);
-        $access->member($attachment->getCard()->getBoard(), $this->me());
+        $attachment = $this->findForMember(Attachment::class, $id, $access);
         $key = $previews->pdfKey($attachment);
         $this->em->flush();
         return $this->json(['url' => '/uploads/'.$key]);
@@ -120,7 +117,7 @@ class AttachmentController extends ApiController
     /** Any board member may add; only the uploader or a board admin may rename / delete. */
     private function guard(Attachment $attachment, BoardAccess $access): void
     {
-        $m = $access->member($attachment->getCard()->getBoard(), $this->me());
+        $m = $access->memberOfChild($attachment->getCard()->getBoard(), $this->me());
         if ($attachment->getUploader() !== $this->me() && !$m->canManage()) {
             throw new BadRequestHttpException('Seul l’auteur de la pièce jointe ou un administrateur du tableau peut la modifier.');
         }

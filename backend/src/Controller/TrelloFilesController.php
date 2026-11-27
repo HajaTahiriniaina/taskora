@@ -59,7 +59,7 @@ class TrelloFilesController extends ApiController
 
     private function board(int $id, BoardAccess $access): Board
     {
-        $board = $this->find(Board::class, $id);
+        $board = $this->findForMember(Board::class, $id, $access);
         if (!$access->member($board, $this->me())->canManage()) {
             throw new AccessDeniedHttpException('Seuls les administrateurs du tableau peuvent transférer les pièces jointes Trello.');
         }

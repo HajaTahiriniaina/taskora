@@ -62,6 +62,18 @@ class PushSender
         }
     }
 
+    /** Position courante de la file (annulation d'une transaction : voir discardSince). */
+    public function mark(): int
+    {
+        return count($this->queue);
+    }
+
+    /** Retire ce qui a été mis en file depuis mark() (transaction annulée : aucun push orphelin). */
+    public function discardSince(int $mark): void
+    {
+        $this->queue = array_slice($this->queue, 0, $mark);
+    }
+
     /** Sends what was queued. @return int number of messages delivered to push services */
     public function flush(): int
     {

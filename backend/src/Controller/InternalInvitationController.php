@@ -3,23 +3,23 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\InternalCaller;
 use App\Service\InvitationClaimer;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Attribute\AsController;
-use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Endpoint transitoire appelé par identity-service après une inscription (U2-a, ADR A10),
  * contrat docs/contracts/openapi/identity-service.internal.yaml. Réseau interne seulement (nginx ne
- * route que /api/ et /uploads/), hors pare-feu /api : protégé par le secret partagé
- * INTERNAL_API_SECRET comparé en temps constant ; secret vide ou absent → toujours refusé.
+ * route que /api/ et /uploads/), hors pare-feu /api : protégé par le secret de son appelant
+ * INTERNAL_API_SECRET seul (U12, InternalCaller) ; secret vide ou absent, ou égal à
+ * INTERNAL_SECRET_BOARD_TO_SYMFONY → toujours refusé.
  * Supprimé à la migration de board-service.
  */
 #[AsController]
@@ -28,14 +28,13 @@ class InternalInvitationController
     public function __construct(
         private EntityManagerInterface $em,
         private InvitationClaimer $claimer,
-        #[Autowire('%env(default::INTERNAL_API_SECRET)%')]
-        private ?string $internalSecret = null,
+        private InternalCaller $caller,
     ) {}
 
     #[Route('/internal/invitations/claim', methods: ['POST'])]
     public function claim(Request $request): JsonResponse
     {
-        $this->authorize($request);
+        $this->caller->requireIdentity($request);
 
         $data = json_decode($request->getContent(), true);
         if (!is_array($data)) {
@@ -74,14 +73,5 @@ class InternalInvitationController
         });
 
         return new JsonResponse(['claimed' => count($boardIds), 'boardIds' => array_values($boardIds)]);
-    }
-
-    private function authorize(Request $request): void
-    {
-        $expected = (string) $this->internalSecret;
-        $given = $request->headers->get('X-Internal-Secret');
-        if ('' === $expected || !is_string($given) || !hash_equals($expected, $given)) {
-            throw new UnauthorizedHttpException('Internal', 'Accès interne refusé.');
-        }
     }
 }

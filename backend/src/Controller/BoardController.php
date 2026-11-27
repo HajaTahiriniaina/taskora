@@ -171,8 +171,7 @@ class BoardController extends ApiController
     #[Route('/{id}/archived-lists', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function archivedLists(int $id, BoardAccess $access, CardRepository $cards): JsonResponse
     {
-        $board = $this->find(Board::class, $id);
-        $access->member($board, $this->me());
+        $board = $this->findForMember(Board::class, $id, $access);
         $lists = array_values(array_filter($board->getLists()->toArray(), fn ($l) => $l->isArchived() && !$l->isDeleted()));
         usort($lists, fn ($a, $b) => $b->getArchivedAt() <=> $a->getArchivedAt());
         $totals = $cards->totals(array_map(fn ($l) => $l->getId(), $lists));
@@ -183,8 +182,7 @@ class BoardController extends ApiController
     #[Route('/{id}/archived', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function archived(int $id, Request $request, BoardAccess $access, CardRepository $cards): JsonResponse
     {
-        $board = $this->find(Board::class, $id);
-        $access->member($board, $this->me());
+        $board = $this->findForMember(Board::class, $id, $access);
         $offset = max(0, $request->query->getInt('offset'));
         $page = $cards->archived($board, trim((string) $request->query->get('q', '')), $offset, 30);
         return $this->json([

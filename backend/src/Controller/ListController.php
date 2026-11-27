@@ -19,8 +19,7 @@ class ListController extends ApiController
     #[Route('/lists/{id}', methods: ['PATCH'])]
     public function update(int $id, Request $request, BoardAccess $access): JsonResponse
     {
-        $list = $this->find(BoardList::class, $id);
-        $access->member($list->getBoard(), $this->me());
+        $list = $this->findForMember(BoardList::class, $id, $access);
         $data = $this->body($request);
         if (array_key_exists('title', $data)) {
             $list->setTitle($this->requireString($data, 'title', 160));
@@ -36,8 +35,7 @@ class ListController extends ApiController
     #[Route('/lists/{id}', methods: ['DELETE'])]
     public function delete(int $id, BoardAccess $access, Trash $trash): JsonResponse
     {
-        $list = $this->find(BoardList::class, $id);
-        $access->member($list->getBoard(), $this->me());
+        $list = $this->findForMember(BoardList::class, $id, $access);
         $trash->trashList($list, $this->me());
         return $this->json(null, 204);
     }
@@ -46,8 +44,7 @@ class ListController extends ApiController
     #[Route('/lists/{id}/archive', methods: ['POST'])]
     public function archive(int $id, BoardAccess $access, CardRepository $cards): JsonResponse
     {
-        $list = $this->find(BoardList::class, $id);
-        $access->member($list->getBoard(), $this->me());
+        $list = $this->findForMember(BoardList::class, $id, $access);
         $list->setArchivedAt($list->getArchivedAt() ?? new \DateTimeImmutable());
         $this->em->flush();
         return $this->json($this->presenter->list($list, $cards->countInList($list)));
@@ -57,8 +54,7 @@ class ListController extends ApiController
     #[Route('/lists/{id}/restore', methods: ['POST'])]
     public function restore(int $id, BoardAccess $access, CardRepository $cards): JsonResponse
     {
-        $list = $this->find(BoardList::class, $id);
-        $access->member($list->getBoard(), $this->me());
+        $list = $this->findForMember(BoardList::class, $id, $access);
         if ($list->isArchived()) {
             $last = max([-1, ...array_map(fn ($l) => $l->getPosition(), $list->getBoard()->getOpenLists())]);
             $list->setArchivedAt(null)->setPosition($last + 1);
@@ -71,8 +67,7 @@ class ListController extends ApiController
     #[Route('/lists/{id}/cards', methods: ['GET'])]
     public function cards(int $id, Request $request, BoardAccess $access, CardRepository $cards): JsonResponse
     {
-        $list = $this->find(BoardList::class, $id);
-        $access->member($list->getBoard(), $this->me());
+        $list = $this->findForMember(BoardList::class, $id, $access);
         $offset = max(0, $request->query->getInt('offset'));
         $page = $cards->page($id, $offset, $request->query->getInt('limit', 30), BoardController::filters($request, $this->me()));
         return $this->json($this->presenter->cardPage($page, $offset));
@@ -81,8 +76,7 @@ class ListController extends ApiController
     #[Route('/lists/{id}/cards', methods: ['POST'])]
     public function addCard(int $id, Request $request, BoardAccess $access, CardRepository $cards, ActivityLogger $activity): JsonResponse
     {
-        $list = $this->find(BoardList::class, $id);
-        $access->member($list->getBoard(), $this->me());
+        $list = $this->findForMember(BoardList::class, $id, $access);
         $card = new Card($list, $this->requireString($this->body($request), 'title'), $cards->countInList($list), $this->me(), $cards->nextNumber($list->getBoard()));
         $this->em->persist($card);
         $activity->log($card, $this->me(), 'created', ['list' => $list->getTitle()]);
@@ -93,8 +87,7 @@ class ListController extends ApiController
     #[Route('/labels/{id}', methods: ['PATCH'])]
     public function updateLabel(int $id, Request $request, BoardAccess $access): JsonResponse
     {
-        $label = $this->find(Label::class, $id);
-        $access->member($label->getBoard(), $this->me());
+        $label = $this->findForMember(Label::class, $id, $access);
         $data = $this->body($request);
         if (isset($data['name'])) {
             $label->setName($this->requireString($data, 'name', 60));
@@ -109,8 +102,7 @@ class ListController extends ApiController
     #[Route('/labels/{id}', methods: ['DELETE'])]
     public function deleteLabel(int $id, BoardAccess $access): JsonResponse
     {
-        $label = $this->find(Label::class, $id);
-        $access->member($label->getBoard(), $this->me());
+        $label = $this->findForMember(Label::class, $id, $access);
         $this->em->getConnection()->executeStatement('DELETE FROM card_label WHERE label_id = ?', [$id]);
         $this->em->remove($label);
         $this->em->flush();
