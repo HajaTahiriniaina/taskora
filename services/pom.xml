@@ -24,6 +24,7 @@
 
   <modules>
     <module>identity-service</module>
+    <module>board-service</module>
   </modules>
 
   <properties>
@@ -59,6 +60,8 @@
     <sonar-plugin.version>5.9.0.7382</sonar-plugin.version>
     <dependency-check.version>13.0.0</dependency-check.version>
     <enforcer.version>3.7.0</enforcer.version>
+    <!-- Compteur de requêtes SQL des IT *QueryCountIT (B-ADR-8) ; vérifiée sur Maven Central le 27/11/2026 -->
+    <datasource-proxy.version>1.11.1</datasource-proxy.version>
 
     <!-- argLine vide par défaut : JaCoCo le remplit ; @{argLine} reste valide quand JaCoCo est sauté (compat) -->
     <argLine></argLine>
@@ -97,6 +100,9 @@
     <compat.symfony.url>http://localhost:8081</compat.symfony.url>
     <compat.identity.url>http://localhost:8082</compat.identity.url>
     <compat.web.url>http://localhost:8080</compat.web.url>
+    <!-- board-service publié par docker-compose.board-dev.yml (127.0.0.1:8083) ; amont attendu de T1 via nginx -->
+    <compat.board.url>http://localhost:8083</compat.board.url>
+    <compat.board.t1>api</compat.board.t1>
   </properties>
 
   <dependencyManagement>
@@ -168,6 +174,11 @@
         <artifactId>checker-qual</artifactId>
         <version>${checker.version}</version>
       </dependency>
+      <dependency>
+        <groupId>net.ttddyy</groupId>
+        <artifactId>datasource-proxy</artifactId>
+        <version>${datasource-proxy.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -201,6 +212,8 @@
               <compat.symfony.url>${compat.symfony.url}</compat.symfony.url>
               <compat.identity.url>${compat.identity.url}</compat.identity.url>
               <compat.web.url>${compat.web.url}</compat.web.url>
+              <compat.board.url>${compat.board.url}</compat.board.url>
+              <compat.board.t1>${compat.board.t1}</compat.board.t1>
             </systemPropertyVariables>
           </configuration>
         </plugin>
@@ -218,6 +231,8 @@
               <compat.symfony.url>${compat.symfony.url}</compat.symfony.url>
               <compat.identity.url>${compat.identity.url}</compat.identity.url>
               <compat.web.url>${compat.web.url}</compat.web.url>
+              <compat.board.url>${compat.board.url}</compat.board.url>
+              <compat.board.t1>${compat.board.t1}</compat.board.t1>
             </systemPropertyVariables>
           </configuration>
           <executions>
@@ -297,8 +312,9 @@
                   <rule>
                     <element>PACKAGE</element>
                     <includes>
-                      <include>com.taskora.identity.domain*</include>
-                      <include>com.taskora.identity.application*</include>
+                      <!-- Cœur de chaque module (identity, board…) : mêmes seuils A12 -->
+                      <include>com.taskora.*.domain*</include>
+                      <include>com.taskora.*.application*</include>
                     </includes>
                     <limits>
                       <limit>
