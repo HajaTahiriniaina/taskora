@@ -2,13 +2,13 @@
 
 ```
 Fonctionnalité : board-service, socle + tableaux/membres/invitations/corbeille des tableaux
-Spec : docs/specs/phase-3-board-service.md (§2–§7, §10, §11), docs/specs/boards-members.md, docs/specs/archives-trash.md, docs/specs/decisions.md
+Spec : docs/specs/phase-3-board-service.md (§2–§7, §10, §11), docs/specs/boards-members.md, docs/specs/archives-trash.md, docs/specs/decisions.md (U6–U13)
 Contrats : docs/contracts/openapi/board-service.yaml (T0+T1), board-service.internal.yaml, symfony.internal.yaml
 Architecture : docs/architecture/backend-hexagonal.md §10 (B-ADR-1 à 12, A9 révisée), docs/architecture/board-migration.md
 CI : docs/ci/requests/backend.md, partie « board-service (phase 3) » (Manuel)
 Service(s) : board-service (nouveau, services/board-service) + backend Symfony (U8-a, /internal/notifications) + identity-service (INVITATION_CLAIM_URL)
 Branche : feat/board-service (aucun push sans accord de l'utilisateur)
-0. Manuel        — §6.1 (réponse B4, puis stack) ; en parallèle de l'étape 1
+0. Manuel        — §6.1 (réponse B4, puis stack) ; en parallèle de l'étape 1 ; mesure board-facts.sql avant RB0 sur accord explicite de l'utilisateur (U11)
 1. BackTesteur   — §2 (Java) puis §4.1 (PHPUnit) et §5.1 (identity) : tests rouges
 2. BackCodeur    — §3 (board-service), §4.2 (Symfony), §5.2 (identity) : vert sans toucher aux tests
 3. BackReviewer  — §7 ; boucle Codeur ↔ Reviewer (3 boucles max, puis remontée à BackAli)
@@ -48,14 +48,17 @@ Détail : board-migration.md §1 et ADR B-ADR-1 à 12.
 3. Droits MariaDB minimaux **vérifiés** (FA10) : cascades sans droit sur les tables filles ; `SELECT` par colonne sur `user` sans `password`.
 4. Pas de JPA : `JdbcClient` (B-ADR-1). Pas de Spring Data REST (B-ADR-8).
 5. Accès : 404 indiscernable pour un non-membre, contrôle **avant** l'analyse du corps (B-ADR-3) ; E12 → 404 `Ressource introuvable.`
-6. Corps vide = `{}` ; JSON scalaire → 400 `JSON invalide.` ; tableau JSON = objet sans clé connue (reproduit).
+6. Corps vide = `{}` ; corps non JSON ou JSON valide **non objet** (tableau compris : `[]`, `[1]`, `"x"`, `42`, `true`, `null`) → 400 `JSON invalide.` (**U13**, E16 étendu à board-service).
 7. E22/E23/E28 corrigés en T1 (messages exacts dans le contrat) ; E24 et E13 conservés.
 8. `PATCH /api/boards/{id}` répond avec `listCount`/`cardCount` à 0 (reproduit, FA11).
 9. Ordres : accueil `created_at DESC, id DESC`, membres et étiquettes par `id`, listes `position, id`, corbeille `deleted_at DESC, id DESC` (à figer par le miroir SC-BOARD-029 ; si Symfony diffère sur des données sans égalité, c'est le miroir qui a raison et BackAli corrige le contrat).
 10. Notifications : messages composés par board-service, livrés par l'outbox à `POST /internal/notifications` (Symfony).
+11. **U12** : secrets internes par appelant (B-ADR-5 §6) : board-service vérifie `INTERNAL_SECRET_IDENTITY_TO_BOARD` et envoie `INTERNAL_SECRET_BOARD_TO_SYMFONY` ; Symfony vérifie `INTERNAL_API_SECRET` sur le claim seulement et `INTERNAL_SECRET_BOARD_TO_SYMFONY` sur ses nouveaux endpoints ; identity envoie `INVITATION_CLAIM_SECRET`.
+12. **U10** : 503 de B-ADR-6 accepté (T4, hors de cet ordre de travail) ; SC-COMMENT-013 à ajuster par Paul avant T4.
+13. **U11** : `board-facts.sql` lancé par Manuel seulement, sur accord explicite de l'utilisateur au moment de l'exécution, après la démo, avant RB0 de T1 puis avant T2.
 
 ### 1.4 Divergences voulues (exclues du miroir, constante `INTENTIONAL_DIVERGENCES`)
-Une entrée par cas, avec sa référence en commentaire : E12 (id non numérique) ; E22 (types texte : `title`, `description`, `email`) ; E23 (`withDefaults`, `showCardNumbers`) ; E28 (membre visé inexistant, invitation d'un autre tableau) ; adhésions/invitations concurrentes (409 au lieu de 500). **E1 n'est pas exclu** : U8-a aligne Symfony, le miroir compare donc les cas de non-membre (statut et corps).
+Une entrée par cas, avec sa référence en commentaire : U13 (corps JSON non objet : `[]`, `[1]`, `"x"`) ; E12 (id non numérique) ; E22 (types texte : `title`, `description`, `email`) ; E23 (`withDefaults`, `showCardNumbers`) ; E28 (membre visé inexistant, invitation d'un autre tableau) ; adhésions/invitations concurrentes (409 au lieu de 500). **E1 n'est pas exclu** : U8-a aligne Symfony, le miroir compare donc les cas de non-membre (statut et corps).
 
 ## 2. Étape 1 — BackTesteur (Java, tests rouges, commit `test(board): socle T0 et tranche T1`)
 
@@ -75,7 +78,7 @@ Nommage : `@DisplayName("SC-… — …")`. Toute réponse d'API est validée co
 | SC-BOARD-020 | `JwtResolutionTest` (unitaire), `JwtSecurityIT` (API), `TokenVectors` (paire générée à l'exécution, chiffrée comme Lexik) | unitaire, sécurité | jeton identity (`uid`) et Symfony (sans `uid`) → même liste ; expiré, `alg:none`, HS256 avec la clé publique, autre clé, `iat` futur, en-tête absent, `uid`/`username` incohérents, compte disparu, `username` absent → corps Lexik exacts + `WWW-Authenticate: Bearer` ; le contexte ne contient **ni** clé privée **ni** passphrase (`BoardSecretsConfigTest`) |
 | SC-BOARD-021 | `AccessMatrixIT` | sécurité | matrice générée depuis le contrat : chaque opération T1 × {owner, admin, member, non-membre, anonyme} × {ressource d'Alice, id inexistant} × {corps valide, invalide, non JSON} ; non-membre ≡ inexistant (statut, corps, **tous** les en-têtes) ; **0 écriture** (empreinte des tables) et 0 message d'outbox ; membre retiré → 404 dès la requête suivante |
 | SC-BOARD-021 (politique) | `BoardAccessPolicyTest` | unitaire | toutes les branches de B-ADR-3 |
-| SC-BOARD-024 | `ErrorFormatIT` | API | non JSON → `JSON invalide.` ; corps vide sur `favorite` = `{}` ; `[]` = objet vide ; `abc`, `0`, `-1`, `99999999999` → 404 `Ressource introuvable.` ; 500 simulé → `Erreur interne du serveur.` sans trace ; trim PHP et troncature 160/180 en points de code (emoji) |
+| SC-BOARD-024 | `ErrorFormatIT` | API | non JSON → `JSON invalide.` ; corps vide sur `favorite` = `{}` ; **U13** : `[]`, `[1]`, `"x"`, `42`, `true`, `null` sur `POST /boards`, `PATCH /boards/{id}`, `POST …/members`, `PATCH …/members/{userId}` → 400 `JSON invalide.` sans écriture (et, pour un non-membre, 404 d'abord) ; `abc`, `0`, `-1`, `99999999999` → 404 `Ressource introuvable.` ; 500 simulé → `Erreur interne du serveur.` sans trace ; trim PHP et troncature 160/180 en points de code (emoji) |
 | SC-BOARD-025 | `NotificationOutboxIT` (WireMock `/internal/notifications`) | intégration | ajout d'un membre : `board_invite` + `member_joined` aux bons destinataires, textes exacts, jamais l'acteur ; Symfony KO 2 min (WireMock 503) → réponse 201 puis livraison ; rejeu même `eventId` ; requête en 409 → aucun message ; WireMock 401 → `FAILED`, journal `ERROR`, pas de boucle ; corps conforme au schéma `NotificationRequested` |
 | SC-BOARD-026 | `LogHygieneIT` | sécurité | journaux capturés d'un parcours T1 : 0 jeton, secret, mot de passe ; 0 e-mail en `INFO` |
 | SC-BOARD-027 | `ProfileFreshnessIT` | intégration | changement de `name`/`avatar_color` dans `taskora.user` entre deux requêtes → visible dans `members` |
@@ -94,7 +97,7 @@ Nommage : `@DisplayName("SC-… — …")`. Toute réponse d'API est validée co
 | SC-BOARD-012, 035 | `CancelInvitationIT`, `NoAccountEnumerationIT` | API, sécurité | E28 : réponses identiques pour « existant non membre » et « inexistant » |
 | SC-BOARD-029 | `BoardQueryCountIT` | intégration | nombre de requêtes SQL **identique** pour 1 tableau et 200 tableaux / 300 listes (`GET /api/boards` ≤ 4 ; `GET /api/boards/{id}` ≤ 9) |
 | SC-BOARD-030, SC-IDENT-005 | `ClaimInvitationsIT` | API, intégration | contrat identique à `identity-service.internal.yaml` (validation du schéma) ; 2 tableaux dont un dans la corbeille ; rejeu → `claimed:0` ; secret absent/faux → 401 ; utilisateur absent → 404 ; e-mail différent → 409 ; déjà membre → invitation supprimée sans notification ; `board_invite` par l'outbox avec l'inviteur comme acteur (ou « Quelqu'un ») |
-| A18 (secret) | `InternalSecretRequiredTest` | config | `INTERNAL_API_SECRET` vide → le contexte ne démarre pas (message sans valeur) |
+| A18, U12 (secrets) | `InternalSecretRequiredTest`, `InternalSecretPerCallerIT` | config, sécurité | `INTERNAL_SECRET_IDENTITY_TO_BOARD` ou `INTERNAL_SECRET_BOARD_TO_SYMFONY` vide, ou les deux égaux → le contexte ne démarre pas (message citant la variable, jamais la valeur) ; `/internal/invitations/claim` refuse (401 `Accès interne refusé.`) `INTERNAL_SECRET_BOARD_TO_SYMFONY`, `INTERNAL_API_SECRET` et un secret aléatoire, accepte seulement `INTERNAL_SECRET_IDENTITY_TO_BOARD` ; `SymfonyNotificationClient` envoie `INTERNAL_SECRET_BOARD_TO_SYMFONY` (WireMock vérifie l'en-tête) ; aucune variable `INTERNAL_API_SECRET` lue par board-service |
 | `verify` | `VerifyInvariantsIT` | intégration | V1–V8 sur jeux sains et corrompus ; `baseline` puis `check` ; code de sortie 0/2/1 ; sortie = nombres seulement |
 | Outbox | `OutboxRelayIT` | intégration | `SKIP LOCKED` avec deux relais ; backoff ; classement 200/400/401/404/409/5xx/délai ; purge des `DELIVERED` > 30 j |
 | Miroir (`@Tag("compat")`) | `BoardMirrorCompatibilityTest`, `MirrorScopeTest`, `CrossWritesCompatTest` (SC-BOARD-023), `CrossClaimCompatTest` (SC-BOARD-030 rejeu croisé), `RoutingCompatTest` (SC-BOARD-022) | compatibilité | mêmes requêtes contre Symfony (8081) et board-service (8083) sur la **même base** de la stack `taskora-ci-board` ; JSON sémantique ; `INTENTIONAL_DIVERGENCES` (§1.4) ; `MirrorScopeTest` vérifie que chaque opération T1 du contrat est couverte par le miroir ou listée en divergence |
@@ -125,6 +128,7 @@ Implémenter le squelette jusqu'au vert, **sans toucher aux tests**. Contraintes
 |---|---|---|
 | `tests/Controller/BoardAccess404Test.php` | SC-BOARD-021 (U8-a), SC-BOARD-006, SC-BOARD-034 | même matrice que `AccessMatrixIT` sur les routes **T1 et T2–T5 encore servies par Symfony**, y compris pièces jointes et fichiers Trello : non-membre → 404 avec le message du §5.3 de la spec (`Tableau introuvable.` pour `/api/boards/{id}/**`, `Ressource introuvable.` pour les ressources enfants, `Cet élément n’est pas dans la corbeille.` / `Ce tableau n’est pas dans la corbeille.` pour `/api/trash/**`) ; non-membre + élément dans la corbeille → message du non-membre (plus de fuite « dans la corbeille ») ; membre : messages actuels ; gestion → 403 inchangé |
 | `tests/Controller/InternalNotificationsTest.php` | SC-BOARD-025 | contrat `symfony.internal.yaml` ; secret absent/faux/vide côté serveur → 401 ; jamais l'acteur ; doublons ; destinataire inconnu ignoré ; `boardId`/`cardId` inexistant → `created:0` ; rejeu `eventId` → `created:0` sans push ; push mis en file avec titre/URL/étiquette actuels ; transaction (panne → ni notification ni reçu) |
+| `tests/Controller/InternalSecretPerCallerTest.php` | U12 | `/internal/notifications` : refuse `INTERNAL_API_SECRET` (secret d'identity) et un secret aléatoire, accepte `INTERNAL_SECRET_BOARD_TO_SYMFONY` ; `/internal/invitations/claim` : refuse `INTERNAL_SECRET_BOARD_TO_SYMFONY`, accepte `INTERNAL_API_SECRET` ; les deux variables égales ou l'une vide → 401 partout où elle protège |
 | `tests/Migrations/InternalEventReceiptMigrationTest.php` | R1, R10 | `migrate` puis `doctrine:schema:validate` vert ; `down()` réversible ; aucune autre table modifiée |
 | Non-régression | — | suite existante verte (claim, etc.) |
 Commit de référence `<sha-test-backend>`.
@@ -132,19 +136,19 @@ Commit de référence `<sha-test-backend>`.
 ### 4.2 BackCodeur-sur-Symfony (commit `feat(backend): accès 404 (U8-a) et notifications internes`)
 - `BoardAccess` : non-membre → `NotFoundHttpException` ; message selon le contexte (`member()` pour `/api/boards/{id}/**` → `Tableau introuvable.` ; nouvelle méthode pour les ressources enfants → `Ressource introuvable.`) ; tableau dans la corbeille : `Ce tableau est dans la corbeille.` **seulement** pour un membre.
 - `ApiController::find()` : le contrôle « dans la corbeille » passe **après** le contrôle d'accès (nouvelle méthode `findForMember()` utilisée par les 31 appels) ; `TrashController::trashed()` et `ownedTrashedBoard()` : non-membre → 404 du §5.3.
-- `InternalNotificationController` (`POST /internal/notifications`) + entité/migration `internal_event_receipt` écrite à la main (board-migration.md §2.1) ; secret comme `InternalInvitationController`.
+- `InternalNotificationController` (`POST /internal/notifications`) + entité/migration `internal_event_receipt` écrite à la main (board-migration.md §2.1) ; secret **`INTERNAL_SECRET_BOARD_TO_SYMFONY`** (U12), vérifié par un service commun `InternalCaller` (`hash_equals`, refus si vide ou égal à l'autre secret) ; `InternalInvitationController` garde `INTERNAL_API_SECRET` seul.
 - Interdit : modifier `backend/tests/**`, générer un diff Doctrine, stager `backend/src/Service/TrelloImporter.php` s'il porte une modification sans rapport.
 
 ## 5. identity-service (`INVITATION_CLAIM_URL`)
 ### 5.1 BackTesteur (commit `test(identity): URL de consommation des invitations`)
-`InvitationClaimUrlConfigTest` : défaut = `SYMFONY_INTERNAL_URL` ; valeur explicite utilisée par `SymfonyInvitationClaimClient` (WireMock sur deux ports) ; aucun autre comportement modifié (suite existante verte).
+`InvitationClaimUrlConfigTest` : défaut URL = `SYMFONY_INTERNAL_URL`, défaut secret = `INTERNAL_API_SECRET` ; `INVITATION_CLAIM_URL` et `INVITATION_CLAIM_SECRET` explicites utilisés **ensemble** par `SymfonyInvitationClaimClient` (WireMock sur deux ports, chacun n'acceptant que son secret : un message envoyé à la mauvaise cible avec le mauvais secret → 401 → `FAILED`) ; secret de claim vide → refus de démarrer ; aucun autre comportement modifié (suite existante verte).
 ### 5.2 BackCodeur (commit `feat(identity): URL de consommation des invitations configurable`)
-Propriété `identity.invitations.claim-url` (`INVITATION_CLAIM_URL`, défaut `${SYMFONY_INTERNAL_URL}`) ; rien d'autre. Changement minimal : **la bascule d'identity n'est pas retardée** ; si ce commit arrive après la bascule d'identity, il suit la procédure normale (revue, CI).
+Propriétés `identity.invitations.claim-url` (`INVITATION_CLAIM_URL`, défaut `${SYMFONY_INTERNAL_URL}`) et `identity.invitations.claim-secret` (`INVITATION_CLAIM_SECRET`, défaut `${INTERNAL_API_SECRET}`, U12), lues au moment de l'envoi ; rien d'autre. Changement minimal : **la bascule d'identity n'est pas retardée** ; si ce commit arrive après la bascule d'identity, il suit la procédure normale (revue, CI).
 
 ## 6. Manuel
 ### 6.1 Avant et pendant l'étape 1
 1. Répondre à la question **B4** (schéma `taskora` des IT généré depuis les migrations Doctrine, contrôlé en CI) dans `docs/ci/requests/backend.md` §B6.
-2. Stack : service `board` (profil `board`), `docker-compose.board-dev.yml` (127.0.0.1:8083), init `board` + droits exacts (board-migration.md §3), variables nginx `BOARD_T1_UPSTREAM`…`T5` avec les expressions du §5.2, `INVITATION_CLAIM_URL` pour identity, `.env.example`. Le service `board` reste non démarrable tant que l'image n'existe pas (profil).
+2. Stack : trois secrets internes distincts par appelant (U12, demande CI §B3 point 5 bis) ; service `board` (profil `board`), `docker-compose.board-dev.yml` (127.0.0.1:8083), init `board` + droits exacts (board-migration.md §3), variables nginx `BOARD_T1_UPSTREAM`…`T5` avec les expressions du §5.2, `INVITATION_CLAIM_URL` pour identity, `.env.example`. Le service `board` reste non démarrable tant que l'image n'existe pas (profil).
 ### 6.2 Dès le commit de l'étape 1
 Workflows `board-service.yml`, `board-security.yml`, `board-compat.yml`, zones `changes`, `ci-gate` (demande §B1–B5). Les jobs sont rouges jusqu'à l'étape 2 : c'est attendu.
 ### 6.3 Demande à FrontPierre (via Paul)
@@ -159,7 +163,7 @@ Périmètre : `services/board-service/**`, `services/pom.xml`, `backend/src/**` 
 5. Classement bloquant / majeur / mineur ; tout bloquant renvoie à BackCodeur (3 boucles max).
 
 ## 8. Répétition du retour arrière de T1 (RB0–RB9)
-Procédure : board-migration.md §7. Stack neuve `-p taskora-rehearsal` (ports libres en 127.0.0.1, secrets éphémères jamais affichés), données synthétiques via l'API Symfony, **jamais** `taskora` ni `taskora-e2e`. Prérequis : étapes 1–3 vertes, CI `board-*` et `backend-phpunit` verts, e2e `@board` T1 disponibles, U8-a déployé dans l'image Symfony de la stack. Compte rendu chiffré `docs/reviews/<date>-board-t1-rollback-rehearsal.md` (BackAli, Manuel). Points propres à T1 : RB2/RB4 commutent **aussi** `INVITATION_CLAIM_URL` ; RB5 inscrit un invité avec le claim servi par Symfony puis RB7 avec board-service ; `verify` en RB1, RB6 et après RB7.
+Procédure : board-migration.md §7. Stack neuve `-p taskora-rehearsal` (ports libres en 127.0.0.1, secrets éphémères jamais affichés), données synthétiques via l'API Symfony, **jamais** `taskora` ni `taskora-e2e`. Prérequis : étapes 1–3 vertes, CI `board-*` et `backend-phpunit` verts, e2e `@board` T1 disponibles, U8-a déployé dans l'image Symfony de la stack. Compte rendu chiffré `docs/reviews/<date>-board-t1-rollback-rehearsal.md` (BackAli, Manuel). Points propres à T1 : RB2/RB4 commutent **aussi** `INVITATION_CLAIM_URL` et `INVITATION_CLAIM_SECRET` (U12) ; RB3 vérifie qu'un appel au claim de board-service avec `INTERNAL_API_SECRET` est refusé (401) ; RB5 inscrit un invité avec le claim servi par Symfony puis RB7 avec board-service ; `verify` en RB1, RB6 et après RB7.
 
 ## 9. Recette BackAli et critères de sortie T0 + T1 (spec §11.1)
 1. Scénarios critiques T0/T1 `validé`, importants au moins `vert` (matrice `docs/specs/traceability.md`, mise à jour par Paul).
@@ -168,6 +172,6 @@ Procédure : board-migration.md §7. Stack neuve `-p taskora-rehearsal` (ports l
 4. Rapport BackReviewer sans bloquant ; intégrité des tests prouvée.
 5. Répétition RB0–RB9 réussie ; `verify` vert ; outbox sans `FAILED`.
 6. PHPUnit verts (U8-a, `/internal/notifications`) ; identity pointe vers board-service en recette, SC-IDENT-005 vert.
-7. Faits F0–F13 mesurés (board-migration.md §1.4) **avant** RB0 ; un écart à FA5/FA6 renvoie à BackAli.
+7. Faits F0–F13 mesurés (board-migration.md §1.4) **avant** RB0, par Manuel, sur accord explicite de l'utilisateur donné au moment de l'exécution (U11) ; seconde mesure avant T2 ; un écart à FA5/FA6 renvoie à BackAli.
 8. Latence : suivi (U5) ; L5 (0 × 5xx) exigé.
 Bascule réelle de T1 : seulement après accord explicite de l'utilisateur, hors heures de pointe, annoncée (U9-a), U8-a déployé **avant** ou **dans la même opération**.

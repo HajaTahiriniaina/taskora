@@ -18,6 +18,8 @@ info:
       `Le champ "<nom>" doit être une chaîne de caractères.` (plus de conversion PHP ni de 500) ; `ids` non tableau
       → 400 `Le champ "ids" doit être un tableau.` ; couleur de plus de 20 caractères → 400 `Couleur invalide.`
     - **E23** : champ booléen présent qui n'est pas un booléen JSON (`null` compris) → 400 `Le champ "<nom>" doit être un booléen.`
+    - **E16 étendu (U13)** : corps JSON valide qui n'est pas un **objet** (`[]`, `[1]`, `"x"`, `42`, `true`, `null`)
+      → 400 `{"error":"JSON invalide."}`, sur toutes les routes du périmètre (Symfony acceptait un tableau comme `{}`).
     - **E28** : pas d'énumération des comptes : membre visé inexistant ou non membre → 404 `Membre introuvable.` ;
       invitation inexistante ou d'un autre tableau → 404 `Ressource introuvable.`
     - Concurrence : adhésions et invitations simultanées → 409 (messages actuels), jamais 500.
@@ -29,9 +31,8 @@ info:
       (docs/architecture/backend-hexagonal.md B-ADR-2). Erreurs au format Lexik `{"code":401,"message":…}`
       + `WWW-Authenticate: Bearer`.
     - Corps : JSON UTF-8. **Corps vide = `{}`** (le front envoie `favorite` sans corps ; la règle E20 de phase 1 ne
-      s'applique pas ici). Corps non JSON ou JSON scalaire (`"x"`, `42`, `true`, `null`) → 400 `JSON invalide.`
-      Un tableau JSON (`[]`, `[1]`) est traité comme un objet sans clé connue (comportement PHP reproduit,
-      `x-compat`). Clés inconnues ignorées.
+      s'applique pas ici). Corps non JSON, ou JSON valide qui n'est pas un objet (tableau compris : `[]`, `[1]`,
+      `"x"`, `42`, `true`, `null`) → 400 `JSON invalide.` (U13, E16 étendu ; divergence voulue). Clés inconnues ignorées.
     - Ordre des contrôles : authentification → identifiant de chemin (E12) → **accès** (§5.3 de la spec) →
       analyse du corps → validation. Un non-membre ne voit jamais un message de validation.
     - Champs texte : `trim` PHP (espace, \t, \n, \r, \0, \x0B), longueurs en points de code, troncature silencieuse
@@ -118,7 +119,11 @@ x-tranches:
     routes:
       - POST /cards/{id}/comments
       - DELETE /comments/{id}
-    divergences: [E2, 'B-ADR-6 (503 si l''inspection des fichiers est impossible)']
+    divergences:
+      - E2
+      - 'U10 / B-ADR-6 : commentaire contenant au moins un fichier /uploads/ inconnu et stockage Symfony injoignable (/internal/storage/inspect : erreur réseau, 5xx, délai) → 503 {"error":"Service de fichiers indisponible, réessayez."}, aucune écriture (Symfony ignorait le fichier en silence)'
+    scenarios-to-adjust:
+      - 'SC-COMMENT-013 : Paul ajoute le cas « stockage injoignable → 503, rien d''écrit » AVANT les tests de T4 (U10)'
   T5:
     status: listé
     routes:
@@ -169,7 +174,7 @@ paths:
           `Backend #14b8a6`, `Idée #eab308`.
         L'appelant devient membre `owner`. Réponse : tableau complet (`invitations: []`, `trelloFiles: 0`,
         compteurs à 0). Événement `BoardCreated` (outbox, `HELD`). Une seule transaction.
-      x-scenarios: [SC-BOARD-001, SC-BOARD-023, SC-BOARD-024, SC-BOARD-028, SC-CARD-043]
+      x-scenarios: [SC-BOARD-001, SC-BOARD-023, SC-BOARD-024, SC-BOARD-028, SC-CARD-043, U13]
       requestBody:
         required: false
         content:
@@ -191,6 +196,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               examples:
                 invalidJson: { value: { error: JSON invalide. } }
+                notAnObject: { summary: 'corps JSON non objet ([], "x", 42) — U13 (E16 étendu)', value: { error: JSON invalide. } }
                 titleRequired: { value: { error: 'Le champ "title" est obligatoire.' } }
                 titleNotString: { summary: E22, value: { error: 'Le champ "title" doit être une chaîne de caractères.' } }
                 descriptionNotString: { summary: E22, value: { error: 'Le champ "description" doit être une chaîne de caractères.' } }
@@ -228,7 +234,7 @@ paths:
         `background` hors liste ou non chaîne : ignoré. `showCardNumbers` : booléen JSON (E23).
         Réponse : résumé du tableau **avec `listCount` et `cardCount` à 0** (comportement actuel reproduit, `x-compat`).
       x-compat: réponse sans compteurs (Presenter::boardSummary appelé sans compteurs)
-      x-scenarios: [SC-BOARD-005, SC-BOARD-021, SC-BOARD-024, SC-CARD-043]
+      x-scenarios: [SC-BOARD-005, SC-BOARD-021, SC-BOARD-024, SC-CARD-043, U13]
       requestBody:
         required: false
         content:
@@ -247,6 +253,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               examples:
                 invalidJson: { value: { error: JSON invalide. } }
+                notAnObject: { summary: U13 (E16 étendu), value: { error: JSON invalide. } }
                 titleRequired: { value: { error: 'Le champ "title" est obligatoire.' } }
                 titleNotString: { summary: E22, value: { error: 'Le champ "title" doit être une chaîne de caractères.' } }
                 showCardNumbersNotBoolean: { summary: E23, value: { error: 'Le champ "showCardNumbers" doit être un booléen.' } }
@@ -280,7 +287,7 @@ paths:
       tags: [boards]
       operationId: toggleFavorite
       summary: Basculer le favori de l'appelant (propre à chaque membre)
-      description: Corps ignoré (le front n'en envoie pas). Bascule `board_member.favorite` de l'appelant.
+      description: Corps ignoré (le front n'en envoie pas ; un corps présent n'est ni analysé ni contrôlé, comme aujourd'hui). Bascule `board_member.favorite` de l'appelant.
       x-scenarios: [SC-BOARD-008, SC-BOARD-021, SC-BOARD-024]
       responses:
         '200':
@@ -315,7 +322,7 @@ paths:
         Aucun compte : invitation (index unique `(board_id, email)`) → 202 ; invitation déjà en attente → 409.
         Le rôle d'une invitation n'est pas mémorisé (E24 conservé). Requêtes concurrentes : une seule réussit, les
         autres → 409, jamais 500 (SC-BOARD-017, SC-BOARD-031).
-      x-scenarios: [SC-BOARD-009, SC-BOARD-010, SC-BOARD-011, SC-BOARD-013, SC-BOARD-017, SC-BOARD-021, SC-BOARD-025, SC-BOARD-031]
+      x-scenarios: [SC-BOARD-009, SC-BOARD-010, SC-BOARD-011, SC-BOARD-013, SC-BOARD-017, SC-BOARD-021, SC-BOARD-025, SC-BOARD-031, U13]
       requestBody:
         required: false
         content:
@@ -344,6 +351,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               examples:
                 invalidJson: { value: { error: JSON invalide. } }
+                notAnObject: { summary: U13 (E16 étendu), value: { error: JSON invalide. } }
                 emailRequired: { value: { error: 'Le champ "email" est obligatoire.' } }
                 emailNotString: { summary: E22, value: { error: 'Le champ "email" doit être une chaîne de caractères.' } }
                 emailInvalid: { value: { error: Adresse e-mail invalide. } }
@@ -372,7 +380,7 @@ paths:
         → propriétaire visé → 403 → `role` ∈ {`admin`, `member`} sinon 400 `Rôle invalide.` (y compris `owner` et
         une valeur non chaîne). Un gestionnaire peut se rétrograder lui-même. Le propriétaire reste unique ; aucune
         route ne transfère la propriété (SC-BOARD-032). Verrou sur l'adhésion visée (B-ADR-4). `MemberRoleChanged` (`HELD`).
-      x-scenarios: [SC-BOARD-014, SC-BOARD-021, SC-BOARD-032, SC-BOARD-035]
+      x-scenarios: [SC-BOARD-014, SC-BOARD-021, SC-BOARD-032, SC-BOARD-035, U13]
       requestBody:
         required: false
         content:
@@ -391,7 +399,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               examples:
                 invalidRole: { value: { error: Rôle invalide. } }
-                invalidJson: { value: { error: JSON invalide. } }
+                invalidJson: { summary: 'non JSON, ou JSON non objet — U13', value: { error: JSON invalide. } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403':
           description: Gestionnaire requis, ou propriétaire visé

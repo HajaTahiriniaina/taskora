@@ -8,8 +8,12 @@ info:
     par nginx. Appelés par board-service (outbox ou appel synchrone court). Ils disparaissent quand
     notification-service et attachment-service reprennent ces responsabilités (phases 4–5).
     Règles communes (identiques à `/internal/invitations/claim`, ADR A10) :
-    - en-tête `X-Internal-Secret` = `INTERNAL_API_SECRET`, comparé par `hash_equals` ; variable vide ou absente →
-      toujours 401 `{"error":"Accès interne refusé."}` ;
+    - **un secret par appelant (U12)**, en-tête `X-Internal-Secret`, comparé par `hash_equals` :
+      `INTERNAL_SECRET_BOARD_TO_SYMFONY` pour les quatre endpoints de ce fichier (appelant : board-service) ;
+      `INTERNAL_API_SECRET` (existant, appelant : identity-service) pour `/internal/invitations/claim` **seulement**,
+      conservé jusqu'à la bascule de T1 (ensuite identity appelle board-service). Le secret d'un appelant est refusé
+      (401) par les endpoints de l'autre. Variable vide ou absente, ou deux variables de même valeur → toujours 401
+      `{"error":"Accès interne refusé."}` (et journal `ERROR` sans valeur) ;
     - corps : objet JSON, sinon 400 `JSON invalide.` ; erreurs `{"error"}` (ApiExceptionListener couvre `/internal`) ;
     - idempotence par `eventId` quand l'endpoint a un effet : table `internal_event_receipt` (migration Doctrine
       additive écrite à la main, board-migration.md §2.1), reçu écrit **dans la même transaction** que l'effet ;
@@ -21,7 +25,8 @@ info:
 servers:
   - url: http://api:80
     description: Symfony sur le réseau Docker (`SYMFONY_INTERNAL_URL` de board-service)
-security: []
+security:
+  - boardToSymfony: []
 paths:
   /internal/notifications:
     post:
@@ -35,7 +40,7 @@ paths:
         `boardId` ou `cardId` fourni mais inexistant (supprimé entre-temps) → aucune notification (la cascade l'aurait
         supprimée), 200 `{created: 0}`. Une transaction : notifications + reçu `eventId`.
         **Idempotent** : `eventId` déjà reçu → 200 `{created: 0}`, aucun push.
-      x-scenarios: [SC-BOARD-025, SC-BOARD-030, SC-CARD-038, SC-COMMENT-015]
+      x-scenarios: [SC-BOARD-025, SC-BOARD-030, SC-CARD-038, SC-COMMENT-015, U12]
       parameters:
         - $ref: '#/components/parameters/InternalSecret'
       requestBody:
@@ -108,8 +113,8 @@ paths:
         Lecture seule (`FileStorage::info`), sans effet. Au plus 50 clés ; chaque clé doit être une clé de
         téléversement valide (`Uploads::keyFromUrl`), sinon `null`. Objet absent → `null`.
         Appelé par board-service **avant** d'ouvrir la transaction d'un commentaire (délai 3 s) ; échec → board-service
-        répond 503 sans rien écrire.
-      x-scenarios: [SC-COMMENT-007, SC-COMMENT-013]
+        répond 503 sans rien écrire (divergence voulue, décision U10).
+      x-scenarios: [SC-COMMENT-007, SC-COMMENT-013, U10]
       parameters:
         - $ref: '#/components/parameters/InternalSecret'
       requestBody:
@@ -191,12 +196,18 @@ paths:
         '401': { $ref: '#/components/responses/Denied' }
         '500': { $ref: '#/components/responses/Internal' }
 components:
+  securitySchemes:
+    boardToSymfony:
+      type: apiKey
+      in: header
+      name: X-Internal-Secret
+      description: Secret `INTERNAL_SECRET_BOARD_TO_SYMFONY` (board-service → Symfony), variable d'environnement, jamais commité (U12)
   parameters:
     InternalSecret:
       name: X-Internal-Secret
       in: header
       required: true
-      description: Secret partagé `INTERNAL_API_SECRET` (variable d'environnement, jamais commitée)
+      description: '`INTERNAL_SECRET_BOARD_TO_SYMFONY` uniquement (U12) ; `INTERNAL_API_SECRET` ou `INTERNAL_SECRET_IDENTITY_TO_BOARD` → 401'
       schema: { type: string, minLength: 32 }
   responses:
     Denied:

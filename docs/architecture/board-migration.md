@@ -37,12 +37,18 @@ Contrainte de l'utilisateur : la base de travail `taskora` contient des données
 
 ### 1.3 Faits restant à mesurer (base de travail, lecture seule, agrégats)
 - **Fichier** : [board-facts.sql](board-facts.sql) (F0–F13). Exécuté à blanc sur le schéma réel : toutes les requêtes passent.
-- **Qui** : l'utilisateur, ou Manuel avec son accord explicite. **Aucun agent ne l'exécute de lui-même sur `taskora`.**
-- **Quand** : après la démonstration client, et au plus tard avant la répétition RB0 de T1 (§7) ; une seconde fois juste avant la bascule réelle de T2 (positions).
+- **Qui (décision U11)** : **Manuel seulement**, et **uniquement avec l'accord explicite de l'utilisateur donné au moment de la lancer** (un accord antérieur ou général ne suffit pas). Aucun autre agent ne l'exécute sur `taskora`.
+- **Quand (U11)** : après la démonstration client ; une première fois **avant la répétition RB0 de T1** (§7), une seconde fois **avant la bascule de T2** (positions). Agrégats seulement, session en lecture seule.
 - **Comment** : commande en tête du fichier (session `READ ONLY`, compte applicatif, mot de passe lu dans l'environnement du conteneur). Sortie : nombres et noms de colonnes uniquement.
 - **Restitution** : recopier les nombres dans le tableau §1.4 (commit `docs(board): faits mesurés`), sans la sortie brute.
 
 ### 1.4 Résultats mesurés (à remplir)
+Mesure 1 (avant RB0 de T1) et mesure 2 (avant T2) : par Manuel, sur accord explicite de l'utilisateur au moment de chaque exécution (U11). Date et accord consignés ici (date seulement, aucune donnée).
+| Mesure | Date | Accord de l'utilisateur consigné |
+|---|---|---|
+| 1 — avant RB0 de T1 | _à faire_ | _à faire_ |
+| 2 — avant T2 | _à faire_ | _à faire_ |
+
 | Réf. | Mesure | Valeur | Attendu / décision liée |
 |---|---|---|---|
 | F0 | version, `sql_mode`, `time_zone` | _à mesurer_ | identiques à FA5, sinon revoir B-ADR-1 |
@@ -174,7 +180,7 @@ Restent **toujours** sur Symfony (aucune expression ne doit les capturer, test d
 - Avant toute recréation du conteneur `web` : export du journal d'accès (constat N2 de la phase 1).
 
 ### 5.3 Consommation des invitations (T1)
-identity-service reçoit une nouvelle variable `INVITATION_CLAIM_URL` (défaut : `SYMFONY_INTERNAL_URL`, comportement actuel inchangé). Bascule T1 : `INVITATION_CLAIM_URL=http://board:8080` puis `docker compose up -d identity`. Les deux implémentations de `/internal/invitations/claim` sont équivalentes et idempotentes : un message d'outbox en attente peut être livré à l'une ou à l'autre (SC-BOARD-030). Même secret `INTERNAL_API_SECRET` des deux côtés.
+identity-service reçoit une nouvelle variable `INVITATION_CLAIM_URL` (défaut : `SYMFONY_INTERNAL_URL`, comportement actuel inchangé). Bascule T1 : `INVITATION_CLAIM_URL=http://board:8080` puis `docker compose up -d identity`. Les deux implémentations de `/internal/invitations/claim` sont équivalentes et idempotentes : un message d'outbox en attente peut être livré à l'une ou à l'autre (SC-BOARD-030). **Secrets par appelant (U12, B-ADR-5 §6)** : identity envoie `INVITATION_CLAIM_SECRET`, qui vaut `INTERNAL_API_SECRET` (accepté par Symfony seulement) avant la bascule et `INTERNAL_SECRET_IDENTITY_TO_BOARD` (accepté par board-service seulement) après ; URL et secret sont commutés **ensemble** (`docker compose up -d identity`).
 
 ## 6. Bascule et retour arrière par tranche (U9-a : sans gel)
 
@@ -182,7 +188,7 @@ identity-service reçoit une nouvelle variable `INVITATION_CLAIM_URL` (défaut :
 Prérequis : critères du §11.1 de la spec, dont la répétition RB0–RB9 (§7) réussie et `verify` vert.
 1. **T-24 h** : annonce (aucune coupure attendue).
 2. **T-10 min** : board-service déployé, sain, **non routé** pour la tranche ; `java -jar board-service.jar --board.verify=baseline` → rapport « état initial » consigné.
-3. **T0** : commutation `BOARD_Tn_UPSTREAM=board:8080` (+ T1 : `INVITATION_CLAIM_URL` d'identity ; + T5 : `TRASH_PURGE_ENABLED=off` côté Symfony et `BOARD_PURGE_ENABLED=on` côté board-service **dans la même opération**).
+3. **T0** : commutation `BOARD_Tn_UPSTREAM=board:8080` (+ T1 : `INVITATION_CLAIM_URL` **et** `INVITATION_CLAIM_SECRET` d'identity ; + T5 : `TRASH_PURGE_ENABLED=off` côté Symfony et `BOARD_PURGE_ENABLED=on` côté board-service **dans la même opération**).
 4. **T0+1** : contrôles à chaud : parcours de la tranche avec un compte de recette, requêtes marquées (routage), `--board.verify=check`.
 5. **T0+5 → T+48 h** : surveillance (§9).
 
@@ -194,7 +200,7 @@ Prérequis : critères du §11.1 de la spec, dont la répétition RB0–RB9 (§7
 
 | Tranche | Spécificités du retour arrière |
 |---|---|
-| T1 | `INVITATION_CLAIM_URL` d'identity remis à Symfony. Effet visible : aucun (U8-a aligne déjà Symfony sur les 404). Les jetons restent valides des deux côtés |
+| T1 | `INVITATION_CLAIM_URL` et `INVITATION_CLAIM_SECRET` d'identity remis à Symfony / `INTERNAL_API_SECRET`. Effet visible : aucun (U8-a aligne déjà Symfony sur les 404). Les jetons restent valides des deux côtés |
 | T2 | Les positions restent contiguës (board-service ne laisse jamais d'état intermédiaire) ; Symfony reprend sans verrou (risque d'avant la migration). Échéances : Symfony réaffiche avec son décalage actuel (E31, rien de pire qu'avant) |
 | T3 | Valeurs JSON écrites en encodage PHP (R5) : relues à l'identique |
 | T4 | Pièces jointes créées par board-service identiques à celles de Symfony (mêmes colonnes) |

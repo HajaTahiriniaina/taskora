@@ -13,9 +13,10 @@ info:
       `board.outbox_message.payload` : `NotificationRequested` (destination `symfony-notifications`) est le corps de
       `POST /internal/notifications` de Symfony (symfony.internal.yaml) ; les événements (destination `broker`)
       sont écrits en `HELD` (pas de RabbitMQ en phase 3, U7-a).
-    Sécurité : en-tête `X-Internal-Secret` = `INTERNAL_API_SECRET` (même valeur pour Symfony, identity et
-    board-service en phase 3), comparé en temps constant ; secret vide → board-service refuse de démarrer.
-    Jamais de JWT sur `/internal/**`. Architecture : docs/architecture/backend-hexagonal.md B-ADR-5.
+    Sécurité (U12 : un secret **par appelant**) : en-tête `X-Internal-Secret`. board-service n'accepte sur
+    `/internal/invitations/claim` **que** `INTERNAL_SECRET_IDENTITY_TO_BOARD` (identity → board), comparé en temps
+    constant ; tout autre secret (dont `INTERNAL_SECRET_BOARD_TO_SYMFONY` et `INTERNAL_API_SECRET`) → 401. Secret vide
+    ou égal à `INTERNAL_SECRET_BOARD_TO_SYMFONY` → board-service refuse de démarrer. Jamais de JWT sur `/internal/**`. Architecture : docs/architecture/backend-hexagonal.md B-ADR-5.
 servers:
   - url: http://board:8080
     description: board-service sur le réseau Docker (`INVITATION_CLAIM_URL` d'identity après la bascule de T1)
@@ -37,11 +38,14 @@ paths:
            → rien ; dans tous les cas l'invitation est supprimée. Tableaux dans la corbeille compris (comportement actuel).
         **Idempotent** : rejeu → 200 `{claimed: 0, boardIds: []}`. Course avec un ajout direct (index unique) →
         l'adhésion existante est conservée, jamais 500.
-      x-scenarios: [SC-BOARD-030, SC-IDENT-005, SC-IDENT-006, SC-BOARD-025]
+      x-scenarios: [SC-BOARD-030, SC-IDENT-005, SC-IDENT-006, SC-BOARD-025, U12]
+      security:
+        - identityToBoard: []
       parameters:
         - name: X-Internal-Secret
           in: header
           required: true
+          description: '`INTERNAL_SECRET_IDENTITY_TO_BOARD` uniquement (U12) ; tout autre secret → 401'
           schema: { type: string, minLength: 32 }
       requestBody:
         required: true
@@ -92,6 +96,12 @@ paths:
               examples:
                 internal: { value: { error: Erreur interne du serveur. } }
 components:
+  securitySchemes:
+    identityToBoard:
+      type: apiKey
+      in: header
+      name: X-Internal-Secret
+      description: Secret `INTERNAL_SECRET_IDENTITY_TO_BOARD` (identity-service → board-service), variable d'environnement, jamais commité (U12)
   schemas:
     Error:
       type: object
