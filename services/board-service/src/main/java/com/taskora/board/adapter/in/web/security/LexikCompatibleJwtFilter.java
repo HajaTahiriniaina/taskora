@@ -13,6 +13,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -38,9 +40,13 @@ public final class LexikCompatibleJwtFilter extends OncePerRequestFilter {
     this.entryPoint = entryPoint;
   }
 
+  /** Chemin routé (décodé, normalisé), jamais l'URI brute (§12.4 B1). */
+  private static final RequestMatcher API =
+      PathPatternRequestMatcher.withDefaults().matcher("/api/**");
+
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return !request.getRequestURI().startsWith(request.getContextPath() + "/api/");
+    return !API.matches(request);
   }
 
   @Override
