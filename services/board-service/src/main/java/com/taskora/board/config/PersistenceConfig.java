@@ -16,8 +16,10 @@ import com.taskora.board.adapter.out.symfony.SymfonyNotificationClient;
 import com.taskora.board.application.port.in.DeliverPendingMessagesUseCase;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -84,11 +86,21 @@ public class PersistenceConfig {
     return new JdbcInvariantsQuery(jdbc, clock);
   }
 
-  /** Exécuteur de la livraison asynchrone (la réponse HTTP n'attend pas Symfony). */
+  /**
+   * Exécuteur de la livraison asynchrone (la réponse HTTP n'attend pas Symfony). File bornée à une
+   * demande, les suivantes sont écartées sans journal (§12.4 m3) : une demande en file n'a pas
+   * encore réservé son lot et verra tout message déjà validé ; le relais planifié reste le filet.
+   */
   @Bean(destroyMethod = "shutdownNow")
   public ExecutorService outboxDeliveryExecutor() {
-    return Executors.newFixedThreadPool(
-        2, Thread.ofPlatform().name("board-outbox-", 0).daemon(true).factory());
+    return new ThreadPoolExecutor(
+        2,
+        2,
+        0L,
+        TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(1),
+        Thread.ofPlatform().name("board-outbox-", 0).daemon(true).factory(),
+        new ThreadPoolExecutor.DiscardPolicy());
   }
 
   @Bean
@@ -100,7 +112,12 @@ public class PersistenceConfig {
     Runnable deliver =
         () -> {
           try {
-            relay.getObject().deliverDue(AFTER_COMMIT_BATCH);
+            // Lot plein : d'autres messages peuvent être dus, dont ceux des demandes écartées par
+            // la file bornée (m3) ; on continue jusqu'à un lot incomplet.
+            int processed;
+            do {
+              processed = relay.getObject().deliverDue(AFTER_COMMIT_BATCH);
+            } while (processed >= AFTER_COMMIT_BATCH);
           } catch (RuntimeException e) {
             // Le relais planifié reprendra le message ; aucune donnée dans le journal.
             LOG.warn("Livraison immédiate de l'outbox en échec : {}", e.getClass().getSimpleName());
