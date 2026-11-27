@@ -1,14 +1,17 @@
 package com.taskora.board.application.port.out;
 
+import com.taskora.board.domain.exception.DomainMessages;
+import com.taskora.board.domain.exception.ValidationException;
 import java.util.Map;
 import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Objet JSON analysé ; une clé absente diffère d'une clé à {@code null}.
  *
  * @param fields champs de premier niveau (chaîne, nombre, booléen, liste, table, ou {@code null})
  */
-public record ParsedBody(Map<String, Object> fields) {
+public record ParsedBody(Map<String, @Nullable Object> fields) {
 
   /**
    * Présence d'une clé.
@@ -17,7 +20,7 @@ public record ParsedBody(Map<String, Object> fields) {
    * @return vrai si la clé est présente (même à {@code null})
    */
   public boolean has(String name) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return fields.containsKey(name);
   }
 
   /**
@@ -29,7 +32,13 @@ public record ParsedBody(Map<String, Object> fields) {
    *     être une chaîne de caractères.}
    */
   public Optional<String> string(String name) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (!has(name)) {
+      return Optional.empty();
+    }
+    if (raw(name) instanceof String s) {
+      return Optional.of(s);
+    }
+    throw new ValidationException(DomainMessages.notString(name));
   }
 
   /**
@@ -41,7 +50,13 @@ public record ParsedBody(Map<String, Object> fields) {
    *     être un booléen.}
    */
   public Optional<Boolean> bool(String name) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (!has(name)) {
+      return Optional.empty();
+    }
+    if (raw(name) instanceof Boolean b) {
+      return Optional.of(b);
+    }
+    throw new ValidationException(DomainMessages.notBoolean(name));
   }
 
   /**
@@ -50,7 +65,7 @@ public record ParsedBody(Map<String, Object> fields) {
    * @param name nom
    * @return valeur, ou {@code null}
    */
-  public Object raw(String name) {
-    throw new UnsupportedOperationException("BackCodeur");
+  public @Nullable Object raw(String name) {
+    return fields.get(name);
   }
 }

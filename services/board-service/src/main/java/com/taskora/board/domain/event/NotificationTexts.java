@@ -1,5 +1,7 @@
 package com.taskora.board.domain.event;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
+
 /** Textes exacts des notifications de T1 (boards-members.md, {@code BoardController} Symfony). */
 public final class NotificationTexts {
   private NotificationTexts() {}
@@ -11,8 +13,11 @@ public final class NotificationTexts {
    * @param boardTitle titre du tableau
    * @return message
    */
-  public static String boardInvite(String actorName, String boardTitle) {
-    throw new UnsupportedOperationException("BackCodeur");
+  public static String boardInvite(@Nullable String actorName, String boardTitle) {
+    return (actorName == null ? "Quelqu'un" : actorName)
+        + " vous a ajouté au tableau « "
+        + boardTitle
+        + " »";
   }
 
   /**
@@ -23,7 +28,7 @@ public final class NotificationTexts {
    * @return message
    */
   public static String memberJoined(String memberName, String boardTitle) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return memberName + " a rejoint le tableau « " + boardTitle + " »";
   }
 
   /**
@@ -34,6 +39,6 @@ public final class NotificationTexts {
    * @return message
    */
   public static String memberRemoved(String actorName, String boardTitle) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return actorName + " vous a retiré du tableau « " + boardTitle + " »";
   }
 }

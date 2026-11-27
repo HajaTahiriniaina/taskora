@@ -3,6 +3,7 @@ package com.taskora.board.application.port.in;
 import com.taskora.board.domain.model.Role;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Résumé de tableau (schéma {@code BoardSummary}).
@@ -22,11 +23,11 @@ import java.util.List;
 public record BoardSummaryView(
     int id,
     String title,
-    String description,
+    @Nullable String description,
     String background,
     boolean showCardNumbers,
     boolean favorite,
-    Role role,
+    @Nullable Role role,
     List<MemberView> members,
     int listCount,
     int cardCount,

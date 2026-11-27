@@ -1,6 +1,8 @@
 package com.taskora.board.domain.model;
 
+import java.util.Locale;
 import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /** Fond de tableau : une des dix valeurs historiques ; toute autre valeur est ignorée. */
 public enum Background {
@@ -31,7 +33,7 @@ public enum Background {
    * @return valeur en minuscules
    */
   public String value() {
-    throw new UnsupportedOperationException("BackCodeur");
+    return name().toLowerCase(Locale.ROOT);
   }
 
   /**
@@ -41,8 +43,16 @@ public enum Background {
    * @param raw valeur reçue (non chaîne : {@code null})
    * @return le fond, ou vide si la valeur doit être ignorée
    */
-  public static Optional<Background> parse(String raw) {
-    throw new UnsupportedOperationException("BackCodeur");
+  public static Optional<Background> parse(@Nullable String raw) {
+    if (raw == null) {
+      return Optional.empty();
+    }
+    for (Background b : values()) {
+      if (b.value().equals(raw)) {
+        return Optional.of(b);
+      }
+    }
+    return Optional.empty();
   }
 
   /**
@@ -52,6 +62,6 @@ public enum Background {
    * @return le fond correspondant
    */
   public static Background fromStored(String stored) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return parse(stored).orElse(AURORA);
   }
 }

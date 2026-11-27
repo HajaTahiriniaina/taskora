@@ -2,6 +2,7 @@ package com.taskora.board.application.port.out;
 
 import com.taskora.board.domain.event.DomainEvent;
 import com.taskora.board.domain.event.NotificationRequested;
+import com.taskora.board.domain.model.BoardId;
 import java.time.Instant;
 import java.util.List;
 
@@ -22,6 +23,15 @@ public interface OutboxPort {
    * @param notification notification composée
    */
   void append(NotificationRequested notification);
+
+  /**
+   * Écrit une notification rattachée à son tableau ({@code aggregate_id}) quand la charge n'en cite
+   * pas ({@code member_removed}, FA13).
+   *
+   * @param notification notification composée
+   * @param aggregate tableau concerné
+   */
+  void append(NotificationRequested notification, BoardId aggregate);
 
   /**
    * Verrouille un lot de messages dus ({@code FOR UPDATE SKIP LOCKED}).

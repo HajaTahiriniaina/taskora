@@ -4,6 +4,7 @@ import com.taskora.board.domain.model.BoardId;
 import com.taskora.board.domain.model.UserId;
 import java.util.List;
 import java.util.UUID;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Notification déjà composée, livrée par l'outbox à {@code POST /internal/notifications} (schéma
@@ -19,7 +20,7 @@ import java.util.UUID;
 public record NotificationRequested(
     UUID eventId,
     NotificationType type,
-    UserId actorId,
+    @Nullable UserId actorId,
     List<UserId> recipientIds,
     String message,
-    BoardId boardId) {}
+    @Nullable BoardId boardId) {}

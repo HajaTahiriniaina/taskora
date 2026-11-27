@@ -1,5 +1,6 @@
 package com.taskora.board.config;
 
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -21,7 +22,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *       BOARD_ROUTING_MARKER}, {@code board.purge.enabled} ← {@code BOARD_PURGE_ENABLED}.
  * </ul>
  *
- * <p>Squelette : la validation (A18, U12) est à écrire par BackCodeur.
+ * <p>Validation au démarrage (A18, U12) : secrets internes non vides et différents ; schéma
+ * historique {@code [a-z_]+}. Les messages nomment la variable, jamais sa valeur.
  *
  * @param jwt clé publique
  * @param legacy schéma et fuseau historiques
@@ -40,6 +42,20 @@ public record BoardProperties(
     Outbox outbox,
     Routing routing,
     Purge purge) {
+
+  static final String IDENTITY_TO_BOARD = "INTERNAL_SECRET_IDENTITY_TO_BOARD";
+  static final String BOARD_TO_SYMFONY = "INTERNAL_SECRET_BOARD_TO_SYMFONY";
+
+  /** Refuse de démarrer sans secrets internes ou avec un schéma historique non conforme. */
+  public BoardProperties {
+    if (internal == null) {
+      throw new IllegalStateException(
+          IDENTITY_TO_BOARD + " et " + BOARD_TO_SYMFONY + " doivent être définis et non vides.");
+    }
+    if (legacy != null && !legacy.schema().matches("[a-z_]+")) {
+      throw new IllegalStateException("LEGACY_SCHEMA doit respecter [a-z_]+.");
+    }
+  }
 
   /**
    * Clé publique des JWT.
@@ -62,7 +78,31 @@ public record BoardProperties(
    * @param identityToBoardSecret secret accepté sur {@code /internal/**}
    * @param boardToSymfonySecret secret envoyé à Symfony
    */
-  public record Internal(String identityToBoardSecret, String boardToSymfonySecret) {}
+  public record Internal(String identityToBoardSecret, String boardToSymfonySecret) {
+
+    /** Secrets non vides et différents (U12), sinon refus de démarrer sans citer de valeur. */
+    public Internal {
+      if (blank(identityToBoardSecret)) {
+        throw new IllegalStateException(IDENTITY_TO_BOARD + " doit être défini et non vide.");
+      }
+      if (blank(boardToSymfonySecret)) {
+        throw new IllegalStateException(BOARD_TO_SYMFONY + " doit être défini et non vide.");
+      }
+      if (identityToBoardSecret.equals(boardToSymfonySecret)) {
+        throw new IllegalStateException(
+            IDENTITY_TO_BOARD + " et " + BOARD_TO_SYMFONY + " doivent être différents (U12).");
+      }
+    }
+
+    private static boolean blank(@Nullable String secret) {
+      return secret == null || secret.isBlank();
+    }
+
+    @Override
+    public String toString() {
+      return "Internal[secrets masqués]";
+    }
+  }
 
   /**
    * Symfony sur le réseau interne.

@@ -1,5 +1,7 @@
 package com.taskora.board.domain.event;
 
+import java.util.Locale;
+
 /** Types de notification ({@code NotificationType} de board-service.internal.yaml). */
 public enum NotificationType {
   /** Ajout à un tableau (direct ou consommation d'invitation). */
@@ -15,6 +17,6 @@ public enum NotificationType {
    * @return valeur en minuscules
    */
   public String value() {
-    throw new UnsupportedOperationException("BackCodeur");
+    return name().toLowerCase(Locale.ROOT);
   }
 }

@@ -1,7 +1,11 @@
 package com.taskora.board.domain.model;
 
+import java.util.Locale;
+
 /** Fonctions de chaîne de PHP reproduites (copie d'identity, pas de dépendance entre modules). */
 public final class PhpString {
+  private static final String TRIM_CHARS = " \t\n\r\0\u000B";
+
   private PhpString() {}
 
   /**
@@ -11,7 +15,15 @@ public final class PhpString {
    * @return chaîne trimée
    */
   public static String trim(String s) {
-    throw new UnsupportedOperationException("BackCodeur");
+    int start = 0;
+    int end = s.length();
+    while (start < end && TRIM_CHARS.indexOf(s.charAt(start)) >= 0) {
+      start++;
+    }
+    while (end > start && TRIM_CHARS.indexOf(s.charAt(end - 1)) >= 0) {
+      end--;
+    }
+    return s.substring(start, end);
   }
 
   /**
@@ -21,7 +33,7 @@ public final class PhpString {
    * @return nombre de points de code
    */
   public static int length(String s) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return s.codePointCount(0, s.length());
   }
 
   /**
@@ -32,7 +44,10 @@ public final class PhpString {
    * @return chaîne tronquée
    */
   public static String truncate(String s, int max) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (length(s) <= max) {
+      return s;
+    }
+    return s.substring(0, s.offsetByCodePoints(0, max));
   }
 
   /**
@@ -42,6 +57,6 @@ public final class PhpString {
    * @return chaîne en minuscules
    */
   public static String lower(String s) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return s.toLowerCase(Locale.ROOT);
   }
 }

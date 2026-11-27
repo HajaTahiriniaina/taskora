@@ -14,6 +14,9 @@ public final class PhpJsonEncoder {
    * @return texte JSON
    */
   public static String encode(Object value) {
-    throw new UnsupportedOperationException("BackCodeur");
+    // Aucune colonne R5 (activity.data, custom_field.options, custom_field_value.value) n'est
+    // écrite
+    // en T1 : l'encodeur sera implémenté avec son golden PHP en T2/T3.
+    throw new UnsupportedOperationException("Encodage PHP (R5) : T2/T3");
   }
 }

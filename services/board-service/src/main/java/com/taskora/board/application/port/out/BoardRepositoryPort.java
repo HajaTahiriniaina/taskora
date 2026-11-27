@@ -9,6 +9,7 @@ import com.taskora.board.domain.model.NewBoard;
 import com.taskora.board.domain.model.UserId;
 import java.time.Instant;
 import java.util.List;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /** Écritures sur {@code taskora.board}, {@code board_list} et {@code label} (DML seulement). */
 public interface BoardRepositoryPort {
@@ -55,6 +56,14 @@ public interface BoardRepositoryPort {
   void restore(BoardId board);
 
   /**
+   * Titre actuel d'un tableau, pour composer les notifications (relu à chaque action, R9).
+   *
+   * @param board tableau existant
+   * @return titre
+   */
+  String titleOf(BoardId board);
+
+  /**
    * Modifications d'un tableau ; un champ {@code null} est inchangé.
    *
    * @param title nouveau titre, ou {@code null}
@@ -64,9 +73,9 @@ public interface BoardRepositoryPort {
    * @param showCardNumbers nouvel affichage des numéros, ou {@code null}
    */
   record BoardChanges(
-      BoardTitle title,
+      @Nullable BoardTitle title,
       boolean descriptionChanged,
-      String description,
-      Background background,
-      Boolean showCardNumbers) {}
+      @Nullable String description,
+      @Nullable Background background,
+      @Nullable Boolean showCardNumbers) {}
 }

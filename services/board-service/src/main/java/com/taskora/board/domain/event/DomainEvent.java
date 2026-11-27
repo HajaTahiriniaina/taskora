@@ -4,6 +4,7 @@ import com.taskora.board.domain.model.BoardId;
 import com.taskora.board.domain.model.UserId;
 import java.time.Instant;
 import java.util.UUID;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /** Événement de domaine écrit dans l'outbox (destination {@code broker}, statut {@code HELD}). */
 public interface DomainEvent {
@@ -34,5 +35,5 @@ public interface DomainEvent {
    *
    * @return auteur
    */
-  UserId actorId();
+  @Nullable UserId actorId();
 }

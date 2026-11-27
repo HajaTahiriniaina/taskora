@@ -1,6 +1,7 @@
 package com.taskora.board.application.port.in;
 
 import java.time.OffsetDateTime;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Tableau de la corbeille (schéma {@code TrashedBoard}).
@@ -17,5 +18,5 @@ public record TrashedBoardView(
     String title,
     String background,
     OffsetDateTime deletedAt,
-    String deletedBy,
+    @Nullable String deletedBy,
     OffsetDateTime purgeAt) {}

@@ -28,7 +28,11 @@ public final class DefaultBoardContent {
    * @return listes par défaut
    */
   public static List<DefaultList> lists() {
-    throw new UnsupportedOperationException("BackCodeur");
+    return List.of(
+        new DefaultList("À faire", 0),
+        new DefaultList("En cours", 1),
+        new DefaultList("En revue", 2),
+        new DefaultList("Terminé", 3));
   }
 
   /**
@@ -37,6 +41,12 @@ public final class DefaultBoardContent {
    * @return étiquettes par défaut
    */
   public static List<DefaultLabel> labels() {
-    throw new UnsupportedOperationException("BackCodeur");
+    return List.of(
+        new DefaultLabel("Urgent", "#ef4444"),
+        new DefaultLabel("Bug", "#f97316"),
+        new DefaultLabel("Feature", "#6366f1"),
+        new DefaultLabel("Design", "#ec4899"),
+        new DefaultLabel("Backend", "#14b8a6"),
+        new DefaultLabel("Idée", "#eab308"));
   }
 }

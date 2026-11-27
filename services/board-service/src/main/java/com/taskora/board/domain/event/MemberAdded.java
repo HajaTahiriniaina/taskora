@@ -5,6 +5,7 @@ import com.taskora.board.domain.model.Role;
 import com.taskora.board.domain.model.UserId;
 import java.time.Instant;
 import java.util.UUID;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Membre ajouté directement ou par consommation d'invitation ({@code MemberAdded}).
@@ -21,7 +22,7 @@ public record MemberAdded(
     UUID eventId,
     Instant occurredAt,
     BoardId boardId,
-    UserId actorId,
+    @Nullable UserId actorId,
     UserId userId,
     Role role,
     boolean viaInvitation)

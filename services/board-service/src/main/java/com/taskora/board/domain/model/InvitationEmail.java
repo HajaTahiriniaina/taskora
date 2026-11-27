@@ -1,5 +1,8 @@
 package com.taskora.board.domain.model;
 
+import com.taskora.board.domain.exception.DomainMessages;
+import com.taskora.board.domain.exception.ValidationException;
+
 /**
  * E-mail d'ajout ou d'invitation : trim PHP, obligatoire, tronqué à 180 points de code, mis en
  * minuscules ({@code mb_strtolower}), puis {@code FILTER_VALIDATE_EMAIL} de PHP (porté d'identity).
@@ -19,6 +22,14 @@ public record InvitationEmail(String value) {
    *     obligatoire.} ou {@code Adresse e-mail invalide.}
    */
   public static InvitationEmail of(String raw) {
-    throw new UnsupportedOperationException("BackCodeur");
+    String trimmed = PhpString.trim(raw);
+    if (trimmed.isEmpty()) {
+      throw new ValidationException(DomainMessages.required("email"));
+    }
+    String email = PhpString.lower(PhpString.truncate(trimmed, MAX_LENGTH));
+    if (!PhpEmailValidator.isValid(email)) {
+      throw new ValidationException(DomainMessages.INVALID_EMAIL);
+    }
+    return new InvitationEmail(email);
   }
 }

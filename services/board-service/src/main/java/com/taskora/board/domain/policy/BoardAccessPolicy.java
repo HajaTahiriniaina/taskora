@@ -1,5 +1,10 @@
 package com.taskora.board.domain.policy;
 
+import com.taskora.board.domain.exception.BoardInTrashException;
+import com.taskora.board.domain.exception.BoardNotFoundException;
+import com.taskora.board.domain.exception.DomainMessages;
+import com.taskora.board.domain.exception.ForbiddenException;
+import com.taskora.board.domain.exception.NotInTrashException;
 import com.taskora.board.domain.model.Role;
 
 /**
@@ -23,7 +28,14 @@ public final class BoardAccessPolicy {
    *     corbeille
    */
   public Role requireMember(BoardAccessView view) {
-    throw new UnsupportedOperationException("BackCodeur");
+    Role role = view.callerRole();
+    if (!view.exists() || role == null) {
+      throw new BoardNotFoundException();
+    }
+    if (view.deletedAt() != null) {
+      throw new BoardInTrashException();
+    }
+    return role;
   }
 
   /**
@@ -35,7 +47,11 @@ public final class BoardAccessPolicy {
    *     administrateurs du tableau.}
    */
   public Role requireManager(BoardAccessView view) {
-    throw new UnsupportedOperationException("BackCodeur");
+    Role role = requireMember(view);
+    if (!role.canManage()) {
+      throw new ForbiddenException(DomainMessages.MANAGER_ONLY);
+    }
+    return role;
   }
 
   /**
@@ -46,7 +62,9 @@ public final class BoardAccessPolicy {
    * @throws com.taskora.board.domain.exception.ForbiddenException membre non propriétaire
    */
   public void requireOwner(BoardAccessView view, String forbiddenMessage) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (requireMember(view) != Role.OWNER) {
+      throw new ForbiddenException(forbiddenMessage);
+    }
   }
 
   /**
@@ -60,6 +78,11 @@ public final class BoardAccessPolicy {
    *     tableau peut le restaurer ou le supprimer.}
    */
   public void requireOwnerOfTrashedBoard(BoardAccessView view) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (!view.exists() || view.callerRole() == null || view.deletedAt() == null) {
+      throw new NotInTrashException();
+    }
+    if (view.callerRole() != Role.OWNER) {
+      throw new ForbiddenException(DomainMessages.OWNER_ONLY_RESTORE);
+    }
   }
 }

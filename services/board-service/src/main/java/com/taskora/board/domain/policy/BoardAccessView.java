@@ -3,6 +3,7 @@ package com.taskora.board.domain.policy;
 import com.taskora.board.domain.model.BoardId;
 import com.taskora.board.domain.model.Role;
 import java.time.Instant;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Données d'accès chargées par une seule requête (B-ADR-3 point 1) : {@code SELECT b.id,
@@ -13,7 +14,8 @@ import java.time.Instant;
  * @param deletedAt mise à la corbeille, ou {@code null}
  * @param callerRole rôle de l'appelant, ou {@code null} s'il n'est pas membre
  */
-public record BoardAccessView(BoardId boardId, boolean exists, Instant deletedAt, Role callerRole) {
+public record BoardAccessView(
+    BoardId boardId, boolean exists, @Nullable Instant deletedAt, @Nullable Role callerRole) {
 
   /**
    * Tableau inexistant.

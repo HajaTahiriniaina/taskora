@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Heure murale des colonnes {@code DATETIME} (B-ADR-11) : écrites et lues en {@code Europe/Paris}
@@ -12,6 +14,9 @@ import java.time.ZoneId;
  * plus ancien, heure inexistante de mars → décalée vers l'avant (comme PHP).
  */
 public class LegacyClock {
+  /** Rétention de la corbeille ({@code Trash::RETENTION_DAYS}). */
+  static final int PURGE_DAYS = 30;
+
   private final Clock clock;
   private final ZoneId zone;
 
@@ -32,7 +37,7 @@ public class LegacyClock {
    * @return valeur à écrire
    */
   public LocalDateTime nowWall() {
-    throw new UnsupportedOperationException("BackCodeur " + clock + zone);
+    return toWall(clock.instant());
   }
 
   /**
@@ -42,7 +47,7 @@ public class LegacyClock {
    * @return valeur à écrire
    */
   public LocalDateTime toWall(Instant instant) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return LocalDateTime.ofInstant(instant.truncatedTo(ChronoUnit.SECONDS), zone);
   }
 
   /**
@@ -52,7 +57,19 @@ public class LegacyClock {
    * @return date avec décalage
    */
   public OffsetDateTime fromWall(LocalDateTime wall) {
-    throw new UnsupportedOperationException("BackCodeur");
+    // Sans décalage préféré : heure ambiguë → décalage le plus ancien ; heure inexistante → vers
+    // l'avant (comportement de PHP).
+    return ZonedDateTime.of(wall.truncatedTo(ChronoUnit.SECONDS), zone).toOffsetDateTime();
+  }
+
+  /**
+   * Heure murale lue → instant.
+   *
+   * @param wall valeur lue
+   * @return instant
+   */
+  public Instant instantOf(LocalDateTime wall) {
+    return fromWall(wall).toInstant();
   }
 
   /**
@@ -63,6 +80,6 @@ public class LegacyClock {
    * @return date de purge avec décalage
    */
   public OffsetDateTime purgeAt(LocalDateTime deletedAtWall) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return fromWall(deletedAtWall.plusDays(PURGE_DAYS));
   }
 }

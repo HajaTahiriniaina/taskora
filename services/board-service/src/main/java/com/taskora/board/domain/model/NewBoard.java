@@ -1,6 +1,7 @@
 package com.taskora.board.domain.model;
 
 import java.time.Instant;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Tableau à créer (identifiant attribué par {@code AUTO_INCREMENT}).
@@ -13,7 +14,7 @@ import java.time.Instant;
  */
 public record NewBoard(
     BoardTitle title,
-    String description,
+    @Nullable String description,
     Background background,
     UserId ownerId,
     Instant createdAt) {}

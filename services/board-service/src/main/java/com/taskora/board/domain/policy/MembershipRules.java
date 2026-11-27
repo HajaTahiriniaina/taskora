@@ -1,8 +1,12 @@
 package com.taskora.board.domain.policy;
 
+import com.taskora.board.domain.exception.DomainMessages;
+import com.taskora.board.domain.exception.ForbiddenException;
+import com.taskora.board.domain.exception.ValidationException;
 import com.taskora.board.domain.model.Membership;
 import com.taskora.board.domain.model.Role;
 import com.taskora.board.domain.model.UserId;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /** Règles d'adhésion : propriétaire unique et non transférable, rôles (SC-BOARD-014, 032). */
 public final class MembershipRules {
@@ -15,8 +19,8 @@ public final class MembershipRules {
    * @param requested valeur reçue, ou {@code null}
    * @return rôle attribué
    */
-  public static Role roleForAddition(String requested) {
-    throw new UnsupportedOperationException("BackCodeur");
+  public static Role roleForAddition(@Nullable String requested) {
+    return Role.ADMIN.value().equals(requested) ? Role.ADMIN : Role.MEMBER;
   }
 
   /**
@@ -26,8 +30,14 @@ public final class MembershipRules {
    * @return rôle demandé
    * @throws com.taskora.board.domain.exception.ValidationException {@code Rôle invalide.}
    */
-  public static Role roleForChange(String requested) {
-    throw new UnsupportedOperationException("BackCodeur");
+  public static Role roleForChange(@Nullable String requested) {
+    if (Role.ADMIN.value().equals(requested)) {
+      return Role.ADMIN;
+    }
+    if (Role.MEMBER.value().equals(requested)) {
+      return Role.MEMBER;
+    }
+    throw new ValidationException(DomainMessages.INVALID_ROLE);
   }
 
   /**
@@ -38,7 +48,9 @@ public final class MembershipRules {
    *     peut pas être modifié.}
    */
   public static void ensureRoleChangeable(Membership target) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (target.role() == Role.OWNER) {
+      throw new ForbiddenException(DomainMessages.OWNER_ROLE_LOCKED);
+    }
   }
 
   /**
@@ -52,6 +64,11 @@ public final class MembershipRules {
    *     propriétaire ne peut pas quitter son tableau.}
    */
   public static void ensureRemovable(UserId actor, Role actorRole, Membership target) {
-    throw new UnsupportedOperationException("BackCodeur");
+    if (!actor.equals(target.userId()) && !actorRole.canManage()) {
+      throw new ForbiddenException(DomainMessages.MANAGER_ONLY);
+    }
+    if (target.role() == Role.OWNER) {
+      throw new ForbiddenException(DomainMessages.OWNER_CANNOT_LEAVE);
+    }
   }
 }

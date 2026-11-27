@@ -1,6 +1,7 @@
 package com.taskora.board.application.port.in;
 
 import java.time.OffsetDateTime;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Liste ouverte de la coquille (schéma {@code List}).
@@ -13,4 +14,9 @@ import java.time.OffsetDateTime;
  * @param cardCount cartes ouvertes
  */
 public record ListView(
-    int id, String title, int position, String color, OffsetDateTime archivedAt, int cardCount) {}
+    int id,
+    String title,
+    int position,
+    @Nullable String color,
+    @Nullable OffsetDateTime archivedAt,
+    int cardCount) {}

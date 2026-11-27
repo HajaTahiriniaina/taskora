@@ -1,6 +1,7 @@
 package com.taskora.board.domain.model;
 
 import java.time.Instant;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Invitation en attente d'un e-mail sans compte ({@code invitation}).
@@ -12,4 +13,4 @@ import java.time.Instant;
  * @param createdAt date de création
  */
 public record Invitation(
-    int id, BoardId boardId, String email, UserId invitedBy, Instant createdAt) {}
+    int id, BoardId boardId, String email, @Nullable UserId invitedBy, Instant createdAt) {}

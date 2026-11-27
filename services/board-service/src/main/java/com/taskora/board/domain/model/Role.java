@@ -1,5 +1,7 @@
 package com.taskora.board.domain.model;
 
+import java.util.Locale;
+
 /** Rôle d'un membre ({@code board_member.role}). */
 public enum Role {
   /** Propriétaire unique, non transférable. */
@@ -15,7 +17,7 @@ public enum Role {
    * @return valeur en minuscules
    */
   public String value() {
-    throw new UnsupportedOperationException("BackCodeur");
+    return name().toLowerCase(Locale.ROOT);
   }
 
   /**
@@ -24,7 +26,7 @@ public enum Role {
    * @return vrai pour {@link #OWNER} et {@link #ADMIN}
    */
   public boolean canManage() {
-    throw new UnsupportedOperationException("BackCodeur");
+    return this != MEMBER;
   }
 
   /**
@@ -34,6 +36,6 @@ public enum Role {
    * @return le rôle correspondant
    */
   public static Role fromStored(String stored) {
-    throw new UnsupportedOperationException("BackCodeur");
+    return valueOf(stored.toUpperCase(Locale.ROOT));
   }
 }

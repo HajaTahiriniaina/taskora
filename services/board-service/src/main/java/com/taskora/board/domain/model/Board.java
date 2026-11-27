@@ -1,6 +1,7 @@
 package com.taskora.board.domain.model;
 
 import java.time.Instant;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Tableau ({@code taskora.board}).
@@ -18,10 +19,10 @@ import java.time.Instant;
 public record Board(
     BoardId id,
     BoardTitle title,
-    String description,
+    @Nullable String description,
     Background background,
     boolean showCardNumbers,
     UserId ownerId,
     Instant createdAt,
-    Instant deletedAt,
-    UserId deletedBy) {}
+    @Nullable Instant deletedAt,
+    @Nullable UserId deletedBy) {}
