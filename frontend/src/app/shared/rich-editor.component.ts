@@ -82,7 +82,7 @@ export class RichEditorComponent implements OnDestroy {
   private host = viewChild.required<ElementRef<HTMLElement>>('host');
   private frame = viewChild.required<ElementRef<HTMLElement>>('frame');
   /** "@" suggestion list: members matching what is typed after "@", position under the caret. */
-  mention = signal<null | { items: User[]; index: number; top: number; left: number }>(null);
+  mention = signal<null | { index: number; items: User[]; left: number; top: number }>(null);
   private mentionCommand: ((attrs: { id: string; label: string }) => void) | null = null;
   private fileInput = viewChild.required<ElementRef<HTMLInputElement>>('file');
   private anyFileInput = viewChild.required<ElementRef<HTMLInputElement>>('anyFile');
@@ -92,7 +92,7 @@ export class RichEditorComponent implements OnDestroy {
   private tick = signal(0);
   isEmpty = signal(true);
   /** Files being sent, with their progress (shown under the text). */
-  fileUploads = signal<{ uid: number; name: string; progress: number; saving: boolean }[]>([]);
+  fileUploads = signal<{ name: string; progress: number; saving: boolean; uid: number }[]>([]);
   uploading = computed(() => this.fileUploads().length);
   private uploadSeq = 0;
   pop = signal<'color' | 'heading' | 'highlight' | 'link' | null>(null);
@@ -249,9 +249,9 @@ export class RichEditorComponent implements OnDestroy {
   }
 
   private showMentions(props: {
-    items: User[];
-    command: (a: { id: string; label: string }) => void;
     clientRect?: (() => DOMRect | null) | null;
+    command: (a: { id: string; label: string }) => void;
+    items: User[];
   }) {
     this.mentionCommand = props.command;
     const rect = props.clientRect?.();

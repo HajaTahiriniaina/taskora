@@ -34,7 +34,7 @@ import { LogoComponent } from '../../shared/logo.component';
           <h1>Créer un compte</h1>
           <p>Commencez à collaborer en quelques secondes.</p>
           @if (error()) {
-            <div class="error"><tk-icon name="x" [size]="16" />{{ error() }}</div>
+            <div class="error" role="alert"><tk-icon name="x" [size]="16" />{{ error() }}</div>
           }
           <div class="field">
             <label for="name">Nom complet</label>

@@ -45,7 +45,7 @@ export class FilterPanelComponent implements OnInit, OnDestroy {
   keyword = signal('');
   private keywordTimer: null | ReturnType<typeof setTimeout> = null;
 
-  dueOptions: { value: DueFilter; label: string; icon: string; tone: string }[] = [
+  dueOptions: { icon: string; label: string; tone: string; value: DueFilter }[] = [
     { value: 'none', label: 'Aucune date', icon: 'calendar', tone: 'neutral' },
     { value: 'overdue', label: 'En retard', icon: 'clock', tone: 'red' },
     { value: 'day', label: 'Dû dans les 24 heures', icon: 'clock', tone: 'yellow' },

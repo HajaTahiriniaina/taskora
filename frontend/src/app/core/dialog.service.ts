@@ -2,14 +2,14 @@ import { Injectable } from '@angular/core';
 import Swal from 'sweetalert2';
 
 export interface ConfirmOptions {
-  title: string;
+  cancelText?: string;
+  confirmText?: string;
+  icon?: 'info' | 'question' | 'warning';
   /** Plain text (never interpreted as HTML: titles of cards / boards come from users). */
   text?: string;
-  confirmText?: string;
-  cancelText?: string;
+  title: string;
   /** danger: red button, focus on Cancel (irreversible / destructive actions). */
   tone?: 'danger' | 'primary';
-  icon?: 'info' | 'question' | 'warning';
 }
 
 /**

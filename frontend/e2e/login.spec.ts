@@ -5,6 +5,8 @@ import { hasStoredToken, readStoredToken, SESSION_EXPIRED_TOAST } from './suppor
 
 // Page /login (docs/specs/pages.md §2).
 
+const INVALID_CREDENTIALS = 'E-mail ou mot de passe incorrect.';
+
 test.describe('Connexion — /login', () => {
   test(
     'SC-IDENT-007 — connexion nominale (e-mail dans une autre casse) : /boards, jeton accepté',
@@ -53,9 +55,10 @@ test.describe('Connexion — /login', () => {
 
         expect(response.status(), attempt.label).toBe(401);
         bodies.push(await response.text());
-        await expect(
-          page.getByText('E-mail ou mot de passe incorrect.', { exact: true }),
-        ).toBeVisible();
+        // Message annoncé (role="alert", identity.md §6, recette m6), texte exact.
+        const alert = page.getByRole('alert').filter({ hasText: INVALID_CREDENTIALS });
+        await expect(alert).toBeVisible();
+        await expect(alert).toHaveText(INVALID_CREDENTIALS);
         // Aucun toast SweetAlert2, en particulier pas celui de session. L'intercepteur le crée avant
         // que le composant n'affiche son message : on compte donc tout de suite, sans assertion
         // à réessai (le toast disparaît seul après quelques secondes et la masquerait).

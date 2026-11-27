@@ -95,10 +95,45 @@ Statut : **accepté avec modifications** (26/11/2026). Détail : [../README.md](
 
 ### Boucle de revue 1 (Manuel, 26/11/2026)
 - B5 : `identity-security` échoue avec « NVD_API_KEY absent : dependency-check 13 ne peut pas s'exécuter » si le secret manque ; clé passée par `-DnvdApiKeyEnvironmentVariable=NVD_API_KEY`. Secret `NVD_API_KEY` créé par l'utilisateur dans GitHub.
-- Rapport OWASP : **en attente** du premier run GitHub Actions (push à approuver par l'utilisateur) ; aucune clé NVD locale, aucun run local tenté. Résumé (nombres, CVE éventuelles) à reporter ici.
+- Rapport OWASP : `identity-security` vert sur la PR #1 ; résumé chiffré : voir N7 ci-dessous.
 - m2 : nginx `client_max_body_size 64k` + 413 JSON sur `/api/auth/` et `location = /api/me` (vérifié : 65 536 octets → 400 du backend, 65 537 → 413, `chunked` → 413).
 - m9 : fait par le coordinateur (`DB_BIND=127.0.0.1` par défaut, 0b6af27).
-- m10 : digests pour mariadb, gotenberg, sonarqube, node, nginx ; `mem_limit`/`pids_limit` sur `identity`. `eclipse-temurin` (Dockerfile d'identity) reste à épingler par BackCodeur.
+- m10 : digests pour mariadb, gotenberg, sonarqube, node, nginx ; `mem_limit`/`pids_limit` sur `identity`. `eclipse-temurin:25-jdk` et `25-jre` (`services/identity-service/Dockerfile`) sont épinglés par digest depuis (BackCodeur) ; `dunglas/frankenphp` et `composer` (`backend/Dockerfile`) le sont par N2 ci-dessous.
+
+### Suites de la recette du 26/11/2026 (Manuel, 26/11/2026)
+Référence : [recette identity-service](../../reviews/2026-11-26-identity-service-recette.md), points N2 et N7.
+
+#### N2 : images du backend Symfony épinglées par digest
+`backend/Dockerfile` : mêmes étiquettes, suivies du digest d'index multi-architecture, résolu le 26/11/2026 par `docker buildx imagetools inspect <image:tag>`.
+
+| Image | Digest (index OCI multi-architecture) |
+|---|---|
+| `dunglas/frankenphp:1-php8.4-alpine` | `sha256:f81693fa548684eb12964eeab78d86325b75c5cd91289c09ffc4dd4404a641e5` |
+| `composer:2` | `sha256:0049ce90b432795bf413a738b073963ada1a689e1a8708104684baafe94586ec` |
+
+Vérification : `docker build -f backend/Dockerfile backend/` (contexte `./backend` du service `api` de `docker-compose.yml`) réussi, sous une étiquette jetable supprimée ensuite. Mise à jour : relancer `imagetools inspect`, remplacer le digest, reconstruire.
+
+#### N7 : résumé OWASP (condition C1)
+- Gate (`identity-security.yml` + profil `security-scan` de `services/pom.xml`) : `./mvnw -B -ntp -pl identity-service -am -Psecurity-scan verify -DskipTests -DskipITs`, dependency-check-maven 13.0.0, `failBuildOnCVSS=7`. Le job échoue dès qu'une dépendance a un score CVSS ≥ 7 ; un job vert signifie donc **0 vulnérabilité de CVSS ≥ 7**. Les vulnérabilités de score < 7 ne bloquent pas, mais figurent dans le rapport.
+- Run local impossible sans clé NVD. Essai du 26/11/2026 : `./mvnw -B -ntp -pl identity-service -am -Psecurity-scan org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7`, dans `eclipse-temurin:25-jdk` (même digest que le Dockerfile d'identity), avec un dépôt Maven jetable. Résultat : échec en 21 s, avec `NvdApiException: Invalid API Key, length of 0` puis `NoDataException: No documents exist`. Aucune clé n'a été demandée ni lue.
+- Les nombres sont donc à reporter depuis l'artefact du **dernier run vert** de `identity-security` (PR #1, fusion `86b3b07`, ou le dernier run hebdomadaire vert) :
+  1. GitHub → *Actions* → run `ci` de la PR #1 (ou run `identity-security` planifié) → job `identity-security / identity-security` vert ;
+  2. section *Artifacts* → **`identity-dependency-check`** (rétention 14 jours ; s'il a expiré, relancer `identity-security` par *Run workflow*) ;
+  3. dans l'archive : `dependency-check-report.html` (en-tête *Summary*), `dependency-check-report.json` et `dependency-check-report.sarif`, produits dans `services/identity-service/target/`. Depuis le JSON :
+     - dépendances analysées : `jq '.dependencies | length'` ;
+     - dépendances vulnérables : `jq '[.dependencies[] | select(.vulnerabilities)] | length'` ;
+     - vulnérabilités par sévérité : `jq -r '[.dependencies[].vulnerabilities[]? | .severity] | group_by(.) | map("\(.[0]): \(length)") | .[]'` ;
+     - CVE et scores : `jq -r '.dependencies[] | select(.vulnerabilities) | .fileName as $f | .vulnerabilities[] | "\($f) \(.name) \(.cvssv3.baseScore // .cvssv2.score)"'`.
+
+| Indicateur | Valeur |
+|---|---|
+| Run de référence (n°, date) | à compléter depuis l'artefact CI |
+| Version de dependency-check / date de la base NVD | 13.0.0 / à compléter depuis l'artefact CI |
+| Dépendances analysées | à compléter depuis l'artefact CI |
+| Dépendances avec au moins une vulnérabilité | à compléter depuis l'artefact CI |
+| Vulnérabilités CVSS ≥ 7 (bloquantes) | 0 (job vert ; à confirmer depuis l'artefact CI) |
+| Vulnérabilités CVSS < 7 (identifiant, dépendance, score) | à compléter depuis l'artefact CI |
+| Suppressions (`suppressionFile`) | aucune configurée dans `services/pom.xml` |
 
 ---
 
