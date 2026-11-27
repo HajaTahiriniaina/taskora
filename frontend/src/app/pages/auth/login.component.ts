@@ -35,7 +35,7 @@ import { LogoComponent } from '../../shared/logo.component';
           <h1>Connexion</h1>
           <p>Ravi de vous revoir sur Taskora.</p>
           @if (error()) {
-            <div class="error"><tk-icon name="x" [size]="16" />{{ error() }}</div>
+            <div class="error" role="alert"><tk-icon name="x" [size]="16" />{{ error() }}</div>
           }
           <div class="field">
             <label for="email">Adresse e-mail</label>
