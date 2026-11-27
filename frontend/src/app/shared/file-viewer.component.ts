@@ -123,12 +123,12 @@ const MAX_COLS = 80;
 interface Sheet {
   name: string;
   rows: string[][];
-  totalRows: number;
   totalCols: number;
+  totalRows: number;
 }
 interface MailAddress {
-  name?: string;
   address?: string;
+  name?: string;
 }
 interface MailFile {
   name: string;
@@ -136,15 +136,15 @@ interface MailFile {
   url: string;
 }
 interface Mail {
-  subject: string;
-  from: string;
-  to: string;
   cc: string;
   date: string;
-  html: null | SafeHtml;
-  text: null | string;
   files: MailFile[];
+  from: string;
+  html: null | SafeHtml;
   remoteImages: boolean;
+  subject: string;
+  text: null | string;
+  to: string;
 }
 
 /**
@@ -188,7 +188,7 @@ export class FileViewerComponent implements OnDestroy {
   sheetIndex = signal(0);
   sheetMode = signal<'pdf' | 'table'>('table');
   mail = signal<Mail | null>(null);
-  private mailSource: null | { html: string; files: Map<string, string> } = null;
+  private mailSource: null | { files: Map<string, string>; html: string } = null;
   private objectUrls: string[] = [];
   private token = 0;
 

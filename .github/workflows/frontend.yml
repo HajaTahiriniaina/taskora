@@ -38,9 +38,9 @@ jobs:
     permissions:
       contents: read
     env:
-      # Ligne de base ESLint de C0 (docs/reviews/2026-11-26-frontend-identity.md : 0 erreur,
-      # 904 avertissements). Ne jamais l'augmenter ; la baisser quand des avertissements disparaissent.
-      LINT_MAX_WARNINGS: "904"
+      # Ligne de base ESLint (C0 : 904 avertissements ; lot B1 : 769). Ne jamais l'augmenter ;
+      # la baisser quand des avertissements disparaissent (frontend.md §5.2).
+      LINT_MAX_WARNINGS: "769"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

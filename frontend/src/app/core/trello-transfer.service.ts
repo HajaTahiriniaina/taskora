@@ -6,11 +6,11 @@ import { ToastService } from './toast.service';
 
 export interface TrelloTransferState extends TrelloFilesState {
   boardId: number;
-  running: boolean;
+  error: null | string;
   /** Last files copied (most recent first) */
   recent: string[];
+  running: boolean;
   waitingSeconds: number;
-  error: null | string;
 }
 
 /**

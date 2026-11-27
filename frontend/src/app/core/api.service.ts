@@ -23,31 +23,31 @@ import {
 } from './models';
 
 export interface TrelloImportReport {
-  lists: number;
+  assignments: number;
+  attachments: number;
+  cardLinks: number;
   cards: number;
-  labels: number;
   comments: number;
   commentsInTrello: number;
-  attachments: number;
-  assignments: number;
-  skippedArchivedLists: number;
-  skippedArchivedCards: number;
-  membersMatched: string[];
-  membersUnmatched: string[];
-  nextCardNumber: number;
   /** Files uploaded on Trello, to copy into Taskora */
   files: number;
   filesBytes: number;
   filesMalicious: number;
-  cardLinks: number;
+  labels: number;
+  lists: number;
+  membersMatched: string[];
+  membersUnmatched: string[];
+  nextCardNumber: number;
+  skippedArchivedCards: number;
+  skippedArchivedLists: number;
 }
 
 export interface PushDevice {
-  id: number;
-  kind: string;
+  createdAt: string;
   device: null | string;
   endpointHash: string;
-  createdAt: string;
+  id: number;
+  kind: string;
   lastSuccessAt: null | string;
 }
 
@@ -57,22 +57,22 @@ export interface TrashInfo {
   purgeAt: string;
 }
 export interface TrashedBoard extends TrashInfo {
+  background: string;
   id: number;
   title: string;
-  background: string;
 }
 export interface BoardTrash {
-  retentionDays: number;
-  lists: (BoardList & TrashInfo)[];
   cards: (TrashInfo & {
+    archived: boolean;
     id: number;
-    number: number;
-    title: string;
+    listDeleted: boolean;
     listId: number;
     listTitle: string;
-    listDeleted: boolean;
-    archived: boolean;
+    number: number;
+    title: string;
   })[];
+  lists: (BoardList & TrashInfo)[];
+  retentionDays: number;
 }
 
 export interface TrelloCredentials {
@@ -80,12 +80,12 @@ export interface TrelloCredentials {
   token: string;
 }
 export interface TrelloFilesState {
-  pending: number;
   done: number;
   failed: number;
-  total: number;
+  failures: { cardId: number; error: string; id: number; name: string }[];
+  pending: number;
   pendingBytes: number;
-  failures: { id: number; name: string; error: string; cardId: number }[];
+  total: number;
 }
 
 /** Thin typed wrapper over the Taskora REST API. */
@@ -128,9 +128,9 @@ export class ApiService {
   transferTrelloFiles(boardId: number, c: TrelloCredentials) {
     return this.http.post<
       TrelloFilesState & {
-        transferred: { name: string; cardId: number }[];
-        errors: { name: string; error: string }[];
+        errors: { error: string; name: string }[];
         retryAfter: null | number;
+        transferred: { cardId: number; name: string }[];
       }
     >(`${this.base}/boards/${boardId}/trello-files/transfer`, c);
   }
@@ -146,7 +146,7 @@ export class ApiService {
 
   // Browser notifications (Web Push)
   pushConfig() {
-    return this.http.get<{ configured: boolean; publicKey: string; devices: PushDevice[] }>(
+    return this.http.get<{ configured: boolean; devices: PushDevice[]; publicKey: string }>(
       `${this.base}/push`,
     );
   }
@@ -172,11 +172,11 @@ export class ApiService {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<{
-      url: string;
-      name: string;
-      mime: string;
-      size: number;
       image: boolean;
+      mime: string;
+      name: string;
+      size: number;
+      url: string;
     }>(`${this.base}/uploads`, form);
   }
 
@@ -185,11 +185,11 @@ export class ApiService {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<{
-      url: string;
-      name: string;
-      mime: string;
-      size: number;
       image: boolean;
+      mime: string;
+      name: string;
+      size: number;
+      url: string;
     }>(`${this.base}/uploads`, form, { reportProgress: true, observe: 'events' });
   }
 
@@ -235,7 +235,7 @@ export class ApiService {
   board(id: number) {
     return this.http.get<Board>(`${this.base}/boards/${id}`);
   }
-  createBoard(data: { title: string; description?: string; background: string }) {
+  createBoard(data: { background: string; description?: string; title: string }) {
     return this.http.post<Board>(`${this.base}/boards`, data);
   }
   updateBoard(id: number, data: Partial<BoardSummary>) {
@@ -250,7 +250,7 @@ export class ApiService {
 
   // Members
   addMember(boardId: number, email: string, role: string) {
-    return this.http.post<{ status: 'added' | 'invited'; member?: Member; message?: string }>(
+    return this.http.post<{ member?: Member; message?: string; status: 'added' | 'invited' }>(
       `${this.base}/boards/${boardId}/members`,
       { email, role },
     );
@@ -334,9 +334,9 @@ export class ApiService {
   }
   archivedCards(boardId: number, q = '', offset = 0) {
     return this.http.get<{
+      hasMore: boolean;
       items: (Card & { listTitle: string })[];
       total: number;
-      hasMore: boolean;
     }>(`${this.base}/boards/${boardId}/archived`, { params: { q, offset } });
   }
   // Trash (30 days)
@@ -378,7 +378,7 @@ export class ApiService {
     return this.http.post<CardDetail>(`${this.base}/cards/${id}/assignees`, { userId });
   }
   cardActivity(id: number, before?: number) {
-    return this.http.get<{ items: Activity[]; hasMore: boolean }>(
+    return this.http.get<{ hasMore: boolean; items: Activity[] }>(
       `${this.base}/cards/${id}/activity`,
       { params: before ? { before, limit: 30 } : { limit: 30 } },
     );
@@ -431,7 +431,7 @@ export class ApiService {
 
   // Notifications
   notifications() {
-    return this.http.get<{ unread: number; items: AppNotification[] }>(
+    return this.http.get<{ items: AppNotification[]; unread: number }>(
       `${this.base}/notifications`,
     );
   }
