@@ -9,7 +9,11 @@ use App\Entity\User;
 use App\Service\InternalCaller;
 use App\Service\Notifier;
 use App\Service\PushSender;
+use Doctrine\DBAL\Exception as DbalException;
+use Doctrine\DBAL\Exception\DeadlockException;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
@@ -35,6 +39,7 @@ class InternalNotificationController
         private Notifier $notifier,
         private PushSender $push,
         private InternalCaller $caller,
+        private LoggerInterface $logger,
     ) {}
 
     #[Route('/internal/notifications', methods: ['POST'])]
@@ -74,11 +79,25 @@ class InternalNotificationController
         }
 
         $mark = $this->push->mark();
+        $eventId = strtolower($data['eventId']);
         try {
             $created = $this->em->wrapInTransaction(fn (): int => $this->notify(
-                strtolower($data['eventId']), $data['type'], $data['actorId'], $recipientIds,
+                $eventId, $data['type'], $data['actorId'], $recipientIds,
                 $data['message'], $data['boardId'] ?? null, $data['cardId'] ?? null,
             ));
+        } catch (DbalException $e) {
+            // Transaction annulée : aucun Web Push pour des notifications non enregistrées.
+            $this->push->discardSince($mark);
+            // Livraison concurrente du même eventId, validée pendant notre transaction (m1) : 1062
+            // (clé dupliquée) ou, sous l'isolation par instantané de MariaDB 11.8, 1020 (« Record has
+            // changed since last read », DeadlockException). Reçu relu par la connexion DBAL
+            // (l'EntityManager est fermé après l'échec) : présent → déjà traité, sinon on relance.
+            if (!self::isConcurrentReceipt($e) || false === $this->em->getConnection()->fetchOne('SELECT 1 FROM internal_event_receipt WHERE event_id = ?', [$eventId])) {
+                throw $e;
+            }
+            $this->logger->info('Reçu interne déjà enregistré par une livraison concurrente.');
+
+            return new JsonResponse(['created' => 0]);
         } catch (\Throwable $e) {
             // Transaction annulée : aucun Web Push pour des notifications non enregistrées.
             $this->push->discardSince($mark);
@@ -115,6 +134,18 @@ class InternalNotificationController
         $this->em->flush();
 
         return count($recipients);
+    }
+
+    /** Violation de la clé du reçu ou conflit d'instantané, à n'importe quel niveau de la chaîne. */
+    private static function isConcurrentReceipt(\Throwable $e): bool
+    {
+        for ($t = $e; null !== $t; $t = $t->getPrevious()) {
+            if ($t instanceof UniqueConstraintViolationException || $t instanceof DeadlockException) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function isId(mixed $value): bool
