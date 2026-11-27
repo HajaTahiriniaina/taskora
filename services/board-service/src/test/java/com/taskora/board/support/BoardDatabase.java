@@ -7,8 +7,12 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -221,11 +225,12 @@ public final class BoardDatabase {
       }
       try (ResultSet rs = ps.executeQuery()) {
         List<Map<String, Object>> rows = new ArrayList<>();
-        int n = rs.getMetaData().getColumnCount();
+        ResultSetMetaData meta = rs.getMetaData();
+        int n = meta.getColumnCount();
         while (rs.next()) {
           Map<String, Object> row = new LinkedHashMap<>();
           for (int i = 1; i <= n; i++) {
-            row.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+            row.put(meta.getColumnLabel(i), column(rs, meta.getColumnType(i), i));
           }
           rows.add(row);
         }
@@ -234,6 +239,19 @@ public final class BoardDatabase {
     } catch (SQLException e) {
       throw new IllegalStateException("SQL de test en échec : " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * DATETIME → {@link LocalDateTime}, DATE → {@link LocalDate} lus directement par le pilote (pas
+   * de {@code Timestamp.toLocalDateTime()}, qui dépend du fuseau de la JVM aux changements
+   * d'heure).
+   */
+  private static Object column(ResultSet rs, int type, int i) throws SQLException {
+    return switch (type) {
+      case Types.TIMESTAMP -> rs.getObject(i, LocalDateTime.class);
+      case Types.DATE -> rs.getObject(i, LocalDate.class);
+      default -> rs.getObject(i);
+    };
   }
 
   public static long count(String sql, Object... args) {

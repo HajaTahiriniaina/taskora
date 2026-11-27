@@ -80,13 +80,30 @@ class InvitationEmailTest {
   @DisplayName(
       "SC-BOARD-031 — 200 caractères : tronqué à 180 PUIS validé → 400 Adresse e-mail invalide.")
   void truncatedThenValidated() {
-    String local = "a".repeat(60);
-    String domain = "b".repeat(60) + "." + "c".repeat(60) + ".exemple.test";
-    String email = local + "@" + domain;
-    assertThat(email.length()).isGreaterThan(180);
+    // Valide entier, invalide une fois tronqué à 180 (finit par « . ») : vérifié en PHP 8.4.28.
+    String email =
+        "a".repeat(60)
+            + "@"
+            + "b".repeat(60)
+            + "."
+            + "c".repeat(57)
+            + "."
+            + "d".repeat(15)
+            + ".test";
+    assertThat(email).hasSize(200);
+    assertThat(email.substring(0, 180)).endsWith(".");
     assertThatThrownBy(() -> InvitationEmail.of(email))
         .isInstanceOf(ValidationException.class)
         .hasMessage("Adresse e-mail invalide.");
+  }
+
+  @Test
+  @DisplayName(
+      "SC-BOARD-031 — plus de 180 caractères, valide une fois tronqué → les 180 premiers caractères")
+  void truncatedThenAccepted() {
+    String email = "a".repeat(60) + "@" + "b".repeat(60) + "." + "c".repeat(60) + ".exemple.test";
+    assertThat(email.length()).isGreaterThan(180);
+    assertThat(InvitationEmail.of(email).value()).isEqualTo(email.substring(0, 180));
   }
 
   @Test

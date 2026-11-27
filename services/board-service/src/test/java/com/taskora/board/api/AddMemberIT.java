@@ -139,9 +139,34 @@ class AddMemberIT extends ApiTestBase {
   @DisplayName(
       "SC-BOARD-031 — e-mail de 200 caractères : tronqué à 180 puis 400 Adresse e-mail invalide.")
   void longEmail() {
-    String email = "a".repeat(60) + "@" + "b".repeat(60) + "." + "c".repeat(60) + ".fr";
+    String email =
+        "a".repeat(60)
+            + "@"
+            + "b".repeat(60)
+            + "."
+            + "c".repeat(57)
+            + "."
+            + "d".repeat(15)
+            + ".test";
+    assertThat(email).hasSize(200);
+    Map<String, Object> before = BoardDatabase.dataFingerprint();
     assertError(
         post(alice(), PATH, "{\"email\":\"" + email + "\"}"), 400, "Adresse e-mail invalide.");
+    assertThat(BoardDatabase.dataFingerprint()).isEqualTo(before);
+  }
+
+  @Test
+  @DisplayName(
+      "SC-BOARD-031 — e-mail de plus de 180 caractères valide une fois tronqué → 202, 180 caractères stockés")
+  void longEmailTruncated() {
+    String email = "a".repeat(60) + "@" + "b".repeat(60) + "." + "c".repeat(60) + ".fr";
+    assertThat(email).hasSize(185);
+    String stored = email.substring(0, 180);
+    assertStatus(post(alice(), PATH, "{\"email\":\"" + email + "\"}"), 202);
+    assertThat(
+            query(
+                "SELECT email FROM taskora.invitation WHERE board_id = 101 AND email LIKE 'aaaa%'"))
+        .containsExactly(Map.of("email", stored));
   }
 
   @Test

@@ -7,6 +7,8 @@ import com.taskora.board.support.Fixture;
 import io.restassured.response.Response;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -77,7 +79,18 @@ class DateCompatibilityIT extends ApiTestBase {
   void purgeAcrossDst() {
     CLOCK.set(Instant.parse("2026-10-10T10:00:00Z"));
     assertStatus(delete(alice(), "/api/boards/101"), 204);
-    JsonNode trashed = json(get(alice(), "/api/trash/boards")).get(0);
+    JsonNode trash = json(get(alice(), "/api/trash/boards"));
+    // deleted_at DESC, id DESC : les fixtures 105 et 103 (supprimées plus tard) précèdent 101.
+    List<Integer> ids = new ArrayList<>();
+    trash.forEach(t -> ids.add(t.get("id").asInt()));
+    assertThat(ids).containsExactly(105, 103, 101);
+    JsonNode trashed = null;
+    for (JsonNode t : trash) {
+      if (t.get("id").asInt() == 101) {
+        trashed = t;
+      }
+    }
+    assertThat(trashed).as("tableau 101 dans la corbeille").isNotNull();
     assertAtom(trashed.get("deletedAt"), "2026-10-10T12:00:00+02:00");
     assertAtom(trashed.get("purgeAt"), "2026-11-09T12:00:00+01:00");
   }

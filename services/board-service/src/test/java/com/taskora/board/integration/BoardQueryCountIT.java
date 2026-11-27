@@ -92,7 +92,7 @@ class BoardQueryCountIT extends ApiTestBase {
             + cards);
     sql.add("UPDATE taskora.board SET card_seq = 20000 WHERE owner_id = 7");
     sql.add(
-        "INSERT INTO taskora.label (name, color, board_id) SELECT CONCAT('L', id), '#000000', id FROM taskora.board_list WHERE board_id = 104");
+        "INSERT INTO taskora.label (name, color, board_id) SELECT CONCAT('L', id), '#000000', board_id FROM taskora.board_list WHERE board_id = 104");
     sql.add(
         "INSERT INTO taskora.invitation (email, created_at, board_id, invited_by_id) SELECT CONCAT('inv', id, '@exemple.test'),"
             + " '2026-11-04 12:00:00', 104, 7 FROM taskora.board_list WHERE board_id = 104");

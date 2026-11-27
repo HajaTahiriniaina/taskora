@@ -47,6 +47,13 @@ class JwtSecurityIT extends ApiTestBase {
   }
 
   @Test
+  @DisplayName(
+      "SC-BOARD-020 — exp en chaîne numérique valide (is_numeric PHP, lcobucci) → 200 (E14)")
+  void expNumericString() {
+    assertStatus(get(TOKENS.expAsString(ALICE_EMAIL), PATH), 200);
+  }
+
+  @Test
   @DisplayName("SC-BOARD-020 — uid seul (sans username) → 200")
   void uidOnly() {
     assertStatus(get(TOKENS.uidOnly(ALICE), PATH), 200);
@@ -89,9 +96,21 @@ class JwtSecurityIT extends ApiTestBase {
             (Supplier<String>) () -> TOKENS.withoutExp(ALICE_EMAIL),
             "Invalid JWT Token"),
         Arguments.of(
-            "exp chaîne",
-            (Supplier<String>) () -> TOKENS.expAsString(ALICE_EMAIL),
+            "exp chaîne non numérique",
+            (Supplier<String>) () -> TOKENS.expAsNonNumericString(ALICE_EMAIL),
             "Invalid JWT Token"),
+        Arguments.of(
+            "exp chaîne NaN",
+            (Supplier<String>) () -> TOKENS.expAsNaN(ALICE_EMAIL),
+            "Invalid JWT Token"),
+        Arguments.of(
+            "exp chaîne <n>d",
+            (Supplier<String>) () -> TOKENS.expAsSuffixedNumber(ALICE_EMAIL),
+            "Invalid JWT Token"),
+        Arguments.of(
+            "exp chaîne numérique passée",
+            (Supplier<String>) () -> TOKENS.expiredAsString(ALICE_EMAIL),
+            "Expired JWT Token"),
         Arguments.of("charabia", (Supplier<String>) () -> "pas.un.jeton", "Invalid JWT Token"),
         Arguments.of(
             "uid et username incohérents",
@@ -133,12 +152,32 @@ class JwtSecurityIT extends ApiTestBase {
   }
 
   @ParameterizedTest(name = "Authorization: \"{0}\"")
-  @ValueSource(strings = {"", "Bearer", "Bearer ", "Basic YWxpY2U6eA==", "bearer x"})
+  @ValueSource(strings = {"", "Bearer", "Bearer ", "Basic YWxpY2U6eA=="})
   @DisplayName("SC-BOARD-020 — en-tête absent ou mal formé → 401 JWT Token not found")
   void notFound(String header) {
     Response r =
         given().baseUri("http://localhost").port(port).header("Authorization", header).get(PATH);
     assertAuthError(r, "JWT Token not found");
+  }
+
+  @Test
+  @DisplayName(
+      "SC-BOARD-020 — préfixe « bearer » insensible à la casse (strcasecmp Lexik) : jeton extrait puis vérifié")
+  void lowercasePrefix() {
+    Response garbage =
+        given()
+            .baseUri("http://localhost")
+            .port(port)
+            .header("Authorization", "bearer x")
+            .get(PATH);
+    assertAuthError(garbage, "Invalid JWT Token");
+    Response valid =
+        given()
+            .baseUri("http://localhost")
+            .port(port)
+            .header("Authorization", "bearer " + TOKENS.symfony(ALICE_EMAIL))
+            .get(PATH);
+    assertStatus(valid, 200);
   }
 
   @Test

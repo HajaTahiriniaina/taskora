@@ -28,8 +28,14 @@ class TaskoraSchemaUntouchedIT extends ApiTestBase {
     assertThat(
             BoardDatabase.count(
                 "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'taskora'"))
-        .as("18 tables Doctrine + doctrine_migration_versions")
-        .isEqualTo(19);
+        .as("19 tables Doctrine + doctrine_migration_versions")
+        .isEqualTo(20);
+    assertThat(
+            BoardDatabase.count(
+                "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'taskora'"
+                    + " AND TABLE_NAME = 'internal_event_receipt'"))
+        .as("internal_event_receipt (migration Version20261128000100) fait partie de taskora")
+        .isEqualTo(1);
   }
 
   @Test

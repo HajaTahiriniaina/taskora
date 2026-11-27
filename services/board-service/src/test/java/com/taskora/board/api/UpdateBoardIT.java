@@ -67,7 +67,7 @@ class UpdateBoardIT extends ApiTestBase {
         "\"0\"|<null>",
         "null|<null>",
         "\"\"|<null>",
-        "\"  garde  \"|  garde  ",
+        "\"  garde  \"|'  garde  '",
         "\"00\"|00"
       })
   @DisplayName(
