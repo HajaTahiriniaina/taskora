@@ -86,6 +86,10 @@ abstract class ApiController extends AbstractController
         if (Trash::isTrashed($o)) {
             throw new NotFoundHttpException('Cet élément est dans la corbeille.');
         }
+        // Enfants rattachés directement au tableau (étiquettes, champs) : Trash::isTrashed ne les voit pas.
+        if (self::boardOf($o)?->isDeleted()) {
+            throw new NotFoundHttpException(BoardAccess::BOARD_IN_TRASH);
+        }
 
         return $o;
     }
