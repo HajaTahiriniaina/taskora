@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -296,10 +297,11 @@ export class FileViewerComponent implements OnDestroy {
     try {
       const { url } = await firstValueFrom(this.api.attachmentPreview(a.id));
       if (!stale()) this.frameUrl.set(this.trusted(url));
-    } catch (e: any) {
+    } catch (e) {
       if (!stale())
         this.error.set(
-          e?.error?.error ?? 'La conversion du document a échoué. Téléchargez-le pour l’ouvrir.',
+          (e as HttpErrorResponse | undefined)?.error?.error ??
+            'La conversion du document a échoué. Téléchargez-le pour l’ouvrir.',
         );
     } finally {
       if (!stale()) this.loading.set(false);
@@ -332,7 +334,7 @@ export class FileViewerComponent implements OnDestroy {
         /* keep UTF-8 */
       }
     }
-    return s.replace(/^﻿/, '');
+    return s.replace(/^\uFEFF/, '');
   }
 
   private showText(buffer: ArrayBuffer) {

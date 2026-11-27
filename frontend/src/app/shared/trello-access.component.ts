@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -180,8 +181,10 @@ export class TrelloAccessComponent {
       this.transfer.setCredentials({ key, token, account });
       this.verified.emit();
       return true;
-    } catch (e: any) {
-      this.error.set(e?.error?.error ?? 'Vérification impossible.');
+    } catch (e) {
+      this.error.set(
+        (e as HttpErrorResponse | undefined)?.error?.error ?? 'Vérification impossible.',
+      );
       return false;
     } finally {
       this.checking.set(false);

@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom, Subject } from 'rxjs';
 
@@ -76,10 +77,11 @@ export class TrelloTransferService {
         });
         if (r.transferred.length) this.progressed.next(boardId);
         if (r.retryAfter) await this.wait(r.retryAfter); // Trello rate limit
-      } catch (e: any) {
+      } catch (e) {
+        const err = e as HttpErrorResponse | undefined;
         const error =
-          e?.error?.error ?? 'La copie a été interrompue (réseau ?). Vous pouvez la reprendre.';
-        if (e?.status === 422) this.credentials.set(null); // key / token refused: ask again
+          err?.error?.error ?? 'La copie a été interrompue (réseau ?). Vous pouvez la reprendre.';
+        if (err?.status === 422) this.credentials.set(null); // key / token refused: ask again
         this.state.set({ ...current, running: false, error });
         return;
       }

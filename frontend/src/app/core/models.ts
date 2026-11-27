@@ -65,7 +65,7 @@ export interface Card {
   /** Image attachment used as cover (thumbnail URL), takes precedence over the color */
   coverImage: null | string;
   createdAt: string;
-  customValues: Record<string, any>;
+  customValues: Record<string, unknown>;
   description: null | string;
   dueDate: null | string;
   id: number;
