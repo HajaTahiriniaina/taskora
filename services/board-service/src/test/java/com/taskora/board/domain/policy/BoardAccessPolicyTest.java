@@ -1,6 +1,7 @@
 package com.taskora.board.domain.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.taskora.board.domain.exception.BoardInTrashException;
@@ -125,7 +126,8 @@ class BoardAccessPolicyTest {
     @Test
     @DisplayName("SC-BOARD-007 — propriétaire : accepté")
     void owner() {
-      policy.requireOwner(open(Role.OWNER), DELETE_FORBIDDEN);
+      assertThatCode(() -> policy.requireOwner(open(Role.OWNER), DELETE_FORBIDDEN))
+          .doesNotThrowAnyException();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -159,7 +161,8 @@ class BoardAccessPolicyTest {
     @Test
     @DisplayName("SC-TRASH-007 — propriétaire d'un tableau dans la corbeille : accepté")
     void owner() {
-      policy.requireOwnerOfTrashedBoard(trashed(Role.OWNER));
+      assertThatCode(() -> policy.requireOwnerOfTrashedBoard(trashed(Role.OWNER)))
+          .doesNotThrowAnyException();
     }
 
     @ParameterizedTest(name = "{0}")

@@ -72,8 +72,9 @@ class OutboxRelayIT extends ApiTestBase {
   }
 
   private static Duration delayUntilNext(String eventId) {
-    LocalDateTime next = (LocalDateTime) message(eventId).get("available_at");
-    return Duration.between(utc(CLOCK.instant()), next);
+    // available_at est écrit en UTC par JdbcOutbox (colonne DATETIME sans fuseau).
+    Instant next = ((LocalDateTime) message(eventId).get("available_at")).toInstant(ZoneOffset.UTC);
+    return Duration.between(CLOCK.instant(), next);
   }
 
   @ParameterizedTest(name = "Symfony {0} → {1}")

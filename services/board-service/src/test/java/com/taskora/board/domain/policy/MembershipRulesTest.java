@@ -1,6 +1,7 @@
 package com.taskora.board.domain.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.taskora.board.domain.exception.ForbiddenException;
@@ -65,15 +66,21 @@ class MembershipRulesTest {
     assertThatThrownBy(() -> MembershipRules.ensureRoleChangeable(membership(ALICE, Role.OWNER)))
         .isInstanceOf(ForbiddenException.class)
         .hasMessage("Le rôle du propriétaire ne peut pas être modifié.");
-    MembershipRules.ensureRoleChangeable(membership(BOB, Role.ADMIN));
-    MembershipRules.ensureRoleChangeable(membership(CARLA, Role.MEMBER));
+    assertThatCode(() -> MembershipRules.ensureRoleChangeable(membership(BOB, Role.ADMIN)))
+        .doesNotThrowAnyException();
+    assertThatCode(() -> MembershipRules.ensureRoleChangeable(membership(CARLA, Role.MEMBER)))
+        .doesNotThrowAnyException();
   }
 
   @Test
   @DisplayName("SC-BOARD-016 — un membre peut quitter le tableau")
   void memberLeaves() {
-    MembershipRules.ensureRemovable(CARLA, Role.MEMBER, membership(CARLA, Role.MEMBER));
-    MembershipRules.ensureRemovable(BOB, Role.ADMIN, membership(BOB, Role.ADMIN));
+    assertThatCode(() ->
+            MembershipRules.ensureRemovable(CARLA, Role.MEMBER, membership(CARLA, Role.MEMBER)))
+        .doesNotThrowAnyException();
+    assertThatCode(
+            () -> MembershipRules.ensureRemovable(BOB, Role.ADMIN, membership(BOB, Role.ADMIN)))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -93,8 +100,12 @@ class MembershipRulesTest {
   @Test
   @DisplayName("SC-BOARD-015 — un gestionnaire retire un membre ou un admin")
   void managerRemoves() {
-    MembershipRules.ensureRemovable(BOB, Role.ADMIN, membership(CARLA, Role.MEMBER));
-    MembershipRules.ensureRemovable(ALICE, Role.OWNER, membership(BOB, Role.ADMIN));
+    assertThatCode(
+            () -> MembershipRules.ensureRemovable(BOB, Role.ADMIN, membership(CARLA, Role.MEMBER)))
+        .doesNotThrowAnyException();
+    assertThatCode(
+            () -> MembershipRules.ensureRemovable(ALICE, Role.OWNER, membership(BOB, Role.ADMIN)))
+        .doesNotThrowAnyException();
   }
 
   @Test
