@@ -165,6 +165,13 @@ async function saveProfile(ctx: Ctx) {
   return req;
 }
 
+/** Rechargement du profil (refreshProfile → GET /api/me), puis rendu. */
+async function refreshProfile(ctx: Ctx, user: User) {
+  ctx.auth.refreshProfile();
+  ctx.http.expectOne({ method: 'GET', url: '/api/me' }).flush(user);
+  await ctx.fixture.whenStable();
+}
+
 describe('ProfileComponent — informations (nom, couleur)', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => {
@@ -230,6 +237,68 @@ describe('ProfileComponent — informations (nom, couleur)', () => {
 
     expect(ctx.name.value, 'champ « Nom complet »').toBe('Camille M.');
     expect(ctx.heading(), 'titre').toBe('Camille M.');
+  });
+
+  it('SC-IDENT-014/015 — profil rechargé pendant la saisie du nom : la saisie est conservée, la couleur non modifiée suit le profil reçu', async () => {
+    // Revue M1 : un GET /api/me tardif ne doit pas effacer une modification en cours.
+    const ctx = await setup();
+    await type(ctx.fixture, ctx.name, 'Camille M.');
+
+    await refreshProfile(ctx, { ...CAMILLE, avatarColor: '#0ea5e9', name: 'Camille Martin' });
+    expect(ctx.name.value, 'champ « Nom complet »').toBe('Camille M.');
+    expect(ctx.heading(), 'titre').toBe('Camille M.');
+    expect(selectedColors(ctx), 'couleur non modifiée').toEqual(['#0ea5e9']);
+
+    const req = await saveProfile(ctx);
+    expect(req.request.body).toEqual({ avatarColor: '#0ea5e9', name: 'Camille M.' });
+    req.flush({ ...CAMILLE, avatarColor: '#0ea5e9', name: 'Camille M.' });
+    await ctx.fixture.whenStable();
+  });
+
+  it('SC-IDENT-014/016 — profil rechargé après le choix d’une couleur : la couleur choisie est conservée, le nom non modifié suit le profil reçu', async () => {
+    const ctx = await setup();
+    colorButton(ctx, '#22c55e').click();
+    await ctx.fixture.whenStable();
+
+    await refreshProfile(ctx, { ...CAMILLE, avatarColor: '#0ea5e9', name: 'Camille Martin' });
+    expect(selectedColors(ctx), 'couleur choisie').toEqual(['#22c55e']);
+    expect(ctx.name.value, 'champ « Nom complet »').toBe('Camille Martin');
+    expect(ctx.heading(), 'titre').toBe('Camille Martin');
+
+    const req = await saveProfile(ctx);
+    expect(req.request.body).toEqual({ avatarColor: '#22c55e', name: 'Camille Martin' });
+    req.flush({ ...CAMILLE, avatarColor: '#22c55e', name: 'Camille Martin' });
+    await ctx.fixture.whenStable();
+  });
+
+  it('SC-IDENT-014/015 — après un enregistrement réussi, le champ « Nom complet » suit de nouveau les rechargements du profil', async () => {
+    const ctx = await setup();
+    await type(ctx.fixture, ctx.name, 'Camille M.');
+    (await saveProfile(ctx)).flush({ ...CAMILLE, name: 'Camille M.' });
+    await ctx.fixture.whenStable();
+
+    await refreshProfile(ctx, { ...CAMILLE, name: 'Camille Martin' });
+    expect(ctx.name.value, 'champ « Nom complet »').toBe('Camille Martin');
+    expect(ctx.heading(), 'titre').toBe('Camille Martin');
+  });
+
+  it('SC-IDENT-014/015 — GET /api/me reçu juste après le 200 du PATCH, sans rendu intermédiaire : nom et couleur suivent le profil rechargé', async () => {
+    // Revue S3 : verrouille l'ordre auth.setUser(u) puis name.set / color.set dans saveProfile().
+    // Inversé, le linkedSignal garderait l'ancienne source et prendrait le 200 pour une saisie.
+    const ctx = await setup();
+    await type(ctx.fixture, ctx.name, 'Camille M.');
+    colorButton(ctx, '#22c55e').click();
+    await ctx.fixture.whenStable();
+
+    (await saveProfile(ctx)).flush({ ...CAMILLE, avatarColor: '#22c55e', name: 'Camille M.' });
+    ctx.auth.refreshProfile();
+    ctx.http
+      .expectOne({ method: 'GET', url: '/api/me' })
+      .flush({ ...CAMILLE, avatarColor: '#ec4899', name: 'Camille Martin' });
+    await ctx.fixture.whenStable();
+
+    expect(ctx.name.value, 'champ « Nom complet »').toBe('Camille Martin');
+    expect(selectedColors(ctx), 'couleur').toEqual(['#ec4899']);
   });
 
   it.each(['', '   '])(
@@ -342,6 +411,20 @@ describe('ProfileComponent — informations (nom, couleur)', () => {
     req.flush({ ...CAMILLE, avatarColor: '#f59e0b', name: 'Camille M.' });
     await ctx.fixture.whenStable();
     expect(ctx.auth.user()?.avatarColor).toBe('#f59e0b');
+  });
+
+  it("SC-IDENT-016 — après 200, la pastille sélectionnée est la couleur renvoyée par l'API, puis elle suit un nouveau chargement du profil", async () => {
+    const ctx = await setup();
+    colorButton(ctx, '#0ea5e9').click();
+    await ctx.fixture.whenStable();
+
+    // L'API fait foi : la couleur stockée (renvoyée) peut différer de la couleur envoyée.
+    (await saveProfile(ctx)).flush({ ...CAMILLE, avatarColor: '#22c55e' });
+    await ctx.fixture.whenStable();
+    expect(selectedColors(ctx), 'couleur renvoyée par l’API').toEqual(['#22c55e']);
+
+    await refreshProfile(ctx, { ...CAMILLE, avatarColor: '#ec4899' });
+    expect(selectedColors(ctx), 'couleur après rechargement').toEqual(['#ec4899']);
   });
 
   it("SC-IDENT-016 — couleur refusée par l'API (E18, 400 « Couleur d'avatar invalide. ») : toast d'erreur, profil inchangé", async () => {
