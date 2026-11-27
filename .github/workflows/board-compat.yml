@@ -1,0 +1,180 @@
+# Compatibilité Symfony ↔ board-service sur la stack compose (docs/ci/requests/backend.md §B2, §B3 ;
+# ordre de travail phase 3 §6.2) : tests JUnit @Tag("compat") — miroir sur la MÊME base, matrice
+# d'accès, écritures croisées, claim croisé — puis routage nginx par tranche (SC-BOARD-022).
+name: board-compat
+
+# Appelé par ci.yml (concurrence gérée par l'appelant), zone « board_compat » : services/board-service/**,
+# services/identity-service/**, backend/**, docker-compose*.yml, docker/mariadb/**, frontend/nginx.conf,
+# frontend/Dockerfile, ce fichier ; PR seulement.
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  board-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      # Projet dédié (jamais « taskora » ni « taskora-e2e ») ; profil board (database, api, db-init,
+      # board, web). identity n'est pas démarré : aucun test compat de board ne passe par lui
+      # (le claim croisé appelle directement les deux amonts ; identity est couvert par identity-compat).
+      COMPOSE: docker compose -p taskora-ci-board -f docker-compose.yml -f docker-compose.board-dev.yml --profile board
+      # Tous les ports publiés sur la boucle locale : Symfony 8081, board-service 8083, nginx 8080, base 3307.
+      API_BIND: 127.0.0.1
+      BOARD_BIND: 127.0.0.1
+      WEB_BIND: 127.0.0.1
+      DB_BIND: 127.0.0.1
+      # En-tête X-Taskora-Backend: board (test de routage) ; T2–T5 restent sur Symfony.
+      BOARD_ROUTING_MARKER: "on"
+      BOARD_T1_UPSTREAM: api:80
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: services/**/pom.xml
+
+      # Secrets de CI éphémères, masqués, jamais affichés. U12 : trois secrets internes DISTINCTS
+      # (identity → Symfony, identity → board, board → Symfony) ; le job échoue si deux valeurs
+      # coïncident. Les tests compat lisent les secrets internes dans l'environnement du job.
+      - name: Secrets éphémères
+        run: |
+          names="JWT_PASSPHRASE INTERNAL_API_SECRET INTERNAL_SECRET_IDENTITY_TO_BOARD INTERNAL_SECRET_BOARD_TO_SYMFONY BOARD_DB_PASSWORD IDENTITY_DB_PASSWORD DB_PASSWORD DB_ROOT_PASSWORD APP_SECRET"
+          seen=""
+          for name in $names; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            case " $seen " in
+              *" $value "*) echo "::error::Deux secrets éphémères identiques : relancer le job."; exit 1 ;;
+            esac
+            seen="$seen $value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      # Rouge tant que services/board-service/Dockerfile n'existe pas (étape 2 de l'ordre de travail).
+      - name: Démarrer la stack (database, api, db-init, board, web)
+        id: stack
+        run: $COMPOSE up -d --build
+
+      - name: Attendre board et web
+        run: |
+          deadline=$((SECONDS + 600))
+          until [ "$(docker inspect -f '{{.State.Health.Status}}' "$($COMPOSE ps -q board)" 2>/dev/null)" = healthy ] \
+            && curl -fsS -o /dev/null http://127.0.0.1:8080/; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              $COMPOSE ps
+              echo "::error::board ou web n'est pas prêt après 10 min"
+              exit 1
+            fi
+            sleep 5
+          done
+          $COMPOSE ps
+
+      # Passe 1 : T1 servie par Symfony (BOARD_T1_UPSTREAM=api:80) — miroir, accès, écritures et
+      # claim croisés, routage « aucune route vers board ».
+      - name: Tests compat (Symfony 8081, board 8083, nginx 8080 ; T1 → Symfony)
+        working-directory: services
+        run: >-
+          ./mvnw -B -ntp -pl board-service verify -Pcompat
+          -Dcompat.symfony.url=http://127.0.0.1:8081
+          -Dcompat.board.url=http://127.0.0.1:8083
+          -Dcompat.web.url=http://127.0.0.1:8080
+          -Dcompat.board.t1=api
+
+      # Passe 2 : bascule de T1 vers board-service par « up -d web » (sans reconstruction), comme en
+      # exploitation (board-migration.md §5.2), puis routage seul. Exécutée même si la passe 1 échoue.
+      - name: Routage, T1 → board-service
+        if: ${{ !cancelled() && steps.stack.outcome == 'success' }}
+        env:
+          BOARD_T1_UPSTREAM: board:8080
+        run: |
+          $COMPOSE up -d --no-build --no-deps web
+          deadline=$((SECONDS + 120))
+          until curl -fsS -o /dev/null http://127.0.0.1:8080/; do
+            [ "$SECONDS" -lt "$deadline" ] || { echo "::error::web non prêt après la bascule"; exit 1; }
+            sleep 2
+          done
+          cd services
+          ./mvnw -B -ntp -pl board-service verify -Pcompat -DskipITs \
+            -Dtest=RoutingCompatTest -Dsurefire.reportNameSuffix=t1-board \
+            -Dcompat.symfony.url=http://127.0.0.1:8081 \
+            -Dcompat.board.url=http://127.0.0.1:8083 \
+            -Dcompat.web.url=http://127.0.0.1:8080 \
+            -Dcompat.board.t1=board
+
+      # Passe 3 : retour arrière de T1 vers Symfony, routage seul.
+      - name: Routage, retour de T1 → Symfony
+        if: ${{ !cancelled() && steps.stack.outcome == 'success' }}
+        env:
+          BOARD_T1_UPSTREAM: api:80
+        run: |
+          $COMPOSE up -d --no-build --no-deps web
+          deadline=$((SECONDS + 120))
+          until curl -fsS -o /dev/null http://127.0.0.1:8080/; do
+            [ "$SECONDS" -lt "$deadline" ] || { echo "::error::web non prêt après le retour arrière"; exit 1; }
+            sleep 2
+          done
+          cd services
+          ./mvnw -B -ntp -pl board-service verify -Pcompat -DskipITs \
+            -Dtest=RoutingCompatTest -Dsurefire.reportNameSuffix=t1-retour-api \
+            -Dcompat.symfony.url=http://127.0.0.1:8081 \
+            -Dcompat.board.url=http://127.0.0.1:8083 \
+            -Dcompat.web.url=http://127.0.0.1:8080 \
+            -Dcompat.board.t1=api
+
+      - name: Rapports de tests
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: board-compat-reports
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            services/board-service/target/surefire-reports/
+            services/board-service/target/failsafe-reports/
+
+      # Contrôle de fuite des journaux (§B3.7), toujours exécuté et bloquant : secrets éphémères,
+      # jeton JWT, e-mail dans une ligne INFO de board. Journaux publiés seulement s'ils sont propres
+      # et que le job a échoué.
+      - name: Contrôle de fuite des journaux compose
+        id: logs
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/compose-logs"
+          log="$RUNNER_TEMP/compose-logs/compose.log"
+          $COMPOSE logs --no-color > "$log" 2>&1 || true
+          leak=""
+          for name in JWT_PASSPHRASE INTERNAL_API_SECRET INTERNAL_SECRET_IDENTITY_TO_BOARD INTERNAL_SECRET_BOARD_TO_SYMFONY BOARD_DB_PASSWORD IDENTITY_DB_PASSWORD DB_PASSWORD DB_ROOT_PASSWORD APP_SECRET; do
+            if [ -n "${!name}" ] && grep -qF -- "${!name}" "$log"; then leak="$leak $name"; fi
+          done
+          if grep -qE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+' "$log"; then leak="$leak jeton-JWT"; fi
+          if $COMPOSE logs --no-color board 2>/dev/null | grep -E '(^|[^A-Z])INFO([^A-Z]|$)' | grep -qiE '@exemple\.test'; then
+            leak="$leak e-mail-en-INFO(board)"
+          fi
+          if [ -n "$leak" ]; then
+            rm -f "$log"
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Fuite dans les journaux compose :$leak (journaux non publiés)."
+            exit 1
+          fi
+          echo "clean=true" >> "$GITHUB_OUTPUT"
+      - name: Publier les journaux compose
+        if: failure() && steps.logs.outputs.clean == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: board-compat-compose-logs
+          retention-days: 14
+          if-no-files-found: ignore
+          path: ${{ runner.temp }}/compose-logs/
+
+      # Stack jetable : toujours supprimée avec ses volumes (données synthétiques @exemple.test).
+      - name: Arrêt de la stack
+        if: always()
+        run: $COMPOSE down -v --remove-orphans

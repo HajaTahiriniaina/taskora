@@ -3,6 +3,7 @@ name: backend
 
 # Appelé par ci.yml (concurrence gérée par l'appelant) ; plus de déclencheur pull_request/push propre.
 # Ancien filtre (job « changes » de ci.yml) : backend/**, docker-compose.yml, docker/mariadb/**, ce fichier ; PR seulement.
+# Phase 3 (§B1) : aussi docs/contracts/openapi/symfony.internal.yaml (validé par les tests des endpoints internes).
 on:
   workflow_call:
 
@@ -32,11 +33,13 @@ jobs:
 
       # Volume neuf : /docker-entrypoint-initdb.d crée taskora_test et les droits de « taskora ».
       # DATABASE_URL (compose) vise /taskora : doctrine.yaml (when@test) ajoute « _test ».
-      # INTERNAL_API_SECRET est retiré : les tests utilisent la valeur factice de backend/.env.test.
+      # INTERNAL_API_SECRET et INTERNAL_SECRET_BOARD_TO_SYMFONY (U12) sont retirés : compose les définit
+      # (vides ici) et une variable d'environnement, même vide, masquerait les valeurs factices
+      # distinctes de backend/.env.test.
       - name: PHPUnit
         run: >-
           docker compose run --rm -e APP_ENV=test -v "$PWD/backend":/app --entrypoint sh api -c
-          'unset INTERNAL_API_SECRET
+          'unset INTERNAL_API_SECRET INTERNAL_SECRET_BOARD_TO_SYMFONY
           && composer install --no-interaction --no-progress
           && php bin/console lexik:jwt:generate-keypair --skip-if-exists --env=test
           && php bin/console doctrine:database:create --if-not-exists --env=test

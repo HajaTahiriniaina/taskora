@@ -1,0 +1,212 @@
+openapi: 3.1.0
+info:
+  title: Taskora board-service — contrats internes (phase 3)
+  version: 0.1.0
+  summary: Consommation des invitations servie par board-service (T1) et charges de son outbox
+  description: |
+    **Non public.** Jamais routé par nginx (seuls /api/ et /uploads/ le sont). Réseau Docker interne `backend`.
+    - `POST /internal/invitations/claim` : **même contrat**, champ pour champ, que
+      `identity-service.internal.yaml` (servi aujourd'hui par Symfony). À la bascule de T1, identity-service pointe
+      `INVITATION_CLAIM_URL` vers board-service ; au retour arrière, vers Symfony. Les deux implémentations sont
+      idempotentes et équivalentes : un message d'outbox d'identity peut être livré à l'une ou à l'autre (SC-BOARD-030).
+    - Les schémas `NotificationRequested` et les événements de domaine décrivent les charges écrites dans
+      `board.outbox_message.payload` : `NotificationRequested` (destination `symfony-notifications`) est le corps de
+      `POST /internal/notifications` de Symfony (symfony.internal.yaml) ; les événements (destination `broker`)
+      sont écrits en `HELD` (pas de RabbitMQ en phase 3, U7-a).
+    Sécurité (U12 : un secret **par appelant**) : en-tête `X-Internal-Secret`. board-service n'accepte sur
+    `/internal/invitations/claim` **que** `INTERNAL_SECRET_IDENTITY_TO_BOARD` (identity → board), comparé en temps
+    constant ; tout autre secret (dont `INTERNAL_SECRET_BOARD_TO_SYMFONY` et `INTERNAL_API_SECRET`) → 401. Secret vide
+    ou égal à `INTERNAL_SECRET_BOARD_TO_SYMFONY` → board-service refuse de démarrer. Jamais de JWT sur `/internal/**`. Architecture : docs/architecture/backend-hexagonal.md B-ADR-5.
+servers:
+  - url: http://board:8080
+    description: board-service sur le réseau Docker (`INVITATION_CLAIM_URL` d'identity après la bascule de T1)
+paths:
+  /internal/invitations/claim:
+    post:
+      operationId: claimInvitations
+      summary: Transformer les invitations en attente d'un nouvel utilisateur en adhésions
+      description: |
+        Contrat identique à identity-service.internal.yaml (corps, statuts, messages). Comportement de board-service :
+        1. secret (401 sinon) → corps : objet JSON (400 `JSON invalide.`), champs `eventId` (UUID), `userId`
+           (entier ≥ 1), `email` (chaîne non vide) présents (400 `Le champ "<nom>" est obligatoire.`) et valides
+           (400 `Le champ "<nom>" est invalide.`) ;
+        2. utilisateur `userId` absent de `taskora.user` → 404 `Utilisateur introuvable.` (rejouable : projection pas
+           encore visible) ; e-mail différent (collation de la colonne) → 409 `L'e-mail ne correspond pas à l'utilisateur.` ;
+        3. une transaction : pour chaque invitation dont `email` est égal (collation) : si pas encore membre → adhésion
+           `member` (rôle d'invitation non mémorisé, E24) + `NotificationRequested` `board_invite` au nouvel utilisateur,
+           acteur = inviteur (`<nom de l'inviteur ou « Quelqu'un »> vous a ajouté au tableau « <titre> »`) ; déjà membre
+           → rien ; dans tous les cas l'invitation est supprimée. Tableaux dans la corbeille compris (comportement actuel).
+        **Idempotent** : rejeu → 200 `{claimed: 0, boardIds: []}`. Course avec un ajout direct (index unique) →
+        l'adhésion existante est conservée, jamais 500.
+      x-scenarios: [SC-BOARD-030, SC-IDENT-005, SC-IDENT-006, SC-BOARD-025, U12]
+      security:
+        - identityToBoard: []
+      parameters:
+        - name: X-Internal-Secret
+          in: header
+          required: true
+          description: '`INTERNAL_SECRET_IDENTITY_TO_BOARD` uniquement (U12) ; tout autre secret → 401'
+          schema: { type: string, minLength: 32 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: 'identity-service.internal.yaml#/components/schemas/InvitationClaimRequest' }
+      responses:
+        '200':
+          description: Invitations consommées (éventuellement aucune)
+          content:
+            application/json:
+              schema: { $ref: 'identity-service.internal.yaml#/components/schemas/InvitationClaimResult' }
+        '400':
+          description: Corps invalide — non rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidJson: { value: { error: JSON invalide. } }
+                missingField: { value: { error: 'Le champ "email" est obligatoire.' } }
+                invalidUserId: { value: { error: 'Le champ "userId" est invalide.' } }
+        '401':
+          description: Secret absent ou faux — non rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                denied: { value: { error: Accès interne refusé. } }
+        '404':
+          description: Utilisateur pas encore visible dans taskora.user — rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                unknownUser: { value: { error: Utilisateur introuvable. } }
+        '409':
+          description: E-mail différent de celui de l'utilisateur — non rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                mismatch: { value: { error: L'e-mail ne correspond pas à l'utilisateur. } }
+        '500':
+          description: Erreur interne — rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                internal: { value: { error: Erreur interne du serveur. } }
+components:
+  securitySchemes:
+    identityToBoard:
+      type: apiKey
+      in: header
+      name: X-Internal-Secret
+      description: Secret `INTERNAL_SECRET_IDENTITY_TO_BOARD` (identity-service → board-service), variable d'environnement, jamais commité (U12)
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { type: string }
+    NotificationType:
+      type: string
+      enum: [board_invite, member_joined, member_removed, card_assigned, card_moved, card_due, card_comment]
+      description: T1 produit les trois premiers ; T2 `card_assigned`, `card_moved`, `card_due` ; T4 `card_comment`
+    NotificationRequested:
+      x-schema-id: taskora.board.NotificationRequested/v1
+      title: NotificationRequested
+      description: |
+        Écrit dans l'outbox dans la transaction de la modification (destination `symfony-notifications`) et envoyé tel
+        quel à `POST /internal/notifications` (Symfony). Le message est **déjà composé** (texte exact des specs) ;
+        Symfony applique les règles de `Notifier` (jamais l'acteur, sans doublon, Web Push après la réponse).
+      type: object
+      additionalProperties: false
+      required: [eventId, type, actorId, recipientIds, message]
+      properties:
+        eventId: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/NotificationType' }
+        actorId: { type: [integer, 'null'], description: auteur de l'action (null = « Quelqu'un ») }
+        recipientIds: { type: array, minItems: 1, maxItems: 500, items: { type: integer, minimum: 1 } }
+        message: { type: string, maxLength: 500 }
+        boardId: { type: [integer, 'null'], description: absent ou null pour member_removed (comportement actuel) }
+        cardId: { type: [integer, 'null'] }
+      examples:
+        - eventId: 3f2c1a7e-9b4d-4e6f-8a1c-2d5e7f9a0b1c
+          type: board_invite
+          actorId: 1
+          recipientIds: [4]
+          message: 'Alice Martin vous a ajouté au tableau « Lancement produit »'
+          boardId: 12
+        - eventId: 9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a
+          type: member_removed
+          actorId: 1
+          recipientIds: [4]
+          message: 'Alice Martin vous a retiré du tableau « Lancement produit »'
+    BoardEventEnvelope:
+      type: object
+      description: Champs communs aux événements de domaine de board-service (destination `broker`, statut `HELD`)
+      required: [eventId, type, version, occurredAt, boardId, actorId]
+      properties:
+        eventId: { type: string, format: uuid }
+        type: { type: string }
+        version: { type: integer, const: 1 }
+        occurredAt: { type: string, format: date-time, description: UTC }
+        boardId: { type: integer }
+        actorId: { type: [integer, 'null'] }
+    BoardCreated:
+      allOf:
+        - $ref: '#/components/schemas/BoardEventEnvelope'
+        - type: object
+          required: [type, ownerId]
+          properties:
+            type: { const: BoardCreated }
+            ownerId: { type: integer }
+      unevaluatedProperties: false
+    MemberAdded:
+      allOf:
+        - $ref: '#/components/schemas/BoardEventEnvelope'
+        - type: object
+          required: [type, userId, role, via]
+          properties:
+            type: { const: MemberAdded }
+            userId: { type: integer }
+            role: { enum: [admin, member] }
+            via: { enum: [direct, invitation] }
+      unevaluatedProperties: false
+    MemberRoleChanged:
+      allOf:
+        - $ref: '#/components/schemas/BoardEventEnvelope'
+        - type: object
+          required: [type, userId, role]
+          properties:
+            type: { const: MemberRoleChanged }
+            userId: { type: integer }
+            role: { enum: [admin, member] }
+      unevaluatedProperties: false
+    MemberRemoved:
+      allOf:
+        - $ref: '#/components/schemas/BoardEventEnvelope'
+        - type: object
+          required: [type, userId, self]
+          properties:
+            type: { const: MemberRemoved }
+            userId: { type: integer }
+            self: { type: boolean, description: true si le membre a quitté lui-même }
+      unevaluatedProperties: false
+    BoardTrashed:
+      allOf:
+        - $ref: '#/components/schemas/BoardEventEnvelope'
+        - type: object
+          required: [type]
+          properties:
+            type: { const: BoardTrashed }
+      unevaluatedProperties: false
+    BoardRestored:
+      allOf:
+        - $ref: '#/components/schemas/BoardEventEnvelope'
+        - type: object
+          required: [type]
+          properties:
+            type: { const: BoardRestored }
+      unevaluatedProperties: false

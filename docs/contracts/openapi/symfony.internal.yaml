@@ -1,0 +1,233 @@
+openapi: 3.1.0
+info:
+  title: Taskora backend Symfony — endpoints internes transitoires (phases 1 et 3)
+  version: 0.1.0
+  summary: Effets que board-service délègue à Symfony pendant la cohabitation (U7-a)
+  description: |
+    **Non public.** Servis par le backend Symfony (`App\Controller\Internal*`), hors pare-feu `/api`, jamais routés
+    par nginx. Appelés par board-service (outbox ou appel synchrone court). Ils disparaissent quand
+    notification-service et attachment-service reprennent ces responsabilités (phases 4–5).
+    Règles communes (identiques à `/internal/invitations/claim`, ADR A10) :
+    - **un secret par appelant (U12)**, en-tête `X-Internal-Secret`, comparé par `hash_equals` :
+      `INTERNAL_SECRET_BOARD_TO_SYMFONY` pour les quatre endpoints de ce fichier (appelant : board-service) ;
+      `INTERNAL_API_SECRET` (existant, appelant : identity-service) pour `/internal/invitations/claim` **seulement**,
+      conservé jusqu'à la bascule de T1 (ensuite identity appelle board-service). Le secret d'un appelant est refusé
+      (401) par les endpoints de l'autre. Variable vide ou absente, ou deux variables de même valeur → toujours 401
+      `{"error":"Accès interne refusé."}` (et journal `ERROR` sans valeur) ;
+    - corps : objet JSON, sinon 400 `JSON invalide.` ; erreurs `{"error"}` (ApiExceptionListener couvre `/internal`) ;
+    - idempotence par `eventId` quand l'endpoint a un effet : table `internal_event_receipt` (migration Doctrine
+      additive écrite à la main, board-migration.md §2.1), reçu écrit **dans la même transaction** que l'effet ;
+      un `eventId` déjà reçu → 200 sans effet ;
+    - jamais de donnée personnelle dans les journaux (identifiants numériques seulement).
+    Par tranche : T1 `/internal/notifications` ; T2 `/internal/attachments/{id}/thumbnail` ; T4 `/internal/storage/inspect` ;
+    T5 `/internal/storage/release`. `/internal/invitations/claim` : voir identity-service.internal.yaml.
+    Architecture : docs/architecture/backend-hexagonal.md B-ADR-5, B-ADR-6, B-ADR-9.
+servers:
+  - url: http://api:80
+    description: Symfony sur le réseau Docker (`SYMFONY_INTERNAL_URL` de board-service)
+security:
+  - boardToSymfony: []
+paths:
+  /internal/notifications:
+    post:
+      operationId: createNotifications
+      summary: Créer les notifications d'une action de board-service et mettre en file le Web Push (T1)
+      description: |
+        Reprend `Notifier::notify` : une notification par destinataire, **jamais l'acteur**, sans doublon ; destinataire
+        inconnu → ignoré ; message stocké tel quel (500 caractères max) ; Web Push mis en file et envoyé après la
+        réponse (`PushSender`), avec le titre (titre du tableau ou « Taskora »), l'URL (`/boards/{boardId}?card={cardId}`,
+        `/boards/{boardId}` ou `/boards`) et l'étiquette (`card-<id>` ou le type) actuels.
+        `boardId` ou `cardId` fourni mais inexistant (supprimé entre-temps) → aucune notification (la cascade l'aurait
+        supprimée), 200 `{created: 0}`. Une transaction : notifications + reçu `eventId`.
+        **Idempotent** : `eventId` déjà reçu → 200 `{created: 0}`, aucun push.
+      x-scenarios: [SC-BOARD-025, SC-BOARD-030, SC-CARD-038, SC-COMMENT-015, U12]
+      parameters:
+        - $ref: '#/components/parameters/InternalSecret'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: 'board-service.internal.yaml#/components/schemas/NotificationRequested' }
+      responses:
+        '200':
+          description: Notifications créées (éventuellement aucune)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [created]
+                properties:
+                  created: { type: integer, minimum: 0 }
+        '400':
+          description: Corps invalide — non rejouable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidJson: { value: { error: JSON invalide. } }
+                missing: { value: { error: 'Le champ "recipientIds" est obligatoire.' } }
+                invalid: { value: { error: 'Le champ "type" est invalide.' } }
+        '401': { $ref: '#/components/responses/Denied' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /internal/attachments/{id}/thumbnail:
+    post:
+      operationId: ensureThumbnail
+      summary: Garantir la miniature d'une pièce jointe image (T2, couverture)
+      description: |
+        Synchrone (délai côté board-service : 5 s). Reprend `Uploads::thumbnailFor` : image sans miniature → génération
+        et enregistrement de `attachment.thumb_key` ; non image ou échec de génération → `thumbKey: null`.
+        Pas d'`eventId` : effet naturellement idempotent. Pièce jointe inexistante → 404.
+      x-scenarios: [SC-CARD-018, SC-CARD-037]
+      parameters:
+        - $ref: '#/components/parameters/InternalSecret'
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Clé de la miniature (ou null)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [thumbKey]
+                properties:
+                  thumbKey: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Denied' }
+        '404':
+          description: Pièce jointe inexistante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                notFound: { value: { error: Ressource introuvable. } }
+        '500': { $ref: '#/components/responses/Internal' }
+  /internal/storage/inspect:
+    post:
+      operationId: inspectStorageObjects
+      summary: Existence, type et taille d'objets du stockage (T4, B-ADR-6)
+      description: |
+        Lecture seule (`FileStorage::info`), sans effet. Au plus 50 clés ; chaque clé doit être une clé de
+        téléversement valide (`Uploads::keyFromUrl`), sinon `null`. Objet absent → `null`.
+        Appelé par board-service **avant** d'ouvrir la transaction d'un commentaire (délai 3 s) ; échec → board-service
+        répond 503 sans rien écrire (divergence voulue, décision U10).
+      x-scenarios: [SC-COMMENT-007, SC-COMMENT-013, U10]
+      parameters:
+        - $ref: '#/components/parameters/InternalSecret'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [keys]
+              properties:
+                keys: { type: array, minItems: 1, maxItems: 50, uniqueItems: true, items: { type: string, maxLength: 255 } }
+      responses:
+        '200':
+          description: Une entrée par clé demandée
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [objects]
+                properties:
+                  objects:
+                    type: object
+                    additionalProperties:
+                      oneOf:
+                        - type: 'null'
+                        - type: object
+                          additionalProperties: false
+                          required: [type, size]
+                          properties:
+                            type: { type: string, maxLength: 120 }
+                            size: { type: integer, minimum: 0 }
+        '400':
+          description: Corps invalide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Denied' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /internal/storage/release:
+    post:
+      operationId: releaseStorageKeys
+      summary: Supprimer des objets du stockage après une purge (T5)
+      description: |
+        Reprend `Uploads::deleteKeys` : objet absent = succès ; erreur du stockage → journalisée (clé seulement),
+        réponse 500 pour que board-service rejoue. Idempotent par `eventId` (reçu écrit **après** la suppression réussie
+        de toutes les clés).
+      x-scenarios: [SC-TRASH-011]
+      parameters:
+        - $ref: '#/components/parameters/InternalSecret'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [eventId, keys]
+              properties:
+                eventId: { type: string, format: uuid }
+                keys: { type: array, minItems: 1, maxItems: 5000, items: { type: string, maxLength: 255 } }
+      responses:
+        '200':
+          description: Objets supprimés (ou déjà absents)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [released]
+                properties:
+                  released: { type: integer, minimum: 0 }
+        '400':
+          description: Corps invalide
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Denied' }
+        '500': { $ref: '#/components/responses/Internal' }
+components:
+  securitySchemes:
+    boardToSymfony:
+      type: apiKey
+      in: header
+      name: X-Internal-Secret
+      description: Secret `INTERNAL_SECRET_BOARD_TO_SYMFONY` (board-service → Symfony), variable d'environnement, jamais commité (U12)
+  parameters:
+    InternalSecret:
+      name: X-Internal-Secret
+      in: header
+      required: true
+      description: '`INTERNAL_SECRET_BOARD_TO_SYMFONY` uniquement (U12) ; `INTERNAL_API_SECRET` ou `INTERNAL_SECRET_IDENTITY_TO_BOARD` → 401'
+      schema: { type: string, minLength: 32 }
+  responses:
+    Denied:
+      description: Secret absent, faux, ou non configuré côté Symfony — non rejouable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            denied: { value: { error: Accès interne refusé. } }
+    Internal:
+      description: Erreur interne — rejouable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            internal: { value: { error: Erreur interne du serveur. } }
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { type: string }

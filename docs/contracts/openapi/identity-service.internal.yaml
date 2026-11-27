@@ -7,7 +7,7 @@ info:
     **Non public.** Jamais routé par nginx (seuls /api/ et /uploads/ le sont). Réseau Docker interne.
     - `POST /internal/invitations/claim` est servi par le **backend Symfony** et appelé par identity-service
       (adapter `SymfonyInvitationClaimClient`, livraison synchrone après l'inscription puis rejeu par l'outbox).
-      Il disparaît à la migration de board-service, qui consommera `UserRegistered`.
+      **Phase 3 (27/11/2026)** : à la bascule de T1, le même contrat est servi par board-service (board-service.internal.yaml) ; identity choisit la cible par `INVITATION_CLAIM_URL` (défaut `SYMFONY_INTERNAL_URL`) et le secret par `INVITATION_CLAIM_SECRET` (défaut `INTERNAL_API_SECRET` ; `INTERNAL_SECRET_IDENTITY_TO_BOARD` après la bascule, U12). Symfony n'accepte sur cet endpoint que `INTERNAL_API_SECRET`. La consommation de `UserRegistered` par un broker reste pour plus tard (U7-a).
     - Les schémas `UserRegistered` et `UserProfileUpdated` décrivent les charges écrites dans
       `identity.outbox_message.payload` (destination `broker`, statut `HELD` en phase 1 : pas de RabbitMQ).
       Ils sont destinés à board-service et notification-service.
@@ -128,8 +128,7 @@ components:
         occurredAt: { type: string, format: date-time, description: 'UTC, ISO 8601 avec fuseau (ex. 2026-11-26T10:00:00+00:00)' }
         userId: { type: integer, format: int32, minimum: 1 }
     UserRegistered:
-      $schema: https://json-schema.org/draft/2020-12/schema
-      $id: https://taskora.local/schemas/identity/UserRegistered/v1.json
+      x-schema-id: taskora.identity.UserRegistered/v1
       title: UserRegistered
       description: Publié (outbox) dans la même transaction que la création du compte.
       allOf:
@@ -152,8 +151,7 @@ components:
           name: Camille Martin
           avatarColor: '#14b8a6'
     UserProfileUpdated:
-      $schema: https://json-schema.org/draft/2020-12/schema
-      $id: https://taskora.local/schemas/identity/UserProfileUpdated/v1.json
+      x-schema-id: taskora.identity.UserProfileUpdated/v1
       title: UserProfileUpdated
       description: |
         Publié (outbox) quand `name` ou `avatarColor` change réellement. Un changement de mot de passe

@@ -34,8 +34,7 @@ class CustomFieldController extends ApiController
     #[Route('/custom-fields/{id}', methods: ['PATCH'])]
     public function update(int $id, Request $request, BoardAccess $access): JsonResponse
     {
-        $field = $this->find(CustomField::class, $id);
-        $access->member($field->getBoard(), $this->me());
+        $field = $this->findForMember(CustomField::class, $id, $access);
         $data = $this->body($request);
         if (isset($data['name'])) {
             $field->setName($this->requireString($data, 'name', 80));
@@ -53,8 +52,7 @@ class CustomFieldController extends ApiController
     #[Route('/custom-fields/{id}', methods: ['DELETE'])]
     public function delete(int $id, BoardAccess $access): JsonResponse
     {
-        $field = $this->find(CustomField::class, $id);
-        $access->member($field->getBoard(), $this->me());
+        $field = $this->findForMember(CustomField::class, $id, $access);
         $this->em->remove($field);
         $this->em->flush();
         return $this->json(null, 204);

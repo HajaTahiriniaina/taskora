@@ -79,6 +79,22 @@ class NimbusTokenVerifierTest {
             (Function<TokenFactory, String>) t -> t.withoutExp(U),
             TokenRejection.INVALID),
         Arguments.of(
+            "exp chaîne non numérique",
+            (Function<TokenFactory, String>) t -> t.expAsNonNumericString(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "exp chaîne NaN",
+            (Function<TokenFactory, String>) t -> t.expAsNaN(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "exp chaîne <n>d",
+            (Function<TokenFactory, String>) t -> t.expAsSuffixedNumber(U),
+            TokenRejection.INVALID),
+        Arguments.of(
+            "exp chaîne numérique passée",
+            (Function<TokenFactory, String>) t -> t.expiredAsString(U),
+            TokenRejection.EXPIRED),
+        Arguments.of(
             "iat futur",
             (Function<TokenFactory, String>) t -> t.futureIat(U),
             TokenRejection.INVALID),
@@ -131,6 +147,13 @@ class NimbusTokenVerifierTest {
     VerifiedToken v = verifier.verify(tokens.valid(U));
     assertThat(v.username()).isEqualTo(U);
     assertThat(v.claims()).containsKeys("iat", "exp", "roles", "username");
+  }
+
+  @Test
+  @DisplayName(
+      "SC-IDENT-012 — exp en chaîne numérique valide (is_numeric PHP, lcobucci) accepté (E14)")
+  void acceptsNumericStringExp() {
+    assertThat(verifier.verify(tokens.expAsString(U)).username()).isEqualTo(U);
   }
 
   @Test

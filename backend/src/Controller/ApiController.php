@@ -2,8 +2,12 @@
 
 namespace App\Controller;
 
-use App\Service\Trash;
+use App\Entity\Board;
+use App\Entity\BoardList;
+use App\Entity\Card;
 use App\Entity\User;
+use App\Service\BoardAccess;
+use App\Service\Trash;
 use App\Service\Presenter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -55,5 +59,49 @@ abstract class ApiController extends AbstractController
             throw new NotFoundHttpException('Cet élément est dans la corbeille.');
         }
         return $o;
+    }
+
+    /**
+     * Élément d'un tableau, accès contrôlé AVANT la corbeille (U8-a, §5.3) : inexistant ou
+     * non-membre → 404 identiques (« Tableau introuvable. » pour un tableau, « Ressource
+     * introuvable. » pour une ressource enfant) ; membre et élément dans la corbeille → message
+     * actuel (« Ce tableau est dans la corbeille. » / « Cet élément est dans la corbeille. »).
+     *
+     * @template T of object
+     * @param class-string<T> $class
+     * @return T
+     */
+    protected function findForMember(string $class, int $id, BoardAccess $access): object
+    {
+        $o = $this->em->find($class, $id);
+        if ($o instanceof Board || Board::class === $class) {
+            $access->member($o instanceof Board ? $o : null, $this->me());
+
+            return $o;
+        }
+        if (null === $o) {
+            throw new NotFoundHttpException(BoardAccess::RESOURCE_NOT_FOUND);
+        }
+        $access->memberOfChild(self::boardOf($o), $this->me());
+        if (Trash::isTrashed($o)) {
+            throw new NotFoundHttpException('Cet élément est dans la corbeille.');
+        }
+        // Enfants rattachés directement au tableau (étiquettes, champs) : Trash::isTrashed ne les voit pas.
+        if (self::boardOf($o)?->isDeleted()) {
+            throw new NotFoundHttpException(BoardAccess::BOARD_IN_TRASH);
+        }
+
+        return $o;
+    }
+
+    /** Tableau d'une ressource enfant (liste, carte, étiquette, champ, checklist, commentaire, pièce jointe). */
+    private static function boardOf(object $o): ?Board
+    {
+        return match (true) {
+            $o instanceof BoardList, $o instanceof Card => $o->getBoard(),
+            method_exists($o, 'getBoard') => $o->getBoard(),
+            method_exists($o, 'getCard') => $o->getCard()->getBoard(),
+            default => null,
+        };
     }
 }

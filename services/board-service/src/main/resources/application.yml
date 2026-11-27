@@ -1,0 +1,68 @@
+# board-service (B-ADR-12, A13) : toute valeur sensible vient d'une variable d'environnement, jamais du dépôt.
+# Clé publique seule (B-ADR-2) ; un secret interne par appelant (U12).
+spring:
+  application:
+    name: board-service
+  main:
+    banner-mode: "off"
+  datasource:
+    # Compte MariaDB dédié « board » (board-migration.md §3), base par défaut taskora (tables partagées, U6-A).
+    url: ${BOARD_DB_URL:jdbc:mariadb://database:3306/taskora}
+    username: ${BOARD_DB_USER:board}
+    password: ${BOARD_DB_PASSWORD:}
+  flyway:
+    # Flyway ne gère que le schéma board, créé par l'init SQL (jamais taskora, R1).
+    schemas: board
+    default-schema: board
+    create-schemas: false
+    locations: classpath:db/migration
+  web:
+    # Erreurs : jamais de trace, de message ni d'exception (A4).
+    error:
+      include-stacktrace: never
+      include-message: never
+      include-binding-errors: never
+      include-exception: false
+      whitelabel:
+        enabled: false
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  server:
+    # /actuator/health pour le healthcheck Docker, jamais routé par nginx.
+    port: 8091
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+
+board:
+  jwt:
+    public-key-path: ${JWT_PUBLIC_KEY_PATH:}
+  legacy:
+    schema: ${LEGACY_SCHEMA:taskora}
+    zone: ${LEGACY_ZONE:Europe/Paris}
+  internal:
+    identity-to-board-secret: ${INTERNAL_SECRET_IDENTITY_TO_BOARD:}
+    board-to-symfony-secret: ${INTERNAL_SECRET_BOARD_TO_SYMFONY:}
+  symfony:
+    internal-url: ${SYMFONY_INTERNAL_URL:http://api:80}
+  outbox:
+    relay:
+      enabled: ${BOARD_OUTBOX_RELAY_ENABLED:true}
+  routing:
+    # SC-BOARD-022 : X-Taskora-Backend: board (recette seulement).
+    marker: ${BOARD_ROUTING_MARKER:off}
+  purge:
+    # T5 (B-ADR-9) : jamais actif en même temps que la boucle de Symfony.
+    enabled: ${BOARD_PURGE_ENABLED:off}

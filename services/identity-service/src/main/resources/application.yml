@@ -63,6 +63,11 @@ identity:
   symfony:
     internal-url: ${SYMFONY_INTERNAL_URL:http://api:80}
     internal-secret: ${INTERNAL_API_SECRET:}
+  invitations:
+    # Consommation des invitations (U12, ordre de travail phase 3 §5.2) : URL et secret utilisés ensemble,
+    # par défaut ceux de Symfony ; à la bascule de T1, board-service et INTERNAL_SECRET_IDENTITY_TO_BOARD.
+    claim-url: ${INVITATION_CLAIM_URL:${identity.symfony.internal-url}}
+    claim-secret: ${INVITATION_CLAIM_SECRET:${identity.symfony.internal-secret}}
   password:
     bcrypt-cost: ${IDENTITY_BCRYPT_COST:13}
     # B1 : native (défaut, libxcrypt via FFM, exige --enable-native-access=ALL-UNNAMED) ou java

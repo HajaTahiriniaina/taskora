@@ -106,7 +106,8 @@ class TrashController extends ApiController
     private function trashed(string $class, int $id, BoardAccess $access, bool $purge = false): Card|BoardList
     {
         $o = $this->em->find($class, $id);
-        if (!$o || !$o->isDeleted()) {
+        // U8-a : absent de la corbeille, inexistant ou non-membre → même 404 (aucune fuite).
+        if (!$o || !$o->isDeleted() || !$o->getBoard()->getMembership($this->me())) {
             throw new NotFoundHttpException('Cet élément n’est pas dans la corbeille.');
         }
         $m = $access->member($o->getBoard(), $this->me());
@@ -119,10 +120,12 @@ class TrashController extends ApiController
     private function ownedTrashedBoard(int $id): Board
     {
         $board = $this->em->find(Board::class, $id);
-        if (!$board || !$board->isDeleted()) {
+        $membership = $board?->getMembership($this->me());
+        // U8-a : absent de la corbeille, inexistant ou non-membre → même 404 ; membre non propriétaire → 403.
+        if (!$board || !$board->isDeleted() || !$membership) {
             throw new NotFoundHttpException('Ce tableau n’est pas dans la corbeille.');
         }
-        if (BoardMember::ROLE_OWNER !== $board->getMembership($this->me())?->getRole()) {
+        if (BoardMember::ROLE_OWNER !== $membership->getRole()) {
             throw new AccessDeniedHttpException('Seul le propriétaire du tableau peut le restaurer ou le supprimer.');
         }
         return $board;

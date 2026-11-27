@@ -41,8 +41,7 @@ class CardController extends ApiController
 
     private function card(int $id, BoardAccess $access): Card
     {
-        $card = $this->find(Card::class, $id);
-        $access->member($card->getBoard(), $this->me());
+        $card = $this->findForMember(Card::class, $id, $access);
         return $card;
     }
 
@@ -264,8 +263,8 @@ class CardController extends ApiController
     #[Route('/comments/{id}', methods: ['DELETE'])]
     public function deleteComment(int $id, BoardAccess $access): JsonResponse
     {
-        $comment = $this->find(Comment::class, $id);
-        $m = $access->member($comment->getCard()->getBoard(), $this->me());
+        $comment = $this->findForMember(Comment::class, $id, $access);
+        $m = $access->memberOfChild($comment->getCard()->getBoard(), $this->me());
         if ($comment->getAuthor() !== $this->me() && !$m->canManage()) {
             throw new BadRequestHttpException('Vous ne pouvez supprimer que vos propres commentaires.');
         }
@@ -288,8 +287,7 @@ class CardController extends ApiController
     #[Route('/checklist/{id}', methods: ['PATCH'])]
     public function updateChecklistItem(int $id, Request $request, BoardAccess $access): JsonResponse
     {
-        $item = $this->find(ChecklistItem::class, $id);
-        $access->member($item->getCard()->getBoard(), $this->me());
+        $item = $this->findForMember(ChecklistItem::class, $id, $access);
         $data = $this->body($request);
         if (array_key_exists('done', $data) && (bool) $data['done'] !== $item->isDone()) {
             $item->setDone((bool) $data['done']);
@@ -305,8 +303,7 @@ class CardController extends ApiController
     #[Route('/checklist/{id}', methods: ['DELETE'])]
     public function deleteChecklistItem(int $id, BoardAccess $access): JsonResponse
     {
-        $item = $this->find(ChecklistItem::class, $id);
-        $access->member($item->getCard()->getBoard(), $this->me());
+        $item = $this->findForMember(ChecklistItem::class, $id, $access);
         $this->activity->log($item->getCard(), $this->me(), 'checklist_removed', ['item' => $item->getContent()]);
         $this->em->remove($item);
         $this->em->flush();

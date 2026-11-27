@@ -31,6 +31,9 @@ jobs:
       identity_service: ${{ steps.diff.outputs.identity_service }}
       identity_security: ${{ steps.diff.outputs.identity_security }}
       identity_compat: ${{ steps.diff.outputs.identity_compat }}
+      board_service: ${{ steps.diff.outputs.board_service }}
+      board_security: ${{ steps.diff.outputs.board_security }}
+      board_compat: ${{ steps.diff.outputs.board_compat }}
       frontend: ${{ steps.diff.outputs.frontend }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,17 +80,25 @@ jobs:
               echo false
             fi
           }
-          backend="$(match '^(backend/|docker-compose\.yml$|docker/mariadb/|\.github/workflows/backend\.yml$)')"
+          backend="$(match '^(backend/|docker-compose\.yml$|docker/mariadb/|docs/contracts/openapi/symfony\.internal\.yaml$|\.github/workflows/backend\.yml$)')"
           identity_service="$(match '^(services/|\.github/workflows/identity-service\.yml$)')"
           identity_security="$(match '^(services/(.*/)?pom\.xml$|\.github/workflows/identity-security\.yml$)')"
           identity_compat="$(match '^(services/identity-service/|backend/|docker-compose\.yml$|docker-compose\.identity-dev\.yml$|docker/mariadb/|frontend/nginx\.conf$|frontend/Dockerfile$|\.github/workflows/identity-compat\.yml$)')"
-          frontend="$(match '^(frontend/|services/identity-service/|services/pom\.xml$|backend/|docker-compose[^/]*\.yml$|docker/mariadb/|\.github/workflows/frontend\.yml$)')"
+          # board-service (phase 3, demande §B1) ; board_service inclut backend/migrations/ et
+          # docker/mariadb/ (schéma taskora des IT et script d'init, §B6).
+          board_service="$(match '^(services/board-service/|services/pom\.xml$|services/config/|services/\.mvn/|services/mvnw|backend/migrations/|docker/mariadb/|\.github/workflows/board-service\.yml$)')"
+          board_security="$(match '^(services/board-service/pom\.xml$|services/pom\.xml$|\.github/workflows/board-security\.yml$)')"
+          board_compat="$(match '^(services/board-service/|services/identity-service/|backend/|docker-compose[^/]*\.yml$|docker/mariadb/|frontend/nginx\.conf$|frontend/Dockerfile$|\.github/workflows/board-compat\.yml$)')"
+          frontend="$(match '^(frontend/|services/identity-service/|services/board-service/|services/pom\.xml$|backend/|docker-compose[^/]*\.yml$|docker/mariadb/|\.github/workflows/frontend\.yml$)')"
 
           # Sur push, backend, identity-security et identity-compat ne tournaient pas : inchangé.
+          # board-security et board-compat : PR seulement aussi (§B1).
           if [ "$EVENT" = push ]; then
             backend=false
             identity_security=false
             identity_compat=false
+            board_security=false
+            board_compat=false
           fi
 
           {
@@ -95,6 +106,9 @@ jobs:
             echo "identity_service=$identity_service"
             echo "identity_security=$identity_security"
             echo "identity_compat=$identity_compat"
+            echo "board_service=$board_service"
+            echo "board_security=$board_security"
+            echo "board_compat=$board_compat"
             echo "frontend=$frontend"
           } | tee -a "$GITHUB_OUTPUT"
 
@@ -134,6 +148,35 @@ jobs:
       contents: read
     uses: ./.github/workflows/identity-compat.yml
 
+  board-service:
+    needs: changes
+    if: needs.changes.outputs.board_service == 'true'
+    permissions:
+      contents: read
+      actions: read # board-test-report
+      checks: write # board-test-report (seul job appelé qui l'utilise)
+    uses: ./.github/workflows/board-service.yml
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  board-security:
+    needs: changes
+    if: needs.changes.outputs.board_security == 'true'
+    permissions:
+      contents: read
+      actions: read # upload-sarif
+      security-events: write # upload-sarif
+    uses: ./.github/workflows/board-security.yml
+    secrets:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+  board-compat:
+    needs: changes
+    if: needs.changes.outputs.board_compat == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/board-compat.yml
+
   frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
@@ -147,7 +190,7 @@ jobs:
   # annulation) : échec si un job requis a échoué ou a été annulé ; « ignoré » = zone non concernée.
   ci-gate:
     name: ci-gate
-    needs: [changes, backend, identity-service, identity-security, identity-compat, frontend]
+    needs: [changes, backend, identity-service, identity-security, identity-compat, board-service, board-security, board-compat, frontend]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
