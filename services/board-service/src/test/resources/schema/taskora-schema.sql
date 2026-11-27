@@ -1,4 +1,4 @@
--- Schéma `taskora` généré depuis backend/migrations (12 migrations Doctrine, dernière : Version20261125165023).
+-- Schéma `taskora` généré depuis backend/migrations (13 migrations Doctrine, dernière : Version20261128000100).
 -- NE PAS MODIFIER À LA MAIN : docker/mariadb/tools/taskora-schema.sh (contrôle CI : --check).
 -- Structure seulement (aucune donnée). Chargement : client mariadb, /docker-entrypoint-initdb.d ou ScriptUtils.
 SET NAMES utf8mb4;
@@ -205,6 +205,13 @@ CREATE TABLE `doctrine_migration_versions` (
   `executed_at` datetime DEFAULT NULL,
   `execution_time` int(11) DEFAULT NULL,
   PRIMARY KEY (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DROP TABLE IF EXISTS `internal_event_receipt`;
+CREATE TABLE `internal_event_receipt` (
+  `event_id` char(36) NOT NULL,
+  `type` varchar(64) NOT NULL,
+  `received_at` datetime NOT NULL,
+  PRIMARY KEY (`event_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `invitation`;
 CREATE TABLE `invitation` (
