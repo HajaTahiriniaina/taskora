@@ -21,7 +21,6 @@ final class InternalEventReceiptMigrationTest extends KernelTestCase
     private const BEFORE = 'DoctrineMigrations\\Version20261125165023';
 
     private Connection $connection;
-    private Application $console;
 
     protected function setUp(): void
     {
@@ -36,15 +35,23 @@ final class InternalEventReceiptMigrationTest extends KernelTestCase
             $this->connection->executeStatement('DROP TABLE '.$this->connection->quoteSingleIdentifier($table));
         }
         $this->connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
-        $this->console = new Application(self::$kernel);
-        $this->console->setAutoExit(false);
     }
 
-    /** @return array{0: int, 1: string} */
+    /**
+     * Chaque commande dans un noyau neuf, comme en exploitation (un processus par commande) : les
+     * instances de migration ne sont jamais réutilisées d'une commande à l'autre (E15).
+     *
+     * @return array{0: int, 1: string}
+     */
     private function console(array $input): array
     {
+        self::ensureKernelShutdown();
+        self::bootKernel();
+        $console = new Application(self::$kernel);
+        $console->setAutoExit(false);
         $output = new BufferedOutput();
-        $code = $this->console->run(new ArrayInput($input + ['--no-interaction' => true]), $output);
+        $code = $console->run(new ArrayInput($input + ['--no-interaction' => true]), $output);
+        $this->connection = static::getContainer()->get(Connection::class);
 
         return [$code, $output->fetch()];
     }
@@ -105,6 +112,18 @@ final class InternalEventReceiptMigrationTest extends KernelTestCase
             ['COLUMN_NAME' => 'type', 'COLUMN_TYPE' => 'varchar(64)', 'IS_NULLABLE' => 'NO', 'COLUMN_KEY' => ''],
             ['COLUMN_NAME' => 'received_at', 'COLUMN_TYPE' => 'datetime', 'IS_NULLABLE' => 'NO', 'COLUMN_KEY' => ''],
         ], $columns);
+    }
+
+    #[TestDox('R1, E15 — migrate --dry-run depuis Version20261125165023 : code 0, internal_event_receipt toujours absente')]
+    public function testDryRunWritesNothing(): void
+    {
+        [$code, $out] = $this->console(['command' => 'doctrine:migrations:migrate', 'version' => self::BEFORE]);
+        self::assertSame(0, $code, $out);
+        self::assertFalse($this->receiptExists());
+
+        [$code, $out] = $this->console(['command' => 'doctrine:migrations:migrate', '--dry-run' => true]);
+        self::assertSame(0, $code, $out);
+        self::assertFalse($this->receiptExists(), 'le dry-run ne doit rien écrire');
     }
 
     #[TestDox('R1 — après migrate, doctrine:schema:validate est vert (entité et base en accord)')]
