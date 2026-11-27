@@ -63,6 +63,10 @@ test_db_grant=$(printf '%s' "$TEST_DB" | sed 's/_/\\_/g')
 
 has_user_table=$(echo "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='${APP_DB}' AND TABLE_NAME='user';" \
   | sql "$@" --batch --skip-column-names)
+# Compte applicatif absent (conteneur lancé sans MARIADB_USER, ex. Testcontainers) : le GRANT sur
+# la base de test échouerait (1133) ; il est alors sauté, le reste de l'init s'applique.
+has_app_user=$(echo "SELECT COUNT(*) FROM mysql.user WHERE User='${APP_USER}' AND Host='%';" \
+  | sql "$@" --batch --skip-column-names)
 
 # board-migration.md §3 : DML sur les tables du tableau, lecture seule sur les autres.
 BOARD_DML_TABLES="board board_list board_member invitation card card_assignee card_label label custom_field custom_field_value checklist_item comment activity"
@@ -89,8 +93,10 @@ ALTER USER 'identity'@'%' IDENTIFIED BY '${pw}';
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'identity'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON identity.* TO 'identity'@'%';
 CREATE DATABASE IF NOT EXISTS \`${TEST_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-GRANT ALL PRIVILEGES ON \`${test_db_grant}\`.* TO '${APP_USER}'@'%';
 SQL
+  if [ "$has_app_user" = "1" ]; then
+    echo "GRANT ALL PRIVILEGES ON \`${test_db_grant}\`.* TO '${APP_USER}'@'%';"
+  fi
   if [ "$has_user_table" = "1" ]; then
     # Projection U1-B + lecture pour la reprise. Jamais DELETE (cascades).
     echo "GRANT SELECT, INSERT, UPDATE ON \`${APP_DB}\`.\`user\` TO 'identity'@'%';"
@@ -128,6 +134,9 @@ if [ "$has_user_table" = "1" ]; then
 else
   echo "taskora-init: OK partiel — ${APP_DB}.user n'existe pas encore (migrations Symfony) :"
   echo "taskora-init: droits sur ${APP_DB}.user à accorder en relançant ce script (service db-init)."
+fi
+if [ "$has_app_user" != "1" ]; then
+  echo "taskora-init: compte ${APP_USER}@% absent (MARIADB_USER non défini ?) : droits sur ${TEST_DB} non accordés."
 fi
 if [ -z "${BOARD_DB_PASSWORD:-}" ]; then
   echo "taskora-init: BOARD_DB_PASSWORD absent : schéma et compte board ni créés ni modifiés."
