@@ -9,6 +9,10 @@ use App\Entity\Notification;
 use App\Entity\User;
 use App\Service\PushSender;
 use App\Tests\Support\ApiTestCase;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Events;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
 
@@ -29,6 +33,9 @@ final class InternalNotificationsTest extends ApiTestCase
     private User $dora;
     private Board $board;
     private Card $card;
+    /** Seconde connexion DBAL de TB11 (livraison concurrente), fermée en tearDown. */
+    private ?Connection $concurrent = null;
+    private ?string $concurrentEventId = null;
 
     protected function setUp(): void
     {
@@ -221,5 +228,77 @@ final class InternalNotificationsTest extends ApiTestCase
         self::assertSame([400, ['error' => $message]], [$status, $json]);
         self::assertCount(0, $this->notifications());
         self::assertSame(0, $this->receipts());
+    }
+
+    protected function tearDown(): void
+    {
+        if (null !== $this->concurrent) {
+            if (null !== $this->concurrentEventId) {
+                $this->concurrent->executeStatement('DELETE FROM internal_event_receipt WHERE event_id = ?', [$this->concurrentEventId]);
+            }
+            $this->concurrent->close();
+            $this->concurrent = null;
+        }
+        parent::tearDown();
+    }
+
+    /** UUID v4 neuf (aléatoire), en minuscules. */
+    private static function newEventId(): string
+    {
+        $b = random_bytes(16);
+        $b[6] = chr((ord($b[6]) & 0x0F) | 0x40);
+        $b[8] = chr((ord($b[8]) & 0x3F) | 0x80);
+
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
+    }
+
+    #[TestDox('m1 (§12.2) — livraison concurrente du même eventId validée pendant la transaction → 200 {created: 0}, aucune notification, aucun push, aucun journal ERROR')]
+    public function testConcurrentDuplicateReceiptAnswersCreatedZero(): void
+    {
+        $eventId = self::newEventId();
+        $this->concurrentEventId = $eventId;
+        $this->concurrent = DriverManager::getConnection($this->em->getConnection()->getParams());
+        $concurrent = $this->concurrent;
+        // Écouteur à usage unique : la seconde livraison insère et VALIDE son reçu dans la
+        // transaction du contrôleur, après le find() et avant l'INSERT du reçu (flush).
+        $listener = new class($concurrent, $eventId) {
+            public bool $fired = false;
+
+            public function __construct(private Connection $connection, private string $eventId)
+            {
+            }
+
+            public function preFlush(PreFlushEventArgs $args): void
+            {
+                if ($this->fired) {
+                    return;
+                }
+                $this->fired = true;
+                $this->connection->executeStatement(
+                    'INSERT INTO internal_event_receipt (event_id, type, received_at) VALUES (?, ?, ?)',
+                    [$this->eventId, 'NotificationRequested', (new \DateTimeImmutable())->format('Y-m-d H:i:s')],
+                );
+            }
+        };
+        $events = $this->em->getEventManager();
+        $events->addEventListener([Events::preFlush], $listener);
+        $logFile = static::getContainer()->getParameter('kernel.logs_dir').'/test.log';
+        clearstatcache();
+        $logOffset = is_file($logFile) ? (int) filesize($logFile) : 0;
+        $this->resetPushes();
+        try {
+            [$status, $json] = $this->post($this->body(['eventId' => $eventId]));
+        } finally {
+            $events->removeEventListener([Events::preFlush], $listener);
+        }
+        clearstatcache();
+        $log = is_file($logFile) ? (string) file_get_contents($logFile, false, null, $logOffset) : '';
+
+        self::assertTrue($listener->fired, 'la livraison concurrente a bien eu lieu pendant la transaction');
+        self::assertSame([200, ['created' => 0]], [$status, $json]);
+        self::assertCount(0, $this->notifications(), 'aucune notification');
+        self::assertSame([], $this->pushed, 'aucun push');
+        self::assertSame(1, (int) $concurrent->fetchOne('SELECT COUNT(*) FROM internal_event_receipt WHERE event_id = ?', [$eventId]), 'un seul reçu, celui de la livraison concurrente');
+        self::assertDoesNotMatchRegularExpression('/\.(ERROR|CRITICAL|ALERT|EMERGENCY):/', $log, 'aucun journal ERROR');
     }
 }
