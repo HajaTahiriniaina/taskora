@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -202,8 +203,79 @@ public abstract class ApiTestBase {
     }
   }
 
+  /**
+   * Requête au chemin <b>brut</b> (B1, §12.2) : {@code URI.create} conserve l'encodage tel quel
+   * (aucune normalisation, aucun décodage ni réencodage), sans filtre de contrat OpenAPI. Un chemin
+   * refusé par {@code URI.create} fait échouer le test.
+   *
+   * @param method méthode HTTP
+   * @param rawPath chemin envoyé octet pour octet (ex. {@code /%69nternal/invitations/claim})
+   * @param secret valeur de {@code X-Internal-Secret}, en-tête absent si nul
+   * @param bearer jeton de {@code Authorization: Bearer …}, en-tête absent si nul
+   * @param body corps JSON, sans corps si nul
+   * @return statut, corps et en-têtes
+   */
+  protected RawExchange rawInternal(
+      String method,
+      String rawPath,
+      @Nullable String secret,
+      @Nullable String bearer,
+      @Nullable String body) {
+    URI uri = URI.create("http://localhost:" + port + rawPath);
+    assertThat(uri.getRawPath()).as("chemin brut transmis tel quel").isEqualTo(rawPath);
+    HttpRequest.Builder b = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30));
+    if (secret != null) {
+      b.header("X-Internal-Secret", secret);
+    }
+    if (bearer != null) {
+      b.header("Authorization", "Bearer " + bearer);
+    }
+    if (body != null) {
+      b.header("Content-Type", "application/json");
+    }
+    b.method(
+        method,
+        body == null
+            ? HttpRequest.BodyPublishers.noBody()
+            : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+    try {
+      HttpResponse<String> r =
+          HTTP.send(b.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+      return new RawExchange(r.statusCode(), r.body(), r.headers().map());
+    } catch (java.io.IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(e);
+    }
+  }
+
   /** Réponse brute. */
   public record RawResponse(int status, String body) {}
+
+  /**
+   * Réponse brute avec en-têtes (noms en minuscules, {@code java.net.http}).
+   *
+   * @param status statut
+   * @param body corps
+   * @param headers en-têtes
+   */
+  public record RawExchange(int status, String body, Map<String, List<String>> headers) {
+    /**
+     * Première valeur d'un en-tête, quelle que soit la casse du nom.
+     *
+     * @param name nom
+     * @return valeur ou {@code null}
+     */
+    public @Nullable String header(String name) {
+      for (Map.Entry<String, List<String>> e : headers.entrySet()) {
+        if (e.getKey().equalsIgnoreCase(name) && !e.getValue().isEmpty()) {
+          return e.getValue().getFirst();
+        }
+      }
+      return null;
+    }
+  }
 
   // ------------------------------------------------------------------ assertions
 

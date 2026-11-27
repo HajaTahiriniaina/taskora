@@ -8,10 +8,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.taskora.board.support.ApiTestBase;
 import com.taskora.board.support.BoardDatabase;
 import com.taskora.board.support.Fixture;
+import com.taskora.board.support.Json;
 import io.restassured.response.Response;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -202,5 +206,51 @@ class JwtSecurityIT extends ApiTestBase {
       Response r = send(route[0], null, route[1], "{}");
       assertAuthError(r, "JWT Token not found");
     }
+  }
+
+  // ------------------------------------------------------------------ B1 (§12.2, TB5)
+
+  /** 401 Lexik exact sur une réponse brute. */
+  private static void assertRawAuthError(
+      SoftAssertions soft, String what, RawExchange r, String message) {
+    soft.assertThat(r.status()).as("%s : statut ; corps = %s", what, r.body()).isEqualTo(401);
+    Map<String, Object> expected = new LinkedHashMap<>();
+    expected.put("code", 401);
+    expected.put("message", message);
+    soft.assertThat(json(r.body()))
+        .as("%s : corps", what)
+        .isEqualTo(JSON.readTree(Json.write(expected)));
+    soft.assertThat(r.header("WWW-Authenticate"))
+        .as("%s : WWW-Authenticate", what)
+        .isEqualTo("Bearer");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"/%61pi/boards/101", "/%61%70%69/boards/101"})
+  @DisplayName("SC-BOARD-020 (B1) — préfixe /api/ encodé : même traitement JWT que /api/boards/101")
+  void encodedApiPrefix(String rawPath) {
+    RawExchange reference = rawInternal("GET", "/api/boards/101", null, alice(), null);
+    assertThat(reference.status()).as("référence /api/boards/101").isEqualTo(200);
+    SoftAssertions soft = new SoftAssertions();
+    RawExchange valid = rawInternal("GET", rawPath, null, alice(), null);
+    soft.assertThat(valid.status())
+        .as("(a) jeton valide : statut ; corps = %s", valid.body())
+        .isEqualTo(reference.status());
+    soft.assertThat(json(valid.body()))
+        .as("(a) jeton valide : corps")
+        .isEqualTo(json(reference.body()));
+    assertRawAuthError(
+        soft, "(b) Bearer x", rawInternal("GET", rawPath, null, "x", null), "Invalid JWT Token");
+    assertRawAuthError(
+        soft,
+        "(c) sans en-tête",
+        rawInternal("GET", rawPath, null, null, null),
+        "JWT Token not found");
+    assertRawAuthError(
+        soft,
+        "(d) jeton expiré",
+        rawInternal("GET", rawPath, null, TOKENS.expired(ALICE_EMAIL), null),
+        "Expired JWT Token");
+    soft.assertAll();
   }
 }

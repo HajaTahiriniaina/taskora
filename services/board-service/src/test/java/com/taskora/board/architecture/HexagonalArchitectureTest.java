@@ -9,6 +9,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -139,6 +140,21 @@ class HexagonalArchitectureTest {
           .should()
           .beFreeOfCycles()
           .as("Règle 5 — aucun cycle entre sous-paquets d'adapter");
+
+  @ArchTest
+  static final ArchRule securityDecidesOnRoutedPath =
+      noClasses()
+          .that()
+          .resideInAnyPackage(ROOT + ".adapter.in.web.security..", ROOT + ".config..")
+          .should()
+          .callMethod(HttpServletRequest.class, "getRequestURI")
+          .orShould()
+          .callMethod(HttpServletRequest.class, "getServletPath")
+          .orShould()
+          .callMethod(HttpServletRequest.class, "getPathInfo")
+          .as(
+              "B1 (§12.2) — la sécurité décide sur le chemin routé (décodé, normalisé), jamais sur"
+                  + " getRequestURI(), getServletPath() ni getPathInfo()");
 
   @ParameterizedTest(name = "{0} absent du classpath")
   @ValueSource(
