@@ -1,5 +1,7 @@
 package com.taskora.identity.config;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -95,16 +97,41 @@ public record IdentityProperties(
 
     static final String MISSING_CLAIM_SECRET =
         "INVITATION_CLAIM_SECRET doit être défini et non vide.";
+    static final String INVALID_CLAIM_URL =
+        "INVITATION_CLAIM_URL doit être une URL http(s) absolue.";
 
     /**
-     * Valide le secret de consommation.
+     * Valide l'URL et le secret de consommation.
      *
-     * @throws IllegalStateException si le secret est absent ou blanc (refus de démarrer)
+     * @throws IllegalStateException si l'URL n'est pas une URL http(s) absolue avec hôte, ou si le
+     *     secret est absent ou blanc (refus de démarrer ; message sans aucune valeur)
      */
     public Invitations {
+      if (!isAbsoluteHttpUrl(claimUrl)) {
+        throw new IllegalStateException(INVALID_CLAIM_URL);
+      }
       if (claimSecret == null || claimSecret.isBlank()) {
         throw new IllegalStateException(MISSING_CLAIM_SECRET);
       }
+    }
+
+    private static boolean isAbsoluteHttpUrl(@Nullable String url) {
+      if (url == null || url.isBlank()) {
+        return false;
+      }
+      URI uri;
+      try {
+        uri = new URI(url);
+      } catch (URISyntaxException e) {
+        return false;
+      }
+      String scheme = uri.getScheme();
+      String host = uri.getHost();
+      return uri.isAbsolute()
+          && scheme != null
+          && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+          && host != null
+          && !host.isEmpty();
     }
 
     @Override
