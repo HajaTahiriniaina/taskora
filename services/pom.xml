@@ -194,7 +194,7 @@
               <include>**/*Test.java</include>
             </includes>
             <!-- Agent Mockito explicite (JDK 21+ : l'auto-attachement dynamique est déprécié ; revue B4) -->
-            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} --enable-native-access=ALL-UNNAMED</argLine>
             <groups>${test.groups}</groups>
             <excludedGroups>${test.excludedGroups}</excludedGroups>
             <systemPropertyVariables>
@@ -211,7 +211,7 @@
             <includes>
               <include>**/*IT.java</include>
             </includes>
-            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+            <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} --enable-native-access=ALL-UNNAMED</argLine>
             <groups>${test.groups}</groups>
             <excludedGroups>${test.excludedGroups}</excludedGroups>
             <systemPropertyVariables>

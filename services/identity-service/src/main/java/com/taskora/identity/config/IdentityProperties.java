@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
 
 /**
@@ -75,8 +76,30 @@ public record IdentityProperties(
     }
   }
 
-  /** Coût bcrypt (13 comme Symfony, 4 en test). */
-  public record Password(int bcryptCost) {}
+  /**
+   * Hachage des mots de passe (A2, B1).
+   *
+   * <ul>
+   *   <li>{@code identity.password.bcrypt-cost} ({@code IDENTITY_BCRYPT_COST}) : coût bcrypt des
+   *       nouveaux hashes, 13 comme Symfony (4 en test) ;
+   *   <li>{@code identity.password.bcrypt-engine} ({@code IDENTITY_BCRYPT_ENGINE}) : {@code native}
+   *       (défaut) = {@code crypt_rn} de libxcrypt ({@code libcrypt.so.1}) via FFM, à parité de
+   *       latence avec PHP ; {@code java} = Spring Security BCrypt en Java pur (≈ 35 % plus lent),
+   *       réservé au développement hors Linux (macOS n'a pas {@code libcrypt.so.1}). Moteur {@code
+   *       native} choisi mais bibliothèque introuvable → le service refuse de démarrer. La JVM doit
+   *       être lancée avec {@code --enable-native-access=ALL-UNNAMED}.
+   * </ul>
+   */
+  public record Password(int bcryptCost, @DefaultValue("native") BcryptEngine bcryptEngine) {
+
+    /** Moteur bcrypt (B1). */
+    public enum BcryptEngine {
+      /** Moteur natif : libxcrypt via FFM, en production (défaut). */
+      NATIVE,
+      /** Moteur Java pur : Spring Security BCrypt, pour le développement hors Linux. */
+      JAVA
+    }
+  }
 
   /** Relais de l'outbox. */
   public record Outbox(Relay relay) {

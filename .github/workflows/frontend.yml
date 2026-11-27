@@ -198,6 +198,19 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium
+      # Le dépôt apt packages.microsoft.com préinstallé sur l'image du runner peut répondre 403
+      # (« no longer signed ») et faire échouer l'apt-get update de Playwright. Chromium n'en a
+      # pas besoin : on désactive ces sources sur ce runner éphémère, sans toucher aux autres.
+      - name: Désactiver les sources apt Microsoft du runner
+        working-directory: .
+        run: |
+          shopt -s nullglob
+          for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            if grep -q 'packages\.microsoft\.com' "$f"; then
+              echo "Source désactivée : $f"
+              sudo mv "$f" "$f.disabled"
+            fi
+          done
       - name: Installer Chromium et ses dépendances
         if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium

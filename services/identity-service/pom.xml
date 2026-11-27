@@ -137,6 +137,10 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <!-- B1 : spring-boot:run, moteur bcrypt natif (FFM) ; hors Linux : IDENTITY_BCRYPT_ENGINE=java -->
+          <jvmArguments>--enable-native-access=ALL-UNNAMED</jvmArguments>
+        </configuration>
       </plugin>
     </plugins>
   </build>

@@ -18,6 +18,11 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
  * Hachage compatible Symfony NativePasswordHasher (A2) : bcrypt $2y$, pré-hachage base64(sha512)
  * au-delà de 72 octets ou avec NUL, vérification bcrypt ($2y$/$2a$/$2b$) et argon2 (i, id), toute
  * autre forme → false sans exception.
+ *
+ * <p>B1 : le calcul bcrypt (hachage, vérification et hash factice) passe par un {@link
+ * BcryptEngine} : natif libxcrypt par défaut, Java pur sur configuration explicite. Le sel vient de
+ * {@link BCrypt#gensalt(String, int, java.security.SecureRandom)} ; la vérification recalcule le
+ * hash et le compare au hash stocké à temps constant ({@link MessageDigest#isEqual}).
  */
 public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
   private static final int BCRYPT_MAX_BYTES = 72;
@@ -31,14 +36,53 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
   /** Hash factice $2y$ au coût configuré, prêt dès le démarrage (A2, SC-IDENT-008). */
   private final String dummyHash;
 
+  /** Moteur bcrypt (B1) : natif par défaut, Java sur configuration explicite. */
+  private final BcryptEngine engine;
+
+  /**
+   * Hacheur avec le moteur bcrypt par défaut : natif libxcrypt (B1).
+   *
+   * @throws IllegalStateException si libcrypt.so.1 est introuvable
+   */
   public SymfonyCompatiblePasswordHasher(int bcryptCost) {
+    this(bcryptCost, new LibxcryptBcryptEngine());
+  }
+
+  /**
+   * Hacheur avec un moteur bcrypt explicite (B1).
+   *
+   * @param bcryptCost coût bcrypt des nouveaux hashes, dans [4, 31]
+   * @param engine moteur bcrypt utilisé pour le hachage, la vérification et le hash factice
+   */
+  public SymfonyCompatiblePasswordHasher(int bcryptCost, BcryptEngine engine) {
     if (bcryptCost < 4 || bcryptCost > 31) {
       throw new IllegalArgumentException("Coût bcrypt hors de [4, 31] : " + bcryptCost);
     }
     this.bcryptCost = bcryptCost;
+    this.engine = engine;
     byte[] secret = new byte[32];
     random.nextBytes(secret);
-    this.dummyHash = bcrypt(HexFormat.of().formatHex(secret), bcryptCost, random);
+    this.dummyHash = bcrypt(engine, HexFormat.of().formatHex(secret), bcryptCost, random);
+    Arrays.fill(secret, (byte) 0);
+  }
+
+  /**
+   * Hacheur sur le moteur natif libxcrypt (identity.password.bcrypt-engine=native, défaut).
+   *
+   * @throws IllegalStateException si libcrypt.so.1 est introuvable (refus de démarrer)
+   */
+  public static SymfonyCompatiblePasswordHasher withNativeEngine(int bcryptCost) {
+    return new SymfonyCompatiblePasswordHasher(bcryptCost, new LibxcryptBcryptEngine());
+  }
+
+  /** Hacheur sur le moteur Java pur (identity.password.bcrypt-engine=java, développement). */
+  public static SymfonyCompatiblePasswordHasher withJavaEngine(int bcryptCost) {
+    return new SymfonyCompatiblePasswordHasher(bcryptCost, new JavaBcryptEngine());
+  }
+
+  /** Moteur bcrypt effectif (contrôle de configuration, B1). */
+  BcryptEngine engine() {
+    return engine;
   }
 
   @Override
@@ -47,7 +91,7 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
       // Garde défensive : le domaine refuse avant (E15).
       throw new PasswordTooLongException();
     }
-    return new HashedPassword(bcrypt(password.value(), bcryptCost, random));
+    return new HashedPassword(bcrypt(engine, password.value(), bcryptCost, random));
   }
 
   @Override
@@ -61,7 +105,7 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
         return argon2.matches(password.value(), encoded);
       }
       if (isBcrypt(encoded)) {
-        return BCrypt.checkpw(bcryptInput(password.value()), encoded);
+        return bcryptMatches(password.value(), encoded);
       }
       return false;
     } catch (RuntimeException e) {
@@ -73,14 +117,40 @@ public class SymfonyCompatiblePasswordHasher implements PasswordHasherPort {
   @Override
   public void verifyAgainstDummy(PlainPassword password) {
     try {
-      BCrypt.checkpw(bcryptInput(password.value()), dummyHash);
+      bcryptMatches(password.value(), dummyHash);
     } catch (RuntimeException e) {
       // Résultat ignoré : seul le temps de calcul compte.
     }
   }
 
-  private static String bcrypt(String plain, int cost, SecureRandom random) {
-    return BCrypt.hashpw(bcryptInput(plain), BCrypt.gensalt(BCRYPT_PREFIX, cost, random));
+  /**
+   * Nouveau hash $2y$ au coût donné, calculé par le moteur (statique : appelé depuis le
+   * constructeur pour le hash factice).
+   */
+  private static String bcrypt(BcryptEngine engine, String plain, int cost, SecureRandom random) {
+    byte[] input = bcryptInput(plain);
+    try {
+      String hash = engine.crypt(input, BCrypt.gensalt(BCRYPT_PREFIX, cost, random));
+      if (hash == null || hash.length() != BCRYPT_HASH_LENGTH) {
+        throw new IllegalStateException("Échec du hachage bcrypt");
+      }
+      return hash;
+    } finally {
+      Arrays.fill(input, (byte) 0);
+    }
+  }
+
+  /** Recalcul par le moteur avec le hash stocké comme réglage, comparaison à temps constant. */
+  private boolean bcryptMatches(String plain, String encoded) {
+    byte[] input = bcryptInput(plain);
+    try {
+      String computed = engine.crypt(input, encoded);
+      return computed != null
+          && MessageDigest.isEqual(
+              computed.getBytes(StandardCharsets.UTF_8), encoded.getBytes(StandardCharsets.UTF_8));
+    } finally {
+      Arrays.fill(input, (byte) 0);
+    }
   }
 
   private static boolean isBcrypt(String encoded) {

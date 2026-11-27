@@ -65,6 +65,9 @@ identity:
     internal-secret: ${INTERNAL_API_SECRET:}
   password:
     bcrypt-cost: ${IDENTITY_BCRYPT_COST:13}
+    # B1 : native (défaut, libxcrypt via FFM, exige --enable-native-access=ALL-UNNAMED) ou java
+    # (développement hors Linux). native sans libcrypt.so.1 → refus de démarrer.
+    bcrypt-engine: ${IDENTITY_BCRYPT_ENGINE:native}
   outbox:
     relay:
       enabled: ${IDENTITY_OUTBOX_RELAY_ENABLED:true}

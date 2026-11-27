@@ -24,7 +24,7 @@ Les filtres `paths` par workflow empêchaient de rendre leurs jobs obligatoires 
 - Permissions : `permissions: {}` partout au niveau du workflow. Chaque job appelant accorde l'union de ce que demandent les jobs appelés, qui gardent leurs propres permissions minimales. `checks: write` n'est accordé qu'aux appels `identity-service` et `frontend`, et seuls leurs jobs `*-test-report` l'utilisent. `security-events: write` n'est accordé qu'à l'appel `identity-security`.
 - Secrets : pas de `secrets: inherit`. Seuls `SONAR_TOKEN` (vers `identity-service`) et `NVD_API_KEY` (vers `identity-security`) sont transmis explicitement ; les autres workflows n'en reçoivent aucun. `vars.SONAR_HOST_URL` reste lu directement.
 - Concurrence : seul `ci.yml` en a pour les runs de CI. `frontend` et `identity-security` gardent un groupe à nom fixe (`frontend-<ref>`, `identity-security-<ref>`) pour leurs runs autonomes. Un appelé qui reprendrait `github.workflow` (qui vaut alors `ci`) partagerait le groupe de l'appelant et provoquerait un interblocage.
-- Artefacts : tous les appels partagent le même run, donc les noms doivent être uniques. Ils le sont déjà : `backend-phpunit-junit`, `identity-test-reports`, `identity-quality-reports`, `identity-dependency-check`, `identity-compat-reports`, `identity-compat-compose-logs`, `frontend-lint-report`, `frontend-unit-reports`, `frontend-e2e-identity-<backend>`, `frontend-compose-logs-<backend>`.
+- Artefacts : tous les appels partagent le même run, donc les noms doivent être uniques. Ils le sont déjà : `backend-phpunit-junit`, `identity-test-reports`, `identity-quality-reports`, `identity-dependency-check`, `identity-image-trivy`, `identity-compat-reports`, `identity-compat-compose-logs`, `frontend-lint-report`, `frontend-unit-reports`, `frontend-e2e-identity-<backend>`, `frontend-compose-logs-<backend>`.
 - Job `ci-gate` (`needs` : `changes` et les cinq appels, `if: always()`) :
   - échec si un résultat est `failure` ou `cancelled`, y compris l'échec de `changes` ;
   - succès si tous sont `success` ou `skipped` (zone non concernée).
@@ -34,7 +34,7 @@ Les filtres `paths` par workflow empêchaient de rendre leurs jobs obligatoires 
 Format `<job appelant> / <job appelé>` ; un appel ignoré n'apparaît que sous le nom de l'appelant, avec le statut « ignoré ».
 - `changes`, `ci-gate`
 - `backend / backend-phpunit`
-- `identity-service / identity-build (verify)`, `identity-service / identity-test-report`, `identity-service / identity-quality (Spotless, Checkstyle, Nullness, OpenRewrite)`, `identity-service / identity-sonar`, `identity-service / identity-image`
+- `identity-service / identity-build (verify)`, `identity-service / identity-test-report`, `identity-service / identity-quality (Spotless, Checkstyle, Nullness, OpenRewrite)`, `identity-service / identity-sonar`, `identity-service / identity-image (build, Trivy)`
 - `identity-security / identity-security`
 - `identity-compat / identity-compat`
 - `frontend / frontend-quality (lint, prettier, tsc)`, `frontend / frontend-unit (ng test, Vitest)`, `frontend / frontend-build (ng build production)`, `frontend / frontend-image`, `frontend / frontend-e2e-identity (symfony)`, `frontend / frontend-e2e-identity (identity)`, `frontend / frontend-test-report`
@@ -62,7 +62,7 @@ Tous les déclencheurs PR et push passent par `ci.yml` (voir ci-dessus) ; la col
 
 | Workflow | Jobs | Déclencheurs |
 |---|---|---|
-| `identity-service.yml` | `identity-build` (`verify` : unitaires, ArchUnit, IT Testcontainers, JaCoCo), `identity-test-report` (publication JUnit, seul job avec `checks: write`, pas sur les PR de fork), `identity-quality` (`-Pquality`, puis `rewrite:dryRun` : échec si le patch n'est pas vide), `identity-sonar` (si `SONAR_TOKEN` + `SONAR_HOST_URL`), `identity-image` (`docker build`, sans push) | `ci.yml` : PR et push sur `main` touchant `services/**` |
+| `identity-service.yml` | `identity-build` (`verify` : unitaires, ArchUnit, IT Testcontainers, JaCoCo), `identity-test-report` (publication JUnit, seul job avec `checks: write`, pas sur les PR de fork), `identity-quality` (`-Pquality`, puis `rewrite:dryRun` : échec si le patch n'est pas vide), `identity-sonar` (si `SONAR_TOKEN` + `SONAR_HOST_URL`), `identity-image` (`docker build` sans push, puis analyse Trivy de la même image : voir « Analyse Trivy de l'image identity ») | `ci.yml` : PR et push sur `main` touchant `services/**` |
 | `identity-security.yml` | `identity-security` (OWASP Dependency-Check, CVSS ≥ 7 bloquant, cache NVD hebdomadaire, SARIF → onglet Security ; **échoue** si `NVD_API_KEY` est absent — dependency-check 13 ne tourne pas sans clé, donc aussi sur les PR de fork ; clé lue par `-DnvdApiKeyEnvironmentVariable=NVD_API_KEY`, jamais en ligne de commande) | `ci.yml` : PR touchant `services/**/pom.xml` ; autonome : lundi 05:00 UTC, manuel |
 | `identity-compat.yml` | `identity-compat` (stack compose complète + `-Pcompat` contre 8081 / 8082 / 8080) | `ci.yml` : PR touchant `services/identity-service/**`, `backend/**`, `docker-compose*.yml`, `docker/mariadb/**`, `frontend/nginx.conf`, `frontend/Dockerfile` |
 | `backend.yml` | `backend-phpunit` (PHPUnit sur `taskora_test`, JUnit en artefact) | `ci.yml` : PR touchant `backend/**`, `docker-compose.yml`, `docker/mariadb/**` |
@@ -76,6 +76,27 @@ OWASP : le rapport viendra du premier run GitHub Actions de `identity-security` 
 Profil `quality` : ne **jamais** exécuter de tests sur des classes compilées avec `-Pquality` (le Checker Framework y écrit `@Pure` dans le bytecode, ArchUnit échoue) ; les jobs `quality` et `security-scan` passent `-DskipTests -DskipITs` (`-DskipTests` seul ne saute pas Failsafe), et en local toujours `clean` entre un build `-Pquality` et un build de tests.
 Validation : `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667` (1.7.12, shellcheck inclus).
 SHA d'actions : vérifiés par `git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag> 'refs/tags/<tag>^{}'` (le SHA épinglé est celui du commit, donc la ligne `^{}` pour une étiquette annotée comme `dorny/test-reporter`).
+
+### Analyse Trivy de l'image identity (C-B1)
+Job `identity-image` (check `identity-service / identity-image (build, Trivy)`), donc à chaque run d'`identity-service` (PR et push sur `main` touchant `services/**`) et couvert par `ci-gate`.
+- **Outil** : binaire Trivy de l'image officielle `aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb` (index multi-architecture, identique sur `ghcr.io/aquasecurity/trivy:0.76.2`, utilisé en repli ; vérifié par `docker buildx imagetools inspect` sur les deux). Pas d'action `aquasecurity/trivy-action` (incident de compromission d'étiquettes ; l'image figée par digest est préférée). Mise à jour : nouvelle version, `docker buildx imagetools inspect aquasec/trivy:<version>`, puis `TRIVY_IMAGE_DIGEST` et `TRIVY_IMAGES` dans `identity-service.yml`.
+- **Cible** : l'image construite à l'étape précédente, passée en archive (`docker save` → `--input`) ; aucun socket Docker monté dans Trivy, aucun push. Trivy tourne avec l'UID du runner.
+- **Seuil bloquant** : `--severity HIGH,CRITICAL --ignore-unfixed`, `--scanners vuln --pkg-types os,library` (paquets Ubuntu et JAR Java), `--exit-code 1`. Une vulnérabilité sans correctif publié ne bloque pas.
+- **Bases** : `trivy-db` et `trivy-java-db` téléchargées à part (`--download-db-only`, `--download-java-db-only`) avec repli `mirror.gcr.io` puis `ghcr.io` (`TRIVY_DB_REPOSITORY`, `TRIVY_JAVA_DB_REPOSITORY`) et 3 tentatives ; l'analyse tourne ensuite avec `--skip-db-update --skip-java-db-update`. Base indisponible → job en échec (jamais d'analyse silencieuse sans base). Cache `actions/cache/restore` / `actions/cache/save` (même SHA que `actions/cache` v6.1.0), clé `trivy-db-<jour UTC>` avec repli `trivy-db-` ; Trivy ne retélécharge que si la base a dépassé sa date de mise à jour. Sauvegardé dès que les bases sont à jour, même si le seuil échoue.
+- **Rapport** : artefact `identity-image-trivy` (`trivy-identity-image.json` et `.txt` en tableau, 14 jours), publié après un contrôle de fuite (jeton `eyJ….eyJ…` ou clé privée PEM → rien n'est publié). Pas d'envoi SARIF : l'appel `identity-service` n'a donc pas `security-events: write` (seul `identity-security` l'a).
+- **Traiter un constat** :
+  1. paquet OS (Ubuntu) : rafraîchir le digest de `eclipse-temurin:25-jdk` / `25-jre` dans `services/identity-service/Dockerfile` (`docker buildx imagetools inspect`) dès qu'Adoptium a reconstruit l'étiquette ; sinon attendre cette reconstruction ;
+  2. bibliothèque Java : monter la version (BOM Spring Boot, propriété de version ou `<dependencyManagement>` dans `services/pom.xml`), puis relancer `identity-security` ;
+  3. en dernier recours, `services/identity-service/.trivyignore` (lu automatiquement s'il existe) : une ligne `CVE-AAAA-NNNNN exp:AAAA-MM-JJ` par exception, précédée d'un commentaire `#` donnant la justification (non exploitable, pas de correctif applicable…), avec une expiration courte (≤ 90 jours). Toute exception est revue par BackReviewer.
+- **Local** (même commande que la CI) :
+  ```bash
+  docker build -f services/identity-service/Dockerfile -t throwaway/identity:scan services/
+  mkdir -p /tmp/trivy/cache && docker save -o /tmp/trivy/identity.tar throwaway/identity:scan
+  docker run --rm --user "$(id -u):$(id -g)" -v /tmp/trivy/cache:/cache -v /tmp/trivy:/work -e TRIVY_CACHE_DIR=/cache \
+    aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb image --input /work/identity.tar \
+    --scanners vuln --pkg-types os,library --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+  docker image rm throwaway/identity:scan && rm -rf /tmp/trivy
+  ```
 
 ### Frontend : politique npm des scripts d'installation (m8)
 npm 11 (`packageManager: npm@11.19.1`) **bloque par défaut** les scripts `preinstall`/`install`/`postinstall` des dépendances et avertit pour chaque paquet non couvert par `package.json#allowScripts`.
@@ -124,7 +145,7 @@ Script idempotent exécuté en root : schéma `identity`, compte `identity` (dro
 - Corps plafonné à **64 Kio** sur `/api/auth/` et `/api/me` (A18, SC-IDENT-035) : au-delà, 413 `{"error":"Corps de requête trop volumineux."}` en JSON, y compris en `chunked` ; le reste de l'API garde 105 Mo (pièces jointes).
 
 ### Images épinglées par digest (m10)
-`mariadb`, `gotenberg`, `sonarqube` (compose) et `node`, `nginx` (`frontend/Dockerfile`) : `tag@sha256:…` (index multi-architecture). Mise à jour : `docker buildx imagetools inspect <image:tag>`. Restent sur étiquette : `eclipse-temurin` (`services/identity-service/Dockerfile`, BackCodeur), `dunglas/frankenphp` et `composer` (`backend/Dockerfile`), `docker pull mariadb:11.8` des workflows (pré-chargement Testcontainers, qui référence l'étiquette). `identity` : `mem_limit: 768m`, `pids_limit: 256`.
+`mariadb`, `gotenberg`, `sonarqube` (compose) et `node`, `nginx` (`frontend/Dockerfile`) : `tag@sha256:…` (index multi-architecture). Mise à jour : `docker buildx imagetools inspect <image:tag>`. `eclipse-temurin:25-jdk` / `25-jre` (`services/identity-service/Dockerfile`) aussi, contrôlés le 27/11/2026 (m6). Restent sur étiquette : `dunglas/frankenphp` et `composer` (`backend/Dockerfile`), `docker pull mariadb:11.8` des workflows (pré-chargement Testcontainers, qui référence l'étiquette). `identity` : `mem_limit: 768m`, `pids_limit: 256`.
 
 ### PHPUnit en local
 ```bash

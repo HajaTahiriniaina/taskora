@@ -66,7 +66,11 @@ public class UseCaseConfig {
 
   @Bean
   public PasswordHasherPort passwordHasher(IdentityProperties properties) {
-    return new SymfonyCompatiblePasswordHasher(properties.password().bcryptCost());
+    IdentityProperties.Password password = properties.password();
+    return switch (password.bcryptEngine()) {
+      case NATIVE -> SymfonyCompatiblePasswordHasher.withNativeEngine(password.bcryptCost());
+      case JAVA -> SymfonyCompatiblePasswordHasher.withJavaEngine(password.bcryptCost());
+    };
   }
 
   @Bean
