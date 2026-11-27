@@ -20,7 +20,9 @@ public interface OutboxPort {
    * Écrit une notification ({@code symfony-notifications}, {@code PENDING}) dans la transaction
    * courante.
    *
-   * @param notification notification composée
+   * @param notification notification composée, rattachée à un tableau
+   * @throws IllegalArgumentException si la notification ne cite aucun tableau (utiliser {@link
+   *     #append(NotificationRequested, BoardId)})
    */
   void append(NotificationRequested notification);
 

@@ -13,17 +13,24 @@ import java.util.List;
 
 /**
  * Relais de l'outbox (B-ADR-5 point 2) : lot réservé dans une transaction courte ({@code FOR UPDATE
- * SKIP LOCKED} et bail), puis livré hors transaction (aucun appel réseau pendant un verrou) ; deux
- * relais ne livrent donc jamais le même message en même temps ; 200 → livré ; 400, 401, 409 → échec
- * définitif ({@code ERROR}, sans boucle) ; 404, 5xx, délai → nouvel essai après 5 s, doublé à
- * chaque échec, plafonné à 5 min. Seuls les messages {@code PENDING} sont livrés ({@code HELD}
- * jamais).
+ * SKIP LOCKED} et bail de 30 s), puis livré hors transaction (aucun appel réseau pendant un
+ * verrou), au plus 25 s après la réservation ; deux relais ne livrent donc jamais le même message
+ * en même temps ; 200 → livré ; 400, 401, 409 → échec définitif ({@code ERROR}, sans boucle) ; 404,
+ * 5xx, délai → nouvel essai après 5 s, doublé à chaque échec, plafonné à 5 min. Seuls les messages
+ * {@code PENDING} sont livrés ({@code HELD} jamais).
  */
 public class OutboxDeliveryService implements DeliverPendingMessagesUseCase {
   static final Duration FIRST_DELAY = Duration.ofSeconds(5);
   static final Duration MAX_DELAY = Duration.ofMinutes(5);
   static final Duration RETENTION = Duration.ofDays(30);
   static final int STUCK_ATTEMPTS = 20;
+
+  /**
+   * Fenêtre de livraison d'un lot réservé, comptée depuis la réservation : nettement sous le bail
+   * de 30 s, pour qu'aucun message ne soit livré après que le bail a pu être repris par un autre
+   * relais (B-ADR-5 point 2).
+   */
+  static final Duration DELIVERY_WINDOW = Duration.ofSeconds(25);
 
   private static final System.Logger LOG = System.getLogger(OutboxDeliveryService.class.getName());
 
@@ -53,12 +60,27 @@ public class OutboxDeliveryService implements DeliverPendingMessagesUseCase {
 
   @Override
   public int deliverDue(int batchSize) {
-    Instant now = clock.instant();
-    List<PendingMessage> due = unitOfWork.inTransaction(() -> outbox.lockDue(now, batchSize));
+    Instant reservedAt = clock.instant();
+    List<PendingMessage> due =
+        unitOfWork.inTransaction(() -> outbox.lockDue(reservedAt, batchSize));
+    Instant deadline = reservedAt.plus(DELIVERY_WINDOW);
+    int processed = 0;
     for (PendingMessage message : due) {
-      deliver(message, clock.instant());
+      Instant now = clock.instant();
+      if (!now.isBefore(deadline)) {
+        // Les messages restants gardent leur bail : ils reviennent à son expiration, sans
+        // tentative ni erreur comptée.
+        LOG.log(
+            System.Logger.Level.WARNING,
+            "Lot d''outbox interrompu après {0} s : {1} message(s) repris à l''expiration du bail",
+            String.valueOf(DELIVERY_WINDOW.toSeconds()),
+            String.valueOf(due.size() - processed));
+        break;
+      }
+      deliver(message, now);
+      processed++;
     }
-    return due.size();
+    return processed;
   }
 
   @Override

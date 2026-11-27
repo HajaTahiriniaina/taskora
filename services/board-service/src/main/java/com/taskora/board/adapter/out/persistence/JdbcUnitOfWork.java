@@ -15,11 +15,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * d'attente de verrou (1205) ou une lecture verrouillante d'une ligne modifiée depuis l'instantané
  * (1020, {@code innodb_snapshot_isolation} actif par défaut depuis MariaDB 11.6) annule la
  * transaction ; le cas d'utilisation entier est rejoué dans une nouvelle transaction, au plus trois
- * fois, après 10 à 50 ms (B-ADR-4 point 4). Les effets externes ne partent qu'après validation
- * (outbox) : un rejeu n'en duplique aucun.
+ * fois (quatre exécutions au total), après 10 à 50 ms (B-ADR-4 point 4). Les effets externes ne
+ * partent qu'après validation (outbox) : un rejeu n'en duplique aucun.
  */
 public class JdbcUnitOfWork implements UnitOfWorkPort {
-  static final int MAX_ATTEMPTS = 3;
+  /** Rejeux au plus (B-ADR-4 point 4) : une exécution puis jusqu'à trois rejeux. */
+  static final int MAX_RETRIES = 3;
+
+  static final int MAX_ATTEMPTS = 1 + MAX_RETRIES;
   static final int MARIADB_DEADLOCK = 1213;
   static final int MARIADB_LOCK_WAIT_TIMEOUT = 1205;
   static final int MARIADB_RECORD_CHANGED = 1020;
@@ -47,13 +50,17 @@ public class JdbcUnitOfWork implements UnitOfWorkPort {
         return template.execute(status -> work.get());
       } catch (DataAccessException e) {
         if (!isLockConflict(e)) {
+          // Cause SQL journalisée ici (le gestionnaire HTTP n'écrit que la classe, sans message).
+          LOG.warn("Transaction annulée (non rejouable) : {}", sqlCause(e));
           throw e;
         }
         if (attempt >= MAX_ATTEMPTS) {
           onRetriesExhausted.run();
+          LOG.warn("Transaction abandonnée après {} rejeux : {}", MAX_RETRIES, sqlCause(e));
           throw e;
         }
-        LOG.debug("Transaction rejouée après un conflit de verrou (essai {})", attempt);
+        LOG.debug(
+            "Transaction rejouée après un conflit de verrou (essai {}) : {}", attempt, sqlCause(e));
         pause();
       }
     }
@@ -65,6 +72,21 @@ public class JdbcUnitOfWork implements UnitOfWorkPort {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+  }
+
+  /**
+   * Cause SQL sans message (qui pourrait citer des valeurs) : {@code SQLState} et code fournisseur.
+   *
+   * @param failure exception
+   * @return description sans donnée
+   */
+  static String sqlCause(Throwable failure) {
+    for (Throwable t = failure; t != null; t = t.getCause()) {
+      if (t instanceof SQLException sql) {
+        return "sqlState=" + sql.getSQLState() + ", errorCode=" + sql.getErrorCode();
+      }
+    }
+    return failure.getClass().getName();
   }
 
   /**

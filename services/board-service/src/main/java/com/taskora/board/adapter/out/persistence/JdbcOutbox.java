@@ -104,7 +104,13 @@ public class JdbcOutbox implements OutboxPort {
 
   @Override
   public void append(NotificationRequested notification) {
-    append(notification, notification.boardId() == null ? new BoardId(0) : notification.boardId());
+    BoardId board = notification.boardId();
+    if (board == null) {
+      // Sans tableau dans la charge (member_removed), le tableau est passé explicitement.
+      throw new IllegalArgumentException(
+          "Notification sans tableau : utiliser append(notification, tableau)");
+    }
+    append(notification, board);
   }
 
   @Override

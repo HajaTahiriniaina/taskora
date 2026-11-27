@@ -12,6 +12,7 @@ import com.taskora.board.domain.exception.TokenRejection;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
@@ -22,6 +23,16 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * {@code username}) est faite par le cas d'utilisation.
  */
 public class NimbusTokenVerifier implements TokenVerifierPort {
+  /**
+   * Grammaire de {@code is_numeric} en PHP 8 : espaces ASCII de tête et de fin, signe facultatif,
+   * décimal (partie entière ou fractionnaire), exposant facultatif ; rien d'autre.
+   */
+  private static final Pattern PHP_NUMERIC =
+      Pattern.compile(
+          "^[ \\t\\n\\r\\x0B\\f]*"
+              + "[+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?"
+              + "[ \\t\\n\\r\\x0B\\f]*$");
+
   private final RSASSAVerifier verifier;
   private final Clock clock;
 
@@ -82,16 +93,29 @@ public class NimbusTokenVerifier implements TokenVerifierPort {
     }
   }
 
-  /** Date numérique (nombre JSON seulement : {@code exp} numérique, A1) ; absente → null. */
+  /**
+   * Date numérique comme {@code lcobucci/jwt} ({@code Parser::convertDate}) : nombre JSON, ou
+   * chaîne conforme à {@code is_numeric} de PHP 8 ({@link #PHP_NUMERIC}) ; {@code NaN}, {@code
+   * Infinity}, hexadécimal, suffixe ({@code d}, {@code f}) et valeur non finie refusés ; absente →
+   * null (A1 point 3, §8.1, E14).
+   */
   private static @Nullable Double numericDate(Map<String, Object> claims, String name) {
     Object value = claims.get(name);
     if (value == null) {
       return null;
     }
+    double date;
     if (value instanceof Number number) {
-      return number.doubleValue();
+      date = number.doubleValue();
+    } else if (value instanceof String text && PHP_NUMERIC.matcher(text).matches()) {
+      date = Double.parseDouble(text.strip());
+    } else {
+      throw rejected(TokenRejection.INVALID);
     }
-    throw rejected(TokenRejection.INVALID);
+    if (!Double.isFinite(date)) {
+      throw rejected(TokenRejection.INVALID);
+    }
+    return date;
   }
 
   /** {@code uid} d'identity : entier positif, sinon jeton invalide ; absent (Symfony) → null. */
