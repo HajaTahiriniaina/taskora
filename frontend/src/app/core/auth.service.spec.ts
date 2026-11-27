@@ -112,4 +112,45 @@ describe('AuthService', () => {
     expect(auth.isLoggedIn()).toBe(true);
     http.verify();
   });
+
+  it('SC-IDENT-014 — refreshProfile : GET /api/me, profil reçu dans user() et taskora.user, jeton inchangé', () => {
+    const token = fakeToken(nowSeconds() + 3600);
+    localStorage.setItem('taskora.token', token);
+    localStorage.setItem('taskora.user', JSON.stringify(USER));
+    const { auth, http } = setup();
+    expect(auth.user(), 'profil lu dans localStorage au démarrage').toEqual(USER);
+
+    auth.refreshProfile();
+    const req = http.expectOne('/api/me');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.body).toBeNull();
+    // Profil renommé ailleurs : la réponse (schéma OpenAPI {id,name,email,avatarColor}) remplace tout.
+    const fresh: User = {
+      avatarColor: '#0ea5e9',
+      email: 'camille@example.com',
+      id: 7,
+      name: 'Camille Martin',
+    };
+    req.flush(fresh);
+
+    expect(auth.user()).toEqual(fresh);
+    expect(JSON.parse(localStorage.getItem('taskora.user') ?? 'null')).toEqual(fresh);
+    expect(localStorage.getItem('taskora.token'), 'jeton intact').toBe(token);
+    expect(auth.token()).toBe(token);
+    expect(auth.isLoggedIn()).toBe(true);
+    http.verify();
+  });
+
+  it('SC-IDENT-014 — refreshProfile sans profil stocké : le profil de GET /api/me est stocké', () => {
+    localStorage.setItem('taskora.token', fakeToken(nowSeconds() + 3600));
+    const { auth, http } = setup();
+    expect(auth.user()).toBeNull();
+
+    auth.refreshProfile();
+    http.expectOne({ method: 'GET', url: '/api/me' }).flush(USER);
+
+    expect(auth.user()).toEqual(USER);
+    expect(JSON.parse(localStorage.getItem('taskora.user') ?? 'null')).toEqual(USER);
+    http.verify();
+  });
 });

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, linkedSignal, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { ApiService } from '../../core/api.service';
@@ -9,15 +9,24 @@ import { ToastService } from '../../core/toast.service';
 import { AvatarComponent } from '../../shared/avatar.component';
 import { IconComponent } from '../../shared/icon.component';
 
+/**
+ * linkedSignal computation for a form field: follow the source unless the user has edited the
+ * field (value different from the previous source), so that a late profile refresh never
+ * overwrites a modification in progress.
+ */
+function keepEdit<T>(source: T, previous?: { source: T; value: T }): T {
+  return previous && previous.value !== previous.source ? previous.value : source;
+}
+
 @Component({
   selector: 'tk-profile',
   imports: [FormsModule, AvatarComponent, IconComponent],
   template: `
     <div class="wrap">
       <div class="hero">
-        <tk-avatar [user]="{ name: name || '?', avatarColor: color }" [size]="84" />
+        <tk-avatar [user]="{ name: name() || '?', avatarColor: color() }" [size]="84" />
         <div>
-          <h1>{{ name || 'Mon profil' }}</h1>
+          <h1>{{ name() || 'Mon profil' }}</h1>
           <p class="muted">{{ auth.user()?.email }}</p>
         </div>
       </div>
@@ -35,11 +44,11 @@ import { IconComponent } from '../../shared/icon.component';
               <button
                 type="button"
                 [style.background]="c"
-                [class.sel]="color === c"
-                (click)="color = c"
+                [class.sel]="color() === c"
+                (click)="color.set(c)"
                 [attr.aria-label]="c"
               >
-                @if (color === c) {
+                @if (color() === c) {
                   <tk-icon name="check" [size]="14" [stroke]="3" />
                 }
               </button>
@@ -299,8 +308,16 @@ export class ProfileComponent {
   private toast = inject(ToastService);
   auth = inject(AuthService);
   palette = PALETTE;
-  name = this.auth.user()?.name ?? '';
-  color = this.auth.user()?.avatarColor ?? PALETTE[6];
+  // Linked to auth.user(): the form follows refreshProfile() (GET /api/me) when it lands after
+  // the page opened (SC-IDENT-014). A value the user has already edited is kept (see keepEdit).
+  name = linkedSignal({
+    computation: keepEdit<string>,
+    source: () => this.auth.user()?.name ?? '',
+  });
+  color = linkedSignal({
+    computation: keepEdit<string>,
+    source: () => this.auth.user()?.avatarColor ?? PALETTE[6],
+  });
   // Signals: the zoneless view must refresh when savePassword() clears them (SC-IDENT-017).
   currentPassword = signal('');
   newPassword = signal('');
@@ -339,9 +356,13 @@ export class ProfileComponent {
 
   saveProfile() {
     this.saving.set(true);
-    this.api.updateMe({ name: this.name, avatarColor: this.color }).subscribe({
+    this.api.updateMe({ name: this.name(), avatarColor: this.color() }).subscribe({
       next: (u) => {
         this.auth.setUser(u);
+        // The saved profile is the reference again: show the name as stored by the API (trim,
+        // 120 max), even though the field held an edit (SC-IDENT-015).
+        this.name.set(u.name);
+        this.color.set(u.avatarColor);
         this.saving.set(false);
         this.toast.success('Profil mis à jour');
       },
