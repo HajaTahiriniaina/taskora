@@ -245,13 +245,14 @@ docker/mariadb/tools/taskora-schema.sh --output <chemin>   # autre destination (
 - La zone `board_service` de `changes` (§B1) est étendue à `^backend/migrations/` et `^docker/mariadb/` : une migration Doctrine relance le contrôle.
 - **Conséquence pour l'ordre de travail** : la migration `internal_event_receipt` (§4.2, BackCodeur) fera dériver le fichier. BackCodeur ne peut pas écrire dans `src/test/**`. BackTesteur régénère donc le fichier (une commande, commit `test(board): schéma taskora régénéré`) après le commit de BackCodeur. BackReviewer vérifie que le diff du fichier ne contient que la nouvelle table. Si BackAli préfère que ce fichier échappe à la règle des tests (il est entièrement déterminé et contrôlé par la CI), c'est à lui de trancher.
 
-**4. Chargement recommandé dans les IT** (vérifié à la main le 27/11/2026, avec le fichier généré et le script d'init de la branche) :
-- Conteneur : `MariaDBContainer` sur l'image `mariadb:11.8@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc` (digest de compose), commande `--character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci`.
+**4. Chargement recommandé dans les IT** (vérifié à la main le 27/11/2026, avec le fichier généré et le script d'init de la branche ; **corrigé le 27/11/2026** d'après BackTesteur, voir « Correctifs » ci-dessous) :
+- Conteneur : `MariaDBContainer` sur l'image `mariadb@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc` (**digest seul**, même digest que compose : Testcontainers refuse la forme « étiquette + digest » `mariadb:11.8@sha256:…`), commande `--character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci`.
 - Deux fichiers copiés dans `/docker-entrypoint-initdb.d/`, exécutés par l'entrypoint en root et dans l'ordre alphabétique :
   - `05-taskora-schema.sql` : `MountableFile.forClasspathResource("schema/taskora-schema.sql")` ;
   - `10-taskora-init.sh` : `MountableFile.forHostPath("../../docker/mariadb/initdb.d/10-taskora-init.sh", 0755)`. Le chemin est relatif au module : Failsafe s'exécute dans `services/board-service`.
 - Variables d'environnement du conteneur :
   - `MARIADB_DATABASE=taskora` ;
+  - `MARIADB_USER=taskora` et `MARIADB_PASSWORD` (valeur aléatoire) : le compte applicatif reçoit les droits sur `taskora_test`, comme dans compose ;
   - `MARIADB_ROOT_PASSWORD` (le script l'exige ; à fixer par `withEnv` si la version de Testcontainers ne le positionne pas) ;
   - `IDENTITY_DB_PASSWORD` et `BOARD_DB_PASSWORD` : valeurs aléatoires générées par le test ;
   - `BOARD_GRANT_COMMENT_FILES` : facultatif, défaut `off`.
@@ -261,6 +262,34 @@ docker/mariadb/tools/taskora-schema.sh --output <chemin>   # autre destination (
   - `ALTER TABLE card` → 1142, `SELECT password` → 1143, `INSERT` dans `notification` → 1142 ;
   - `CREATE TABLE` dans `board` accepté, mais `DROP TABLE` dans `board` → 1142, car §3 n'accorde pas `DROP`. Flyway `clean` est donc impossible (garder `cleanDisabled`) ; les IT ne doivent pas compter sur un `DROP` sous ce compte.
 - Variante plus légère : `withInitScript("schema/taskora-schema.sql")`. Le compte `board` doit alors être créé par le test, et ce n'est plus le script livré qui est vérifié.
+
+**Correctifs du 27/11/2026** (retour de BackTesteur, étape 1) :
+- Sans `MARIADB_USER`, le script d'init échouait : `GRANT ALL PRIVILEGES ON taskora_test.* TO 'taskora'@'%'` → erreur 1133 (compte inexistant), et le conteneur ne démarrait pas. Les IT fixent `MARIADB_USER=taskora` (`BoardDatabase`), ce qui suffit.
+- Le script est en outre rendu robuste : `10-taskora-init.sh` vérifie d'abord que `<MARIADB_USER>@%` existe (`mysql.user`) ; s'il est absent, il crée quand même `taskora_test`, saute seulement ce `GRANT` et l'écrit dans sa sortie (« compte taskora@% absent… »). Rien ne change quand le compte existe (compose, `db-init`, IT).
+- Vérifié sur MariaDB jetable (même digest, réseau `none`, aucun port, secrets éphémères non affichés, conteneurs supprimés), fichier de schéma en `05-` et script en `10-` dans `/docker-entrypoint-initdb.d/` :
+  - sans `MARIADB_USER` : init OK, 54 droits de table `board` sur `taskora`, 5 colonnes sur `user`, aucun droit sur `taskora_test` ;
+  - avec `MARIADB_USER=taskora` : init OK, mêmes droits `board`, droits de `taskora` sur `taskora_test` présents.
+- Image : `mariadb@sha256:e1d5…` (digest seul) dans les IT et pour le pré-tirage du job `board-build`.
+
+### Workflows board-service (§B2, réalisé le 27/11/2026, étape 4 de l'ordre de travail)
+Statut : **accepté** ; tests rouges jusqu'à l'étape 2 (BackCodeur), comme prévu (aucun `continue-on-error`, aucune exclusion).
+- `ci.yml` : zones `board_service` (§B1 + `backend/migrations/` et `docker/mariadb/`, §B6), `board_security`, `board_compat` ; `backend` + `docs/contracts/openapi/symfony.internal.yaml` ; `frontend` + `services/board-service/`. Sur push `main` : `board_security` et `board_compat` à `false`. Appels `board-service` (`SONAR_TOKEN`), `board-security` (`NVD_API_KEY`), `board-compat` (aucun secret), permissions de §B2 ; ajoutés aux `needs` de `ci-gate`.
+- `board-service.yml` :
+  - `board-build (verify)` : `docker/mariadb/tools/taskora-schema.sh --check` (dérive du schéma `taskora` → échec et diff), pré-tirage `mariadb@sha256:e1d5…`, puis `./mvnw -B -ntp -pl board-service -am verify` (tag `concurrency` inclus, `compat` exclu) ; artefact `board-test-reports` ;
+  - `board-test-report` (JUnit dans l'onglet Checks, seul job avec `checks: write`, pas sur les PR de fork) ;
+  - `board-quality (Spotless, Checkstyle, Nullness, OpenRewrite)` : `clean -Pquality verify -DskipTests -DskipITs`, puis `rewrite:dryRun` (patch non vide → échec) ; artefact `board-quality-reports` ;
+  - `board-sonar` : PR, si `SONAR_TOKEN` + `SONAR_HOST_URL` ; clé de projet = variable `SONAR_BOARD_PROJECT_KEY`, sinon `taskora-board-service` ; `SONAR_ORGANIZATION` partagée avec identity ;
+  - `board-image (build, Trivy)` : `docker build -f services/board-service/Dockerfile services/` puis Trivy identique à `identity-image` (même digest, mêmes options, `services/board-service/.trivyignore` s'il existe) ; artefact `board-image-trivy`. Rouge tant que le `Dockerfile` n'existe pas (étape 2).
+- `board-security.yml` : `board-security` (`-Psecurity-scan verify -DskipTests -DskipITs -DnvdApiKeyEnvironmentVariable=NVD_API_KEY`, CVSS ≥ 7 bloquant, échec explicite sans `NVD_API_KEY`, SARIF catégorie `owasp-dependency-check-board`) ; autonome le lundi 05:30 UTC et manuel ; concurrence `board-security-<ref>` ; artefact `board-dependency-check`.
+- `board-compat.yml` : stack `-p taskora-ci-board`, profil `board` + `docker-compose.board-dev.yml`, tous les ports sur `127.0.0.1`, `BOARD_ROUTING_MARKER=on` ; neuf secrets éphémères (`openssl rand -hex 32`, masqués, échec si deux coïncident) dont les trois secrets internes U12, exportés dans l'environnement du job (lus par les tests compat) ; puis :
+  1. `verify -Pcompat` contre 8081 / 8083 / 8080 avec T1 sur Symfony (miroir, matrice d'accès, écritures et claim croisés, routage) ;
+  2. bascule `BOARD_T1_UPSTREAM=board:8080` par `up -d --no-build --no-deps web`, `RoutingCompatTest` seul (`-Dcompat.board.t1=board`) ;
+  3. retour `api:80`, `RoutingCompatTest` seul (`-Dcompat.board.t1=api`) ; suffixes de rapport distincts ;
+  4. contrôle de fuite **toujours exécuté et bloquant** (neuf secrets, jeton `eyJ….eyJ…`, `@exemple.test` dans une ligne `INFO` de `board`), journaux publiés seulement en cas d'échec et s'ils sont propres (`board-compat-compose-logs`) ; rapports `board-compat-reports` ; `down -v --remove-orphans` toujours.
+  - Écart : `identity` n'est pas démarré (aucun test compat de board ne passe par lui ; `identity-compat` le couvre).
+- `backend.yml` / `backend-phpunit` : inchangé, sauf `unset INTERNAL_SECRET_BOARD_TO_SYMFONY` à côté de `unset INTERNAL_API_SECRET` (§B3.5 bis : compose définit la variable, vide en CI, ce qui masquerait la valeur factice de `backend/.env.test`).
+- `frontend-e2e-board` : en attente de FrontPierre (§6.3 de l'ordre de travail).
+- Vérifications : `actionlint` (1.7.12, digest du README) sans erreur ; `docker compose config -q` (env-file vide, `-p taskora-ci-board`) sans profil, `board`, `identity`+`board` ; `taskora-schema.sh --check` à 0 (12 migrations, ~15 s) ; build Maven `-pl board-service -am verify -DskipTests -DskipITs -Djacoco.skip=true` dans `eclipse-temurin:25-jdk` (dépôt Maven jetable) : compilation principale et de test OK.
 
 ### Stack board-service (§B3, réalisé le 27/11/2026, étape 0 de l'ordre de travail)
 - `docker-compose.yml` :

@@ -1,0 +1,321 @@
+# board-service : schéma taskora des IT, build/tests, qualité, Sonar, image
+# (docs/ci/requests/backend.md, partie board-service §B2 et §B6 ; ordre de travail phase 3 §6.2).
+name: board-service
+
+# Appelé par ci.yml (concurrence gérée par l'appelant), zone « board_service » du job « changes » :
+# services/board-service/**, services/pom.xml, services/config/**, services/.mvn/**, services/mvnw*,
+# backend/migrations/** et docker/mariadb/** (schéma taskora des IT, script d'init), ce fichier ;
+# PR et push sur main.
+on:
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        description: "Jeton Sonar (facultatif : board-sonar est ignoré s'il manque)"
+        required: false
+
+permissions: {}
+
+defaults:
+  run:
+    working-directory: services
+
+jobs:
+  board-build:
+    name: board-build (verify)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: services/**/pom.xml
+      # §B6 : le schéma taskora des IT (src/test/resources/schema/taskora-schema.sql) doit être
+      # exactement celui des migrations Doctrine de backend/migrations. Code 1 + diff si dérive :
+      # régénérer avec docker/mariadb/tools/taskora-schema.sh (BackTesteur) puis commiter.
+      - name: Schéma taskora des IT à jour (migrations Doctrine)
+        working-directory: .
+        run: docker/mariadb/tools/taskora-schema.sh --check
+      # Image des IT : digest seul (Testcontainers refuse « étiquette@digest »), même digest que compose.
+      - name: Pré-tirer l'image Testcontainers
+        run: docker pull "$BOARD_IT_MARIADB_IMAGE"
+        env:
+          BOARD_IT_MARIADB_IMAGE: mariadb@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
+      # Tag concurrency inclus (IT de concurrence) ; compat exclu (exige la stack : board-compat).
+      - name: Unitaires, ArchUnit, intégration (Testcontainers), concurrence, JaCoCo
+        run: ./mvnw -B -ntp -pl board-service -am verify
+      - name: Rapports JUnit et couverture
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: board-test-reports
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            services/board-service/target/surefire-reports/
+            services/board-service/target/failsafe-reports/
+            services/board-service/target/site/jacoco/
+
+  # Publication des résultats JUnit dans l'onglet Checks : seul job avec checks: write,
+  # ignoré pour les PR venant d'un fork (jeton en lecture seule).
+  board-test-report:
+    needs: board-build
+    if: >-
+      always() && needs.board-build.result != 'skipped' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+    steps:
+      # dorny/test-reporter lists the repository files (git ls-files) to link test results to sources.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: board-test-reports
+          path: reports
+      - uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a # v3.2.0
+        with:
+          name: board-service tests
+          path: "reports/**/TEST-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+          fail-on-empty: false
+
+  board-quality:
+    name: board-quality (Spotless, Checkstyle, Nullness, OpenRewrite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: services/**/pom.xml
+      - name: Profil quality
+        # -DskipITs : -DskipTests ne saute pas Failsafe ici, et les classes compilées en -Pquality
+        # (@Pure du Checker Framework) font échouer ArchUnit. Ne jamais tester ces classes (A12) :
+        # « clean » d'abord, la demande §B2 l'exige.
+        run: ./mvnw -B -ntp -pl board-service -am clean -Pquality verify -DskipTests -DskipITs
+      - name: OpenRewrite (dryRun, patch vide attendu)
+        run: |
+          ./mvnw -B -ntp -pl board-service rewrite:dryRun
+          patch=board-service/target/rewrite/rewrite.patch
+          if [ -s "$patch" ]; then
+            echo "::error::OpenRewrite propose des changements (voir l'artefact board-quality-reports)"
+            exit 1
+          fi
+      - name: Rapports qualité
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: board-quality-reports
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            services/board-service/target/checkstyle-result.xml
+            services/board-service/target/rewrite/rewrite.patch
+
+  # Actif seulement si le secret SONAR_TOKEN et la variable de dépôt SONAR_HOST_URL existent
+  # (absents pour les PR de fork : le job passe en « ignoré » sans échouer).
+  board-sonar:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      # SonarQube Cloud seulement (facultatifs pour un serveur SonarQube auto-hébergé).
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      # Projet Sonar distinct d'identity (§B2) : variable SONAR_BOARD_PROJECT_KEY, sinon taskora-board-service.
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_BOARD_PROJECT_KEY || 'taskora-board-service' }}
+    steps:
+      - name: Sonar configuré ?
+        id: cfg
+        working-directory: .
+        run: |
+          if [ -n "$SONAR_TOKEN" ] && [ -n "$SONAR_HOST_URL" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Analyse Sonar ignorée : SONAR_TOKEN (secret) ou SONAR_HOST_URL (variable) absent."
+          fi
+      - if: steps.cfg.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - if: steps.cfg.outputs.enabled == 'true'
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: services/**/pom.xml
+      - if: steps.cfg.outputs.enabled == 'true'
+        run: docker pull mariadb@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
+      # Le jeton est lu par le plugin dans la variable d'environnement SONAR_TOKEN.
+      - if: steps.cfg.outputs.enabled == 'true'
+        name: Analyse Sonar (quality gate attendu)
+        run: |
+          args=(-Dsonar.host.url="$SONAR_HOST_URL" -Dsonar.qualitygate.wait=true)
+          if [ -n "$SONAR_ORGANIZATION" ]; then args+=(-Dsonar.organization="$SONAR_ORGANIZATION"); fi
+          args+=(-Dsonar.projectKey="$SONAR_PROJECT_KEY")
+          ./mvnw -B -ntp -pl board-service -am verify sonar:sonar "${args[@]}"
+
+  # Build puis analyse Trivy de la même image (C-B1), sans push. Trivy tourne depuis son image
+  # officielle figée par digest (pas d'action tierce) et lit l'image en archive (docker save) :
+  # pas de socket Docker monté. Bloquant : HIGH/CRITICAL avec correctif disponible, OS et Java.
+  board-image:
+    name: board-image (build, Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # aquasec/trivy:0.76.2 ; même index multi-architecture sur Docker Hub et sur GHCR
+      # (vérifié par docker buildx imagetools inspect sur les deux).
+      TRIVY_IMAGE_DIGEST: sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+      TRIVY_IMAGES: docker.io/aquasec/trivy:0.76.2 ghcr.io/aquasecurity/trivy:0.76.2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Build seulement : aucune publication de registre sans accord de l'utilisateur.
+      - name: docker build
+        working-directory: .
+        run: docker build -f services/board-service/Dockerfile -t taskora/board-service:ci services/
+      - name: Archive de l'image et image Trivy (figée par digest)
+        working-directory: .
+        run: |
+          TRIVY_WORK="$RUNNER_TEMP/trivy"
+          TRIVY_CACHE="$RUNNER_TEMP/trivy-cache"
+          echo "TRIVY_WORK=$TRIVY_WORK" >> "$GITHUB_ENV"
+          echo "TRIVY_CACHE=$TRIVY_CACHE" >> "$GITHUB_ENV"
+          mkdir -p "$TRIVY_WORK" "$TRIVY_CACHE"
+          docker save -o "$TRIVY_WORK/board-image.tar" taskora/board-service:ci
+          for attempt in 1 2 3; do
+            for ref in $TRIVY_IMAGES; do
+              if docker pull -q "$ref@$TRIVY_IMAGE_DIGEST"; then
+                echo "TRIVY_REF=$ref@$TRIVY_IMAGE_DIGEST" >> "$GITHUB_ENV"
+                exit 0
+              fi
+            done
+            sleep $((attempt * 15))
+          done
+          echo "::error::Image Trivy introuvable (Docker Hub et GHCR)."
+          exit 1
+      - name: Jour (clé de cache Trivy)
+        id: day
+        working-directory: .
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      - name: Cache des bases Trivy (restauration)
+        id: trivy-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ steps.day.outputs.day }}
+          restore-keys: trivy-db-
+      # Base mise à jour si le cache a plus de 6 h (métadonnées Trivy). Dépôts de repli dans l'ordre,
+      # trois tentatives : un échec de téléchargement fait échouer le job (pas d'analyse sur une base périmée).
+      - name: Bases Trivy (vulnérabilités, Java)
+        id: trivy-db
+        working-directory: .
+        run: |
+          trivy() {
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$TRIVY_CACHE":/cache -v "$TRIVY_WORK":/work -v "$GITHUB_WORKSPACE":/repo:ro \
+              -e TRIVY_CACHE_DIR=/cache -e TRIVY_NO_PROGRESS=true \
+              -e TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2 \
+              -e TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1 \
+              "$TRIVY_REF" "$@"
+          }
+          for db in --download-db-only --download-java-db-only; do
+            ok=false
+            for attempt in 1 2 3; do
+              if trivy image "$db"; then ok=true; break; fi
+              echo "::warning::trivy image $db : tentative $attempt en échec."
+              sleep $((attempt * 20))
+            done
+            [ "$ok" = true ] || { echo "::error::Base Trivy indisponible ($db)."; exit 1; }
+          done
+      # Seuil : HIGH/CRITICAL corrigeables (--ignore-unfixed), paquets OS et bibliothèques Java.
+      # Exceptions : services/board-service/.trivyignore (justification et « exp: », docs/ci/README.md).
+      - name: Trivy (HIGH/CRITICAL corrigeables bloquants)
+        working-directory: .
+        run: |
+          ignore=()
+          if [ -f services/board-service/.trivyignore ]; then
+            ignore=(--ignorefile /repo/services/board-service/.trivyignore)
+          else
+            ignore=(--ignorefile "")
+          fi
+          set +e
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$TRIVY_CACHE":/cache -v "$TRIVY_WORK":/work -v "$GITHUB_WORKSPACE":/repo:ro \
+            -e TRIVY_CACHE_DIR=/cache -e TRIVY_NO_PROGRESS=true \
+            "$TRIVY_REF" image --input /work/board-image.tar \
+            --scanners vuln --pkg-types os,library \
+            --severity HIGH,CRITICAL --ignore-unfixed "${ignore[@]}" \
+            --skip-db-update --skip-java-db-update \
+            --format json --output /work/trivy-board-image.json --exit-code 1
+          status=$?
+          set -e
+          if [ -s "$TRIVY_WORK/trivy-board-image.json" ]; then
+            docker run --rm --user "$(id -u):$(id -g)" -v "$TRIVY_WORK":/work -e TRIVY_CACHE_DIR=/tmp \
+              "$TRIVY_REF" convert --scanners vuln --format table --output /work/trivy-board-image.txt /work/trivy-board-image.json
+            cat "$TRIVY_WORK/trivy-board-image.txt"
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::error::Trivy : vulnérabilité HIGH/CRITICAL corrigeable dans l'image board-service (code $status, voir l'artefact board-image-trivy)."
+          fi
+          exit "$status"
+      - name: Cache des bases Trivy (sauvegarde)
+        if: always() && steps.trivy-db.outcome == 'success' && steps.trivy-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ steps.day.outputs.day }}
+      # Les rapports ne contiennent que des métadonnées de paquets ; contrôle de fuite par principe
+      # (même motif que frontend.yml) avant toute publication.
+      - name: Contrôle de fuite du rapport Trivy
+        id: scan-report
+        if: always()
+        working-directory: .
+        run: |
+          rm -f "$TRIVY_WORK/board-image.tar"
+          if grep -rqaE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----' "$TRIVY_WORK"; then
+            rm -rf "$TRIVY_WORK"
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Le rapport Trivy contient un jeton ou une clé privée : non publié."
+            exit 1
+          fi
+          echo "clean=true" >> "$GITHUB_OUTPUT"
+      - name: Rapport Trivy
+        if: always() && steps.scan-report.outputs.clean == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: board-image-trivy
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/trivy/trivy-board-image.json
+            ${{ runner.temp }}/trivy/trivy-board-image.txt
