@@ -12,11 +12,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -82,6 +84,9 @@ class BoardMirrorCompatibilityTest {
           "{\"role\":\"admin\"}",
           "{\"role\":\"owner\"}");
 
+  /** Horodatage ATOM en tête de chaîne (même motif que l'ancienne normalisation textuelle). */
+  private static final Pattern ATOM_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T.");
+
   static Account alice;
   static Account bob;
   static Account carla;
@@ -139,20 +144,56 @@ class BoardMirrorCompatibilityTest {
     assertThat(json(b)).as("%s %s : corps", method, path).isEqualTo(json(s));
   }
 
-  /** Remplace les identifiants des jumeaux et les horodatages par des marqueurs. */
-  private static JsonNode normalized(JsonNode n, int twinId) {
+  /**
+   * Normalisation structurelle (C3) : copie profonde ; seul l'{@code id} entier de la racine égal à
+   * l'identifiant du jumeau devient {@code "<jumeau>"} (aucun {@code id} imbriqué touché : un
+   * utilisateur peut avoir le même identifiant que le tableau) ; horodatages ATOM → {@code
+   * "<date>"} ; {@code id} des listes, étiquettes et invitations mis à zéro.
+   */
+  static JsonNode normalized(JsonNode n, int twinId) {
     if (n == null) {
       return null;
     }
-    String text = n.toString().replaceAll("\"id\":" + twinId + "(?=[,}])", "\"id\":\"<jumeau>\"");
-    JsonNode out =
-        CompatStack.JSON.readTree(text.replaceAll("\"\\d{4}-\\d{2}-\\d{2}T[^\"]+\"", "\"<date>\""));
+    JsonNode out = n.deepCopy();
+    replaceDates(out);
+    if (out instanceof ObjectNode root) {
+      JsonNode id = root.get("id");
+      if (id != null && id.isIntegralNumber() && id.asInt() == twinId) {
+        root.put("id", "<jumeau>");
+      }
+    }
     if (out instanceof ObjectNode o && o.has("lists")) {
       o.get("lists").forEach(l -> ((ObjectNode) l).put("id", 0));
       o.get("labels").forEach(l -> ((ObjectNode) l).put("id", 0));
       o.get("invitations").forEach(l -> ((ObjectNode) l).put("id", 0));
     }
     return out;
+  }
+
+  /** Remplace, à toute profondeur, les chaînes commençant par une date ATOM par "<date>". */
+  private static void replaceDates(JsonNode n) {
+    if (n instanceof ObjectNode o) {
+      for (String name : List.copyOf(o.propertyNames())) {
+        JsonNode child = o.get(name);
+        if (isAtomDate(child)) {
+          o.put(name, "<date>");
+        } else {
+          replaceDates(child);
+        }
+      }
+    } else if (n instanceof ArrayNode a) {
+      for (int i = 0; i < a.size(); i++) {
+        if (isAtomDate(a.get(i))) {
+          a.set(i, "<date>");
+        } else {
+          replaceDates(a.get(i));
+        }
+      }
+    }
+  }
+
+  private static boolean isAtomDate(JsonNode n) {
+    return n != null && n.isString() && ATOM_DATE.matcher(n.asString()).lookingAt();
   }
 
   /** Même écriture sur deux jumeaux (un par amont) : statuts et JSON normalisés identiques. */

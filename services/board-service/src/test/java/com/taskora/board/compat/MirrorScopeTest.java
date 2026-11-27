@@ -44,6 +44,21 @@ class MirrorScopeTest {
   }
 
   @Test
+  @DisplayName(
+      "C3 — normalisation des jumeaux : seul l'id racine est remplacé, aucun id imbriqué touché")
+  void normalizedTouchesOnlyRootId() {
+    JsonMapper json = JsonMapper.builder().build();
+    JsonNode board =
+        BoardMirrorCompatibilityTest.normalized(
+            json.readTree("{\"id\":7,\"members\":[{\"id\":7},{\"id\":8}]}"), 7);
+    assertThat(board.get("id").asString()).isEqualTo("<jumeau>");
+    assertThat(board.get("members").get(0).get("id").asInt()).isEqualTo(7);
+    assertThat(board.get("members").get(1).get("id").asInt()).isEqualTo(8);
+    JsonNode added = json.readTree("{\"status\":\"added\",\"member\":{\"id\":7}}");
+    assertThat(BoardMirrorCompatibilityTest.normalized(added, 7)).isEqualTo(added);
+  }
+
+  @Test
   @DisplayName("U13, E22, E23 — les corps du miroir sont des objets aux types conformes")
   void mirrorBodiesAvoidDivergences() {
     JsonMapper json = JsonMapper.builder().build();
