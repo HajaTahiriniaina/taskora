@@ -6,23 +6,25 @@ Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape
 - Les scénarios critiques doivent tous être `validé` avant la bascule du service concerné.
 - Lignes front de SC-IDENT-001, 002, 003, 007, 008, 017, 018, 025 et 026 : fichiers et titres **prévus** par l'ordre de travail `phase-2-frontend-identity-workorder.md` (FrontPierre, 26/11/2026). Le Testeur les confirme ou les corrige à son commit `test(front): …`. Confirmés par FrontTesteur (T2) ; seuls les tests paramétrés de `navigation-guards.spec.ts` ajoutent un suffixe `[<url>]` ou `[<cas>]`. Validées par Paul le 26/11/2026 (`docs/reviews/2026-11-26-frontend-identity-validation-paul.md`) : ces lignes front passent à `validé`. Les lignes back IDENT restent `vert` jusqu'à la répétition du retour arrière (`docs/reviews/2026-11-26-identity-service-validation-paul.md` §3 et §5). Répétition déclarée réussie le 27/11/2026 (décision de l'utilisateur sur R8, `docs/reviews/2026-11-27-identity-phase1-exit-paul.md`) : les lignes back IDENT passent à `validé` ; la ligne PERF-IDENT-1 garde L1–L4 de bout en bout en suivi post-bascule.
 
-## Synthèse au 26/11/2026
+- Phase 3 (board-service, 27/11/2026) : 46 scénarios ajoutés par `phase-3-board-service.md` §7 (SC-BOARD-020 à 035, SC-LIST-011 à 014, SC-CARD-032 à 047, SC-ACTIVITY-008, SC-COMMENT-013 à 016, SC-TRASH-011 à 015). La colonne « Type de test prévu » indique la tranche (T0 à T5). Pour board-service, l'attendu « 403 » des non-membres des scénarios existants devient 404 (décision E1, surcharges listées au §5.5 de ce document). Les scénarios marqués « selon E… » attendent la décision de l'utilisateur (§6.2) avant leur test.
+
+## Synthèse au 27/11/2026
 
 | Domaine | Fichier | Scénarios | Critiques | Importants | Secondaires | Statut |
 |---|---|---|---|---|---|---|
 | IDENT | identity.md | 36 | 14 | 15 | 7 | back : `validé` (27/11/2026, répétition du retour arrière réussie, sortie de phase 1) ; PERF-IDENT-1 L1–L4 : suivi post-bascule ; front : `validé` pour 001, 002, 003, 007, 008, 017, 018, 025, 026 ; à écrire pour 005, 014, 015, 016 |
-| BOARD | boards-members.md | 19 | 10 | 6 | 3 | à écrire |
-| LIST | lists.md | 10 | 5 | 3 | 2 | à écrire |
-| CARD | cards.md | 31 | 13 | 13 | 5 | à écrire |
-| COMMENT | comments-mentions.md | 12 | 5 | 4 | 3 | à écrire |
-| ACTIVITY | activity.md | 7 | 3 | 3 | 1 | à écrire |
+| BOARD | boards-members.md (001–019), phase-3-board-service.md (020–035) | 35 | 20 | 12 | 3 | à écrire |
+| LIST | lists.md (001–010), phase-3-board-service.md (011–014) | 14 | 5 | 5 | 4 | à écrire |
+| CARD | cards.md (001–031), phase-3-board-service.md (032–047) | 47 | 20 | 20 | 7 | à écrire |
+| COMMENT | comments-mentions.md (001–012), phase-3-board-service.md (013–016) | 16 | 8 | 5 | 3 | à écrire |
+| ACTIVITY | activity.md (001–007), phase-3-board-service.md (008) | 8 | 3 | 4 | 1 | à écrire |
 | ARCHIVE | archives-trash.md | 7 | 3 | 3 | 1 | à écrire |
-| TRASH | archives-trash.md | 10 | 8 | 1 | 1 | à écrire |
+| TRASH | archives-trash.md (001–010), phase-3-board-service.md (011–015) | 15 | 10 | 3 | 2 | à écrire |
 | ATTACH | attachments.md | 17 | 7 | 9 | 1 | à écrire |
 | NOTIF | notifications-push.md | 7 | 3 | 3 | 1 | à écrire |
 | PUSH | notifications-push.md | 10 | 5 | 5 | 0 | à écrire |
 | IMPORT | trello-import.md | 16 | 9 | 6 | 1 | à écrire |
-| **Total** | | **182** | **85** | **71** | **26** | |
+| **Total** | | **228** | **107** | **90** | **31** | |
 
 ## Matrice détaillée
 
@@ -128,6 +130,32 @@ Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape
 | SC-BOARD-017 | Concurrence sur les adhésions | important | board-service | intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-BOARD-018 | Invitations visibles par tous les membres | secondaire | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-BOARD-019 | Recherche locale de l'accueil | secondaire | board-service | composant, e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-020 | Jetons d'identity et de Symfony acceptés | critique | board-service | phase 3 T0 : unitaire (résolution), sécurité, compatibilité (corps 401) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-021 | Non-membre : réponse indiscernable d'une ressource inexistante | critique | board-service | phase 3 T0 : sécurité (matrice route × rôle depuis le contrat), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | PHPUnit `BoardAccess` en 404 (si U8-a) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-022 | Routage par tranche et retour arrière | critique | board-service | phase 3 T0 : routage nginx (requêtes marquées), recette | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e `@board` sur les deux amonts | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-023 | Écritures croisées sur les tables partagées | critique | board-service | phase 3 T0 : intégration (deux backends, même base), compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e accueil → tableau → carte sur amonts mixtes | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-024 | Format des erreurs, corps vide et identifiants non numériques | important | board-service | phase 3 T0 : API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-025 | Notifications produites par board-service et livrées par l'outbox | critique | board-service | phase 3 T0 : intégration (outbox, WireMock, rejeu) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | PHPUnit `POST /internal/notifications` (idempotence, secret, acteur exclu) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-026 | Journaux sans données personnelles ni secrets, aucune 5xx | important | board-service | phase 3 T0 : sécurité (journaux capturés) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | recette (analyse des journaux) | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| SC-BOARD-027 | Profil utilisateur à jour dans les tableaux | important | board-service | phase 3 T0 : intégration (projection `taskora.user`) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-028 | Dates écrites comme PHP | critique | board-service | phase 3 T0 : intégration (horloge injectée), compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-029 | Accueil et coquille identiques à Symfony | critique | board-service | phase 3 T1 : compatibilité, intégration (compteur de requêtes SQL) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e accueil et page Tableau sur les deux amonts | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-030 | Consommation des invitations servie par board-service | critique | board-service | phase 3 T1 : API, intégration (contrat interne identique, rejeu croisé) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e inscription d'un invité (SC-IDENT-005) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-031 | Invitations : normalisation, collation et concurrence | important | board-service | phase 3 T1 : intégration (concurrence), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-032 | Propriétaire unique : jamais de tableau sans gestionnaire | critique | board-service | phase 3 T1 : unitaire (domaine), API, intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e onglet Membres (actions masquées pour le propriétaire) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-033 | Retrait d'un membre pendant qu'il travaille | important | board-service | phase 3 T1 : intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e (toast puis retour à l'accueil) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-034 | Corbeille transitive cohérente entre les deux backends | critique | board-service | phase 3 T1 : intégration, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e corbeille de l'accueil | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-BOARD-035 | Pas d'énumération des comptes par les routes de membres | important | board-service | phase 3 T1 : sécurité, API (selon E28) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-LIST-001 | Créer une liste | critique | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | ↳ |  |  |  | e2e « Ajouter une liste » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-LIST-002 | Renommer et colorer une liste | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
@@ -143,6 +171,10 @@ Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape
 | SC-LIST-008 | Accès d'un non-membre | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-LIST-009 | Virtualisation et chargement paresseux | important | board-service | e2e (mesure du DOM et des requêtes) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-LIST-010 | Sélecteur de colonnes | secondaire | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-011 | Réordonnancement : entrées invalides et concurrence | important | board-service | phase 3 T2 : unitaire, intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-012 | Créations concurrentes de listes | secondaire | board-service | phase 3 T2 : intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-013 | Archiver ou mettre à la corbeille une liste pendant un déplacement de carte | important | board-service | phase 3 T2 : intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-LIST-014 | Pagination stable avec des positions à égalité | secondaire | board-service | phase 3 T2 : intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-CARD-001 | Créer une carte | critique | board-service | unitaire, API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | ↳ |  |  |  | e2e « Ajouter une carte » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-CARD-002 | Numéros uniques sous concurrence | critique | board-service | intégration (concurrence, MariaDB réel) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
@@ -194,6 +226,26 @@ Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape
 | SC-CARD-029 | Masquer les numéros | secondaire | board-service | e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-CARD-030 | Accès d'un non-membre aux cartes | critique | board-service | sécurité (matrice) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-CARD-031 | Identifiant non numérique | secondaire | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-032 | Numérotation partagée et continuité après import | critique | board-service | phase 3 T2 : intégration (deux backends, MariaDB réel) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-033 | Positions contiguës sous opérations concurrentes mixtes | critique | board-service | phase 3 T2 : intégration (concurrence, `verify`) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-034 | Déplacements croisés sans interblocage visible | important | board-service | phase 3 T2 : intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-035 | Restaurations concurrentes en bas de liste | important | board-service | phase 3 T2 : intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-036 | Déplacement vers une liste d'un autre tableau ou inaccessible | important | board-service | phase 3 T2 : sécurité, API (selon E27) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-037 | Couverture image : miniature déléguée à Symfony | important | board-service | phase 3 T2 : intégration (WireMock), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | PHPUnit `POST /internal/attachments/{id}/thumbnail` | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e menu Couverture | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-038 | Notifications des cartes via l'outbox | critique | board-service | phase 3 T2 : intégration (outbox, WireMock) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-039 | Fiche carte : données des autres domaines | important | board-service | phase 3 T2 : compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-040 | Filtres : parité exacte avec Symfony | critique | board-service | phase 3 T2 : compatibilité (oracle), intégration, sécurité (injection) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-041 | Nettoyage HTML de la description : parité | critique | board-service | phase 3 T2 : unitaire (corpus partagé), compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | composant `rich-view` sur les sorties de board-service | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-042 | Échéance : l'instant choisi est conservé | critique | board-service | phase 3 T2 : unitaire, intégration, compatibilité (selon E31) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | e2e sélecteur de date (valeur identique après rechargement) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-043 | Types des champs JSON | important | board-service | phase 3 T2 : API (tests paramétrés, selon E22 et E23) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-044 | Encodage des valeurs de champs compatible | critique | board-service | phase 3 T3 : unitaire (encodeur), intégration, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-045 | Supprimer une étiquette ou un champ pendant qu'une carte l'utilise | important | board-service | phase 3 T3 : intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-046 | Positions de checklist et de champs | secondaire | board-service | phase 3 T3 : API (selon E25) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-CARD-047 | Historique des champs inchangés | secondaire | board-service | phase 3 T3 : API (selon E26) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-COMMENT-001 | Commenter une carte | critique | board-service | API, intégration (notifications) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | ↳ |  |  |  | e2e fiche carte (⌘/Ctrl + Entrée pour envoyer) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-COMMENT-002 | Commentaire vide | important | board-service | unitaire (nettoyage), API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
@@ -212,6 +264,10 @@ Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape
 | ↳ |  |  |  | composant | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-COMMENT-011 | Contenus hérités en Markdown | secondaire | board-service | composant, e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-COMMENT-012 | Longueur maximale | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-013 | Un commentaire et ses fichiers, tout ou rien | critique | board-service | phase 3 T4 : intégration (panne injectée), API, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-014 | Nettoyage HTML des commentaires : parité | critique | board-service | phase 3 T4 : unitaire, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-015 | Notifications de commentaire et de mention via l'outbox | critique | board-service | phase 3 T4 : unitaire (extraction), intégration (outbox) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-COMMENT-016 | Supprimer un commentaire : droits et fichiers | important | board-service | phase 3 T4 : API, sécurité (selon E2) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-ACTIVITY-001 | Journal des modifications d'une carte | critique | board-service | unitaire (calcul du différentiel), intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-ACTIVITY-002 | Couverture : entrées exclusives | important | board-service | unitaire | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-ACTIVITY-003 | Pagination par curseur | critique | board-service | API, intégration, sécurité (IDOR) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
@@ -221,6 +277,7 @@ Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape
 | SC-ACTIVITY-005 | Fil mixte et « Masquer les détails » | important | board-service | composant, e2e | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-ACTIVITY-006 | Textes d'activité en français | secondaire | board-service | unitaire (`activity-text.ts`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-ACTIVITY-007 | Accès | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-ACTIVITY-008 | Historique mêlé des deux backends | important | board-service | phase 3 T2 : intégration, compatibilité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-ARCHIVE-001 | Archiver une carte | critique | board-service | unitaire, API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | ↳ |  |  |  | e2e menu « ⋯ » → « Archiver la carte » | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-ARCHIVE-002 | Archivage idempotent | important | board-service | API | Backend (BackTesteur) | à définir par le Testeur | à écrire |
@@ -249,6 +306,13 @@ Mise à jour par Paul à chaque validation (voir `docs/team/workflow.md`, étape
 | ↳ |  |  |  | CI (tâche planifiée déclarée) | DevOps (Manuel) | à définir par le Testeur | à écrire |
 | SC-TRASH-009 | Droits sur la corbeille d'un tableau | critique | board-service | sécurité | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-TRASH-010 | Affichage des jours restants | secondaire | board-service | unitaire (`daysLeft`) | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-011 | Purge : lignes supprimées, fichiers libérés par l'outbox | critique | board-service | phase 3 T5 : intégration (panne simulée, WireMock) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | PHPUnit `POST /internal/storage/release` | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-012 | Une seule purge planifiée active | critique | board-service | phase 3 T5 : intégration (verrou de planification, horloge injectée) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| ↳ |  |  |  | CI et recette (variable de désactivation vérifiée au démarrage) | DevOps (Manuel) | à définir par le Testeur | à écrire |
+| SC-TRASH-013 | Restauration pendant la purge | important | board-service | phase 3 T5 : intégration (concurrence) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-014 | Purge d'un grand tableau sans bloquer les autres | important | board-service | phase 3 T5 : intégration (volume) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
+| SC-TRASH-015 | Purge en cascade d'éléments plus récents | secondaire | board-service | phase 3 T5 : intégration (selon E30) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | SC-ATTACH-001 | Joindre un fichier à une carte | critique | attachment-service | API, intégration (LocalStack) | Backend (BackTesteur) | à définir par le Testeur | à écrire |
 | ↳ |  |  |  | e2e bouton « Pièce jointe » avec barre de progression | Frontend (FrontTesteur) | à définir par le Testeur | à écrire |
 | SC-ATTACH-002 | Limite de 100 Mo | critique | attachment-service | API, intégration | Backend (BackTesteur) | à définir par le Testeur | à écrire |

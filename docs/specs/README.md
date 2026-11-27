@@ -20,6 +20,7 @@ Objectif : permettre la migration vers les microservices Spring Boot (`docs/arch
 | [pages.md](pages.md) | Pages et vues du frontend | — | FrontPierre |
 | [traceability.md](traceability.md) | Matrice scénario → test → statut | — | tous |
 | [phase-1-identity.md](phase-1-identity.md) | Plan d'exécution de la migration d'identity-service | — | BackAli, FrontPierre, Manuel |
+| [phase-3-board-service.md](phase-3-board-service.md) | Migration de board-service : périmètre, tranches T0–T5, données, autorisation, scénarios de cohabitation, questions ouvertes | `SC-BOARD-020+`, `SC-LIST-011+`, `SC-CARD-032+`, `SC-COMMENT-013+`, `SC-ACTIVITY-008`, `SC-TRASH-011+` | board-service |
 
 ## Conventions communes
 
