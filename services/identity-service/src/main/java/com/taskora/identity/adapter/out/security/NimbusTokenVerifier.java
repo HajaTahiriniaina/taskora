@@ -13,6 +13,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
@@ -21,6 +22,16 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * signature fausse, nbf futur → INVALID ; username absent → MISSING_USERNAME. Tolérance 0 s.
  */
 public class NimbusTokenVerifier implements TokenVerifierPort {
+  /**
+   * Grammaire de {@code is_numeric} en PHP 8 : espaces ASCII de tête et de fin, signe facultatif,
+   * décimal (partie entière ou fractionnaire), exposant facultatif ; rien d'autre.
+   */
+  private static final Pattern PHP_NUMERIC =
+      Pattern.compile(
+          "^[ \\t\\n\\r\\x0B\\f]*"
+              + "[+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?"
+              + "[ \\t\\n\\r\\x0B\\f]*$");
+
   private final RSASSAVerifier verifier;
   private final Clock clock;
 
@@ -84,20 +95,29 @@ public class NimbusTokenVerifier implements TokenVerifierPort {
     }
   }
 
-  /** Date numérique (nombre ou chaîne numérique, comme lcobucci) ; absente → null. */
+  /**
+   * Date numérique comme {@code lcobucci/jwt} ({@code Parser::convertDate}) : nombre JSON, ou
+   * chaîne conforme à {@code is_numeric} de PHP 8 ({@link #PHP_NUMERIC}) ; {@code NaN}, {@code
+   * Infinity}, hexadécimal, suffixe ({@code d}, {@code f}) et valeur non finie refusés ; absente →
+   * null (A1 point 3, §8.1, E14).
+   */
   private static @Nullable Double numericDate(Map<String, Object> claims, String name) {
     Object value = claims.get(name);
     if (value == null) {
       return null;
     }
+    double date;
     if (value instanceof Number number) {
-      return number.doubleValue();
-    }
-    try {
-      return Double.valueOf(value.toString().trim());
-    } catch (NumberFormatException e) {
+      date = number.doubleValue();
+    } else if (value instanceof String text && PHP_NUMERIC.matcher(text).matches()) {
+      date = Double.parseDouble(text.strip());
+    } else {
       throw rejected(TokenRejection.INVALID);
     }
+    if (!Double.isFinite(date)) {
+      throw rejected(TokenRejection.INVALID);
+    }
+    return date;
   }
 
   private static TokenRejectedException rejected(TokenRejection reason) {
