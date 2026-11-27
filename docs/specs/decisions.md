@@ -19,6 +19,31 @@ Les recommandations de Paul sont validées par l'utilisateur.
 |---|---|
 | U5 | Les critères de latence L1 à L4 (PERF-IDENT-1) ne bloquent plus la bascule : « Tant que ça fonctionne, on règlera les mesures plus tard. » Ils deviennent un suivi après la bascule. L5 (aucune 5xx) reste exigé. Risque accepté : p95 de bout en bout non prouvé ; parades : `BcryptLatencyIT` en CI, retour arrière en ~1 s. Détail : [sortie de phase 1](../reviews/2026-11-27-identity-phase1-exit-paul.md). |
 
+## 2026-11-27 : phase 3 (board-service)
+Toutes les recommandations de Paul (`phase-3-board-service.md` §6) sont validées par l'utilisateur : « Comme Paul recommande ».
+
+| Réf. | Décision |
+|---|---|
+| U6 | **A** : tables partagées en place dans `taskora` pendant la cohabitation ; tables techniques de board-service dans un schéma `board`. Le déplacement des tables se fait à la fin de la cohabitation. |
+| U7 | **a** : outbox + endpoints internes transitoires de Symfony pour notifications, push et fichiers. Pas de RabbitMQ en phase 3. |
+| U8 | **a** : `BoardAccess` de Symfony passe en 404 (messages du §5.3) à la bascule de T1. |
+| U9 | **a** : bascule de chaque tranche sans gel des écritures (commutation nginx), hors heures de pointe, annoncée. |
+| E22 | **Corrigé** : type JSON inattendu → 400 (`Le champ "<nom>" doit être une chaîne de caractères.`, `Le champ "ids" doit être un tableau.`, `Couleur invalide.`). |
+| E23 | **Corrigé** : booléen JSON exigé → sinon 400 `Le champ "<nom>" doit être un booléen.` |
+| E8 | **Corrigé** (étendu aux champs de type date) : 400 `Date invalide.` sans modification. |
+| E24 | **Conservé** en phase 3 (rôle d'invitation non mémorisé) ; à reprendre plus tard. |
+| E25 | **Corrigé** : position = max + 1, tri par `position, id`. |
+| E26 | **Corrigé** : aucune entrée d'historique si la valeur normalisée est identique. |
+| E27 | **Corrigé** : liste inexistante, d'un autre tableau ou inaccessible → 404 `Ressource introuvable.` ; liste archivée du même tableau → 400 inchangé. |
+| E28 | **Corrigé** : réponses identiques (assignation → 400 `Cet utilisateur n'est pas membre du tableau.` ; membres → 404 `Membre introuvable.` ; invitation → 404 `Ressource introuvable.`). |
+| E29 | **Conservé** en phase 3, avec tri `position, id`. |
+| E30 | **Conservé** et documenté. |
+| E31 | **Corrigé** dans board-service : `card.due_date` lu et écrit en UTC (à confirmer d'abord par un test miroir). |
+| E32 | **Corrigé** : notification `card_due` seulement si la date change. |
+| E2 | **Corrigé** dans board-service : 403. |
+| E12 | **Corrigé** : 404 `{"error":"Ressource introuvable."}` pour toute route du périmètre. |
+| E13 | **Conservé** en phase 3. |
+
 ## 2026-11-26 : écarts corrigés dans identity-service (au lieu d'être reproduits)
 Décision de l'utilisateur : **corriger** ces écarts dans identity-service. Le backend Symfony n'est pas modifié. Les tests `compat` excluent ces cas, qui sont des divergences voulues.
 
