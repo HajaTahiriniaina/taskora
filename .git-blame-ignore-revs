@@ -5,3 +5,5 @@
 489578a6d3d9b5c984cbca614da0aa29de09f8b3
 # style(front): eslint --fix (perfectionist : imports, unions)
 a74eb3467a8484920809c92acf2a01484dbe9f59
+# style(front): lot B1 du lint (sort-interfaces, sort-object-types)
+3e4a1c3c32f3efe5bb237e3cf40ce5be7f3ef7f8
