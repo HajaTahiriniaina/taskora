@@ -68,9 +68,11 @@ test.describe('Inscription — /register', () => {
       await page.getByRole('button', { name: 'Créer mon compte' }).click();
 
       expect((await responsePromise).status()).toBe(409);
-      await expect(
-        page.getByText('Un compte existe déjà avec cette adresse e-mail.', { exact: true }),
-      ).toBeVisible();
+      // Message annoncé (role="alert", identity.md §6, recette m6), texte exact.
+      const duplicate = 'Un compte existe déjà avec cette adresse e-mail.';
+      const duplicateAlert = page.getByRole('alert').filter({ hasText: duplicate });
+      await expect(duplicateAlert).toBeVisible();
+      await expect(duplicateAlert).toHaveText(duplicate);
       await expect(page).toHaveURL(/\/register$/);
       expect(await hasStoredToken(page), 'taskora.token absent').toBe(false);
     },
@@ -88,9 +90,11 @@ test.describe('Inscription — /register', () => {
       await page.getByRole('button', { name: 'Créer mon compte' }).click();
 
       expect((await responsePromise).status()).toBe(400);
-      await expect(
-        page.getByText('Le champ "name" est obligatoire.', { exact: true }),
-      ).toBeVisible();
+      // Message annoncé (role="alert", identity.md §6, recette m6), texte exact.
+      const required = 'Le champ "name" est obligatoire.';
+      const requiredAlert = page.getByRole('alert').filter({ hasText: required });
+      await expect(requiredAlert).toBeVisible();
+      await expect(requiredAlert).toHaveText(required);
       await expect(page).toHaveURL(/\/register$/);
       expect(await hasStoredToken(page), 'taskora.token absent').toBe(false);
     },

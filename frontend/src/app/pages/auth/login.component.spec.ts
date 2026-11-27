@@ -49,6 +49,10 @@ async function setupAndSubmit() {
 
 const errorText = (root: HTMLElement) => root.querySelector('.error')?.textContent?.trim() ?? null;
 
+// Message d'erreur annoncé : lu dans l'élément de rôle alert (identity.md §6, recette m6).
+const alertText = (root: HTMLElement) =>
+  root.querySelector('[role="alert"]')?.textContent?.trim() ?? null;
+
 describe('LoginComponent', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => {
@@ -66,18 +70,18 @@ describe('LoginComponent', () => {
       { status: 401, statusText: 'Unauthorized' },
     );
     await fixture.whenStable();
-    expect(errorText(root)).toBe('E-mail ou mot de passe incorrect.');
+    expect(alertText(root)).toBe('E-mail ou mot de passe incorrect.');
 
     (await submit()).flush(
       { error: 'Erreur interne du serveur.' },
       { status: 500, statusText: 'Internal Server Error' },
     );
     await fixture.whenStable();
-    expect(errorText(root)).toBe('Impossible de se connecter pour le moment.');
+    expect(alertText(root)).toBe('Impossible de se connecter pour le moment.');
 
     (await submit()).error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
     await fixture.whenStable();
-    expect(errorText(root)).toBe('Impossible de se connecter pour le moment.');
+    expect(alertText(root)).toBe('Impossible de se connecter pour le moment.');
 
     expect(navigate).not.toHaveBeenCalled();
     expect(localStorage.getItem('taskora.token')).toBeNull();

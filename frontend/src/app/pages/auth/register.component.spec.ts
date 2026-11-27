@@ -52,6 +52,10 @@ async function fillForm(
 const submitButton = (root: HTMLElement) => buttonByText(root, 'Créer mon compte');
 const errorText = (root: HTMLElement) => root.querySelector('.error')?.textContent?.trim() ?? null;
 
+// Message d'erreur annoncé : lu dans l'élément de rôle alert (identity.md §6, recette m6).
+const alertText = (root: HTMLElement) =>
+  root.querySelector('[role="alert"]')?.textContent?.trim() ?? null;
+
 const VALID = { email: 'camille@example.com', name: 'Camille', password: 'motdepas' };
 
 describe('RegisterComponent', () => {
@@ -121,7 +125,7 @@ describe('RegisterComponent', () => {
         { status: 409, statusText: 'Conflict' },
       );
     await ctx.fixture.whenStable();
-    expect(errorText(ctx.root)).toBe('Un compte existe déjà avec cette adresse e-mail.');
+    expect(alertText(ctx.root)).toBe('Un compte existe déjà avec cette adresse e-mail.');
     expect(ctx.navigate).not.toHaveBeenCalled();
     expect(submitButton(ctx.root).disabled, 'bouton réactivé après l’erreur').toBe(false);
 
@@ -131,7 +135,7 @@ describe('RegisterComponent', () => {
       .expectOne('/api/auth/register')
       .flush(null, { status: 500, statusText: 'Internal Server Error' });
     await ctx.fixture.whenStable();
-    expect(errorText(ctx.root)).toBe('Inscription impossible pour le moment.');
+    expect(alertText(ctx.root)).toBe('Inscription impossible pour le moment.');
     expect(ctx.navigate).not.toHaveBeenCalled();
   });
 });
