@@ -101,7 +101,7 @@ CREATE TABLE scheduler_lock (
 Pas de clé étrangère entre `board` et `taskora`. Aucune table de domaine dans `board` pendant la phase 3 (U6-A).
 
 ### 2.1 Ajout additif côté Symfony (R1, décidé par BackAli)
-Une seule migration Doctrine **écrite à la main** (pas de `doctrine:migrations:diff`, R10) : `Version2026112800xxxx` crée `internal_event_receipt (event_id CHAR(36) NOT NULL PRIMARY KEY, type VARCHAR(64) NOT NULL, received_at DATETIME NOT NULL)` pour l'idempotence de `POST /internal/notifications` (et plus tard `/internal/storage/release`). Entité Doctrine correspondante pour que `doctrine:schema:validate` reste vert. Méthode `down()` fournie. Aucune autre modification du schéma `taskora` en phase 3.
+Une seule migration Doctrine **écrite à la main** (pas de `doctrine:migrations:diff`, R10) : `Version2026112800xxxx` crée `internal_event_receipt (event_id CHAR(36) NOT NULL PRIMARY KEY, type VARCHAR(64) NOT NULL, received_at DATETIME NOT NULL)` pour l'idempotence de `POST /internal/notifications` (et plus tard `/internal/storage/release`). Entité Doctrine correspondante pour que `doctrine:schema:validate` reste vert. Méthode `down()` fournie. `up()` et `down()` n'utilisent que `addSql()` (jamais `$this->connection->executeStatement()` : `--dry-run` exécuterait réellement le DDL et `--write-sql` ne l'écrirait pas ; décision E15 du 27/11/2026). Aucune autre modification du schéma `taskora` en phase 3.
 
 ## 3. Comptes MariaDB (init SQL idempotent, Manuel, exécuté en root)
 Extension de `docker/mariadb/initdb.d/10-taskora-init.sh` (même mécanique que pour `identity` : `REVOKE ALL` puis `GRANT` exacts, droits sur `taskora` accordés par `db-init` une fois les migrations Symfony passées).

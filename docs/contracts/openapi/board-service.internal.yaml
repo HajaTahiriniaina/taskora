@@ -114,8 +114,7 @@ components:
       enum: [board_invite, member_joined, member_removed, card_assigned, card_moved, card_due, card_comment]
       description: T1 produit les trois premiers ; T2 `card_assigned`, `card_moved`, `card_due` ; T4 `card_comment`
     NotificationRequested:
-      $schema: https://json-schema.org/draft/2020-12/schema
-      $id: https://taskora.local/schemas/board/NotificationRequested/v1.json
+      x-schema-id: taskora.board.NotificationRequested/v1
       title: NotificationRequested
       description: |
         Écrit dans l'outbox dans la transaction de la modification (destination `symfony-notifications`) et envoyé tel

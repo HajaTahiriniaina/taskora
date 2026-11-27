@@ -609,18 +609,25 @@ components:
       properties:
         code: { type: integer, const: 401 }
         message: { type: string }
-    UserSummary:
+    UserFields:
+      description: |
+        Champs d'un utilisateur, **sans** `additionalProperties` : base des `allOf` (`Member`). La rigueur (aucun champ
+        en trop) est portée par `unevaluatedProperties: false` sur chaque schéma final (`UserSummary`, `Member`), seul
+        mot-clé JSON Schema 2020-12 qui voit les propriétés évaluées à travers `allOf`/`$ref` (B-ADR-13).
       type: object
-      additionalProperties: false
       required: [id, name, email, avatarColor]
       properties:
         id: { type: integer }
         name: { type: string }
         email: { type: string }
         avatarColor: { type: string }
+    UserSummary:
+      allOf:
+        - $ref: '#/components/schemas/UserFields'
+      unevaluatedProperties: false
     Member:
       allOf:
-        - $ref: '#/components/schemas/UserSummary'
+        - $ref: '#/components/schemas/UserFields'
         - type: object
           required: [role, joinedAt]
           properties:
@@ -630,9 +637,11 @@ components:
     Background:
       type: string
       enum: [aurora, sunset, ocean, forest, midnight, peach, lagoon, berry, graphite, sand]
-    BoardSummary:
+    BoardSummaryFields:
+      description: |
+        Champs d'un tableau sur l'accueil, **sans** `additionalProperties` : base des `allOf` (`BoardSummary`, `Board`).
+        La rigueur est portée par `unevaluatedProperties: false` sur `BoardSummary` et `Board` (B-ADR-13).
       type: object
-      additionalProperties: false
       required: [id, title, description, background, showCardNumbers, favorite, role, members, listCount, cardCount, createdAt]
       properties:
         id: { type: integer }
@@ -646,9 +655,13 @@ components:
         listCount: { type: integer, minimum: 0 }
         cardCount: { type: integer, minimum: 0 }
         createdAt: { type: string, format: date-time }
+    BoardSummary:
+      allOf:
+        - $ref: '#/components/schemas/BoardSummaryFields'
+      unevaluatedProperties: false
     Board:
       allOf:
-        - $ref: '#/components/schemas/BoardSummary'
+        - $ref: '#/components/schemas/BoardSummaryFields'
         - type: object
           required: [trelloFiles, lists, labels, customFields, invitations]
           properties:

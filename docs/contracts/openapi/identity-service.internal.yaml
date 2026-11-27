@@ -128,8 +128,7 @@ components:
         occurredAt: { type: string, format: date-time, description: 'UTC, ISO 8601 avec fuseau (ex. 2026-11-26T10:00:00+00:00)' }
         userId: { type: integer, format: int32, minimum: 1 }
     UserRegistered:
-      $schema: https://json-schema.org/draft/2020-12/schema
-      $id: https://taskora.local/schemas/identity/UserRegistered/v1.json
+      x-schema-id: taskora.identity.UserRegistered/v1
       title: UserRegistered
       description: Publié (outbox) dans la même transaction que la création du compte.
       allOf:
@@ -152,8 +151,7 @@ components:
           name: Camille Martin
           avatarColor: '#14b8a6'
     UserProfileUpdated:
-      $schema: https://json-schema.org/draft/2020-12/schema
-      $id: https://taskora.local/schemas/identity/UserProfileUpdated/v1.json
+      x-schema-id: taskora.identity.UserProfileUpdated/v1
       title: UserProfileUpdated
       description: |
         Publié (outbox) quand `name` ou `avatarColor` change réellement. Un changement de mot de passe
