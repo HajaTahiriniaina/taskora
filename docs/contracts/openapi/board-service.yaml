@@ -173,7 +173,9 @@ paths:
           (positions 0–3) et 6 étiquettes `Urgent #ef4444`, `Bug #f97316`, `Feature #6366f1`, `Design #ec4899`,
           `Backend #14b8a6`, `Idée #eab308`.
         L'appelant devient membre `owner`. Réponse : tableau complet (`invitations: []`, `trelloFiles: 0`,
-        compteurs à 0). Événement `BoardCreated` (outbox, `HELD`). Une seule transaction.
+        `cardCount: 0`, chaque liste avec `cardCount: 0`, **`listCount` = nombre de listes créées** : 4 avec le
+        contenu par défaut, 0 avec `withDefaults: false` ; comportement actuel de `Presenter::board`, corrigé le
+        27/11/2026 après l'étape 1). Événement `BoardCreated` (outbox, `HELD`). Une seule transaction.
       x-scenarios: [SC-BOARD-001, SC-BOARD-023, SC-BOARD-024, SC-BOARD-028, SC-CARD-043, U13]
       requestBody:
         required: false

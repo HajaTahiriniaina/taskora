@@ -182,9 +182,9 @@ Contrôlée **dans chaque cas d'utilisation** (jamais seulement par le routage),
 | Situation | Statut et corps |
 |---|---|
 | Tableau inexistant, **ou** l'appelant n'en est pas membre (tableau ouvert ou dans la corbeille) | 404 `{"error":"Tableau introuvable."}` (routes `/api/boards/{id}/**`) |
-| Membre, tableau dans la corbeille | 404 `{"error":"Ce tableau est dans la corbeille."}` |
+| Membre, tableau dans la corbeille | 404 `{"error":"Ce tableau est dans la corbeille."}` sur **toutes** les routes `/api/boards/{id}/**`, y compris `archived`, `archived-lists` et `trello-files` qui répondent aujourd'hui `Cet élément est dans la corbeille.` (précision BackAli du 27/11/2026, application de U8-a) |
 | Ressource enfant (`/api/lists/{id}`, `/api/cards/{id}`, `/api/labels/{id}`, `/api/custom-fields/{id}`, `/api/checklist/{id}`, `/api/comments/{id}`) inexistante, **ou** appartenant à un tableau dont l'appelant n'est pas membre | 404 `{"error":"Ressource introuvable."}` |
-| Membre, ressource enfant dans la corbeille (directement ou par sa liste / son tableau) | 404 `{"error":"Cet élément est dans la corbeille."}` (ou `Ce tableau est dans la corbeille.` si c'est le tableau, comme aujourd'hui) |
+| Membre, ressource enfant dans la corbeille (directement ou par sa liste / son tableau) | 404 `{"error":"Cet élément est dans la corbeille."}` (si c'est le tableau lui-même qui est visé par une route `/api/boards/{id}/**` : ligne « Membre, tableau dans la corbeille » ci-dessus) |
 | Routes `/api/trash/cards|lists/{id}/**` : élément absent de la corbeille **ou** non-membre | 404 `{"error":"Cet élément n’est pas dans la corbeille."}` |
 | Routes `/api/trash/boards/{id}/**` : tableau absent de la corbeille **ou** non-membre | 404 `{"error":"Ce tableau n’est pas dans la corbeille."}` ; membre non propriétaire → 403 (message actuel) |
 | Membre sans droit de gestion sur une action de gestionnaire | 403 `{"error":"Action réservée aux administrateurs du tableau."}` (inchangé) |
