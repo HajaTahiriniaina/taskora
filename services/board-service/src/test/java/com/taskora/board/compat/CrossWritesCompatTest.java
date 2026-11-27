@@ -8,6 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.taskora.board.compat.CompatStack.Account;
 import io.restassured.response.Response;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -22,6 +24,9 @@ import tools.jackson.databind.JsonNode;
  */
 @Tag("compat")
 class CrossWritesCompatTest {
+  private static final String ITEM_IN_TRASH = "Cet élément est dans la corbeille.";
+  private static final String BOARD_IN_TRASH = "Ce tableau est dans la corbeille.";
+
   static Account alice;
   static Account bob;
 
@@ -64,7 +69,7 @@ class CrossWritesCompatTest {
 
   @Test
   @DisplayName(
-      "SC-BOARD-034 — corbeille via board-service : routes Symfony des listes et cartes → 404 Ce tableau est dans la corbeille. ; restauration → tout réapparaît")
+      "SC-BOARD-034 — corbeille via board-service : routes Symfony des listes, cartes, archives et étiquettes → 404 avec les messages du §5.3 ; restauration → tout réapparaît")
   void transitiveTrash() {
     Response created =
         send(BOARD, alice, "POST", "/api/boards", "{\"title\":\"Corbeille croisée\"}");
@@ -80,19 +85,28 @@ class CrossWritesCompatTest {
         json(send(SYMFONY, bob, "POST", "/api/lists/" + list + "/cards", "{\"title\":\"x\"}"))
             .get("id")
             .asInt();
+    int label =
+        json(send(BOARD, alice, "GET", "/api/boards/" + board, null))
+            .get("labels")
+            .get(0)
+            .get("id")
+            .asInt();
     assertThat(send(BOARD, alice, "DELETE", "/api/boards/" + board, null).statusCode())
         .isEqualTo(204);
-    for (String path :
-        new String[] {
-          "/api/lists/" + list + "/cards",
-          "/api/cards/" + card,
-          "/api/boards/" + board + "/archived"
-        }) {
-      Response r = send(SYMFONY, bob, "GET", path, null);
-      assertThat(r.statusCode()).as(path).isEqualTo(404);
-      assertThat(json(r).get("error").asString())
-          .as(path)
-          .isEqualTo("Ce tableau est dans la corbeille.");
+    // §5.3 : ressources enfants (listes, cartes) → « Cet élément… » ; routes du tableau → « Ce
+    // tableau… ».
+    Map<String, String> expected = new LinkedHashMap<>();
+    expected.put("GET /api/lists/" + list + "/cards", ITEM_IN_TRASH);
+    expected.put("GET /api/cards/" + card, ITEM_IN_TRASH);
+    expected.put("GET /api/boards/" + board + "/archived", BOARD_IN_TRASH);
+    // B2 : étiquette du tableau.
+    expected.put("PATCH /api/labels/" + label, BOARD_IN_TRASH);
+    for (Map.Entry<String, String> e : expected.entrySet()) {
+      String[] route = e.getKey().split(" ", 2);
+      String body = "PATCH".equals(route[0]) ? "{\"name\":\"x\",\"color\":\"#000000\"}" : null;
+      Response r = send(SYMFONY, bob, route[0], route[1], body);
+      assertThat(r.statusCode()).as(e.getKey()).isEqualTo(404);
+      assertThat(json(r).get("error").asString()).as(e.getKey()).isEqualTo(e.getValue());
     }
     assertThat(
             send(BOARD, alice, "POST", "/api/trash/boards/" + board + "/restore", null)
