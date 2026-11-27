@@ -117,9 +117,37 @@ public final class TokenFactory {
     return rs256(lexikHeader(), c, keys.privateKey());
   }
 
+  /** exp en chaîne numérique valide (is_numeric PHP) : accepté comme une date (lcobucci). */
   public String expAsString(String username) {
+    return withExp(username, String.valueOf(clock.epochSecond() + TTL));
+  }
+
+  /** exp en chaîne non numérique : « Invalid JWT Token ». */
+  public String expAsNonNumericString(String username) {
+    return withExp(username, "demain");
+  }
+
+  /** exp « NaN » : refusé par is_numeric, donc « Invalid JWT Token ». */
+  public String expAsNaN(String username) {
+    return withExp(username, "NaN");
+  }
+
+  /** exp {@code "<n>d"} (suffixe de littéral Java) : refusé par is_numeric. */
+  public String expAsSuffixedNumber(String username) {
+    return withExp(username, (clock.epochSecond() + TTL) + "d");
+  }
+
+  /** exp en chaîne numérique passée : « Expired JWT Token ». */
+  public String expiredAsString(String username) {
     Map<String, Object> c = symfonyClaims(username);
-    c.put("exp", String.valueOf(clock.epochSecond() + TTL));
+    c.put("iat", clock.epochSecond() - TTL - 10);
+    c.put("exp", String.valueOf(clock.epochSecond() - 10));
+    return rs256(lexikHeader(), c, keys.privateKey());
+  }
+
+  private String withExp(String username, Object exp) {
+    Map<String, Object> c = symfonyClaims(username);
+    c.put("exp", exp);
     return rs256(lexikHeader(), c, keys.privateKey());
   }
 
